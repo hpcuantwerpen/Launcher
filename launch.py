@@ -1,6 +1,6 @@
 from __future__ import print_function
 import shutil
-import math,re,os,pickle,random,pprint,errno,sys,cStringIO,datetime,argparse
+import math,re,os,pickle,random,pprint,errno,sys,cStringIO,datetime,argparse,subprocess
 
 import paramiko
 import pbs
@@ -179,7 +179,10 @@ class Launcher(wx.Frame):
     """    
     def __init__(self, parent, title):
         super(Launcher,self).__init__(parent,title=title,size=wx.Size(600,670))
-        self.online = False
+
+        self.config = Config()
+        self.open_log_file()
+        
         self.init_ui()
         self.set_names()
         
@@ -415,7 +418,6 @@ class Launcher(wx.Frame):
     ### the widgets ###
     def init_ui(self):        
         self.CreateStatusBar()
-        self.config = Config()
         self.panel = wx.Panel(self)
         self.main_sizer = wx.BoxSizer(wx.VERTICAL)
         self.panel.SetSizer(self.main_sizer)
@@ -658,7 +660,6 @@ class Launcher(wx.Frame):
         self.set_cluster(self.config.attributes['cluster'])
         value=self.get_remote_file_location()
         self.wRemoteFileLocation.SetValue(value)
-        self.open_log_file()
                 
         n_waiting = len(self.config.attributes['submitted_jobs'])
         if n_waiting>0:
@@ -687,9 +688,16 @@ class Launcher(wx.Frame):
         if os.path.exists(self.log):
             old_log = self.log+str(random.random())[1:]
             shutil.copy(self.log,old_log)
-        print('launch-2.py - begin of log - '+str(datetime.datetime.now()))
-        print("wxPython verson:",wx.version())
 
+        print('launch-2.py - begin of log - '+str(datetime.datetime.now()))
+        print("\nVersion info of used components")
+        print("===============================")
+        print(sys.version)
+        print("wxPython version:",wx.version())
+        print("paramiko version:",paramiko.__version__)
+        print("Launcher version:",subprocess.check_output(["git","describe","HEAD"]))
+        
+        
         if old_log:
             print("\nRenaming previous log file 'Launcher.log' to\n    '{}'.".format(old_log))
 
