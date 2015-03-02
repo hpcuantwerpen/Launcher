@@ -1,0 +1,348 @@
+"""
+================================================
+Python pbs module - manipulating pbs job scripts
+================================================
+"""
+
+from StringIO import StringIO
+import math,re,subprocess,os,pprint
+
+class RequestFailed(Exception):
+    def __init__(self, message):
+        s = "Request cannot be satisfied: "
+        self.value = s+message
+    def __str__(self):
+        return repr(self.value)
+
+class ComputeNodeSet(object):
+    """
+    Objects of this class represent a set of compute nodes with identical properties
+
+    :param int nn: number of compute nodes available in this set.
+    :param int cpn: number of cores per node in this set.
+    :param float gpn: GB of ram per compute node in this set.
+    :param float gbOS: GB of ram reserved for the operating system and thus not available for applicatins in this set.    
+    """
+    def __init__(self,name,nn,cpn,gpn,gbOS):
+        self.name = name
+        self.n_nodes = int(nn)                   #: number of compute nodes available in this set
+        self.n_cores_per_node = int(cpn)         #: number of cores per compute nodes in this set
+        self.gb_per_node = float(gpn)-gbOS       #: GB of main memory per compute node in this set
+        self.gb_per_core = self.gb_per_node/cpn  #: GB of main memory per core in this set
+        
+    def request_nodes_cores(self,n_nodes,n_cores_per_node):
+        if n_nodes>self.n_nodes:
+            msg = 'Requesting more nodes than physically available ({}).'.format(self.n_nodes)
+            raise RequestFailed(msg)
+        if n_cores_per_node>self.n_cores_per_node:
+            msg = 'Requesting more cores per node than physically available ({}).'.format(self.n_cores_per_node)
+            raise RequestFailed(msg)
+        n_cores = n_nodes*n_cores_per_node
+        gb_per_core = self.gb_per_node/n_cores_per_node
+        return n_cores,gb_per_core
+    
+    def request_cores_memory(self,n_cores_requested,gb_per_core_requested=0): 
+        if gb_per_core_requested > self.gb_per_node:
+            msg = 'Requesting more memory per core than physically available ({}).'.format(self.gb_per_node)
+            raise RequestFailed(msg)
+        if gb_per_core_requested <= self.gb_per_core:
+            #use all cores per node since there is sufficient memory
+            n_cores_per_node = self.n_cores_per_node
+            n_nodes = int(math.ceil(n_cores_requested / float(n_cores_per_node)))
+            gb_per_core      = self.gb_per_node/n_cores_per_node
+            if n_nodes==1: # respect the number of cores requested instead of returning a full node
+                n_cores_per_node = n_cores_requested
+                gb_per_core      = self.gb_per_node/n_cores_per_node
+        else:
+            #use only am many cores per nodes such that each core has at least the requested memory
+            n_cores_per_node = int(math.floor(self.gb_per_node / gb_per_core_requested))
+            gb_per_core      = self.gb_per_node/n_cores_per_node
+            n_nodes = int(math.ceil(n_cores_requested / float(n_cores_per_node)))
+        n_cores = n_nodes*n_cores_per_node
+        gb = n_nodes*self.gb_per_node
+        
+        if n_nodes > self.n_nodes:
+            msg = 'Requesting more nodes than physically available ({}).'.format(self.n_nodes)
+            raise RequestFailed(msg)
+        if n_nodes==1: # respect the number of cores requested instead of returning a full node
+            n_cores_per_node = n_cores_requested         
+        return (n_nodes, n_cores, n_cores_per_node, gb_per_core, gb)
+        
+hopper_thin_nodes = ComputeNodeSet('hopper_thin_nodes', 96, 20,  64., 6) #: ComputeNodeSet for Hopper's thin nodes
+hopper_fat_nodes  = ComputeNodeSet('hopper_fat_nodes' , 24, 20, 256., 6) #: ComputeNodeSet for Hopper's fat nodes
+turing_harpertown_GbE = ComputeNodeSet('turing_harpertown_GbE', 64,  8, 16., 4) 
+turing_harpertown_IB  = ComputeNodeSet('turing_harpertown_IB' , 32,  8, 16., 4) 
+turing_westmere_GbE   = ComputeNodeSet('turing_westmere_GbE'  , 64, 12, 24., 4) 
+turing_westmere_IB    = ComputeNodeSet('turing_westmere_IB'   ,  8, 12, 24., 4) 
+
+my_macbook        = ComputeNodeSet('my_macbook' , 1, 8, 7., 0) #: ComputeNodeSet for Hopper's fat nodes
+
+node_sets = {'Hopper' : [hopper_thin_nodes
+                        ,hopper_fat_nodes
+                        ]
+            ,'Turing' : [turing_harpertown_GbE
+                        ,turing_harpertown_IB
+                        ,turing_westmere_GbE
+                        ,turing_westmere_IB
+                        ]
+            }
+logins = {'Hopper' : 'login.hpc.uantwerpen.be'
+         ,'Turing' : 'login.turing.calcua.ua.ac.be'
+         }
+clusters = []
+for k in logins.iterkeys():
+    clusters.append(k)
+#==============================================================================
+walltime_units = {'s':    1
+                 ,'m':   60
+                 ,'h': 3600
+                 ,'d':86400 }
+
+walltime_pattern = re.compile(r'((\d+(\.\d*)?|\.\d+)([eE][+-]?\d+)?)\s*([dhms])')
+
+def walltime_seconds_to_str(walltime_seconds):
+    hh = walltime_seconds/3600
+    vv = walltime_seconds%3600 #remaining seconds after subtracting the full hours hh
+    mm = vv/60
+    ss = vv%60                 #remaining seconds after also subtracting the full minutes mm
+    s = str(hh)
+    if hh>9:
+        s = s.rjust(2,'0')
+    s+=':'+str(mm).rjust(2,'0')+':'+str(ss).rjust(2,'0')
+    return s
+
+def format_walltime(walltime):
+    if not isinstance(walltime,str):
+        walltime = str(walltime)+'s'
+    match = walltime_pattern.match(walltime)
+    if match:
+        number = float( match.groups()[0] )
+        unit   =        match.groups()[4]
+        seconds = int(number*walltime_units[unit])
+        minutes,s = divmod(seconds,60)
+        hours,  m = divmod(minutes,60)
+        walltime = (str(hours).rjust(2,'0'))+':'+(str(m).rjust(2,'0'))+':'+(str(s).rjust(2,'0'))
+        return walltime
+    else:
+        raise RuntimeError('Bad wall time format: "%s"'%walltime)
+
+#==============================================================================
+def set_attributes(obj,**kwargs):
+    """ Turn keyword arguments into attributes """
+    for k, v in kwargs.iteritems():
+        setattr(obj, k, v)
+#==============================================================================
+shebang = "#!/bin/bash\n"
+
+class Script(object):
+    """
+    class for manipulating pbs job scripts.
+    Keyword arguments (kwargs) become object attributes
+    """
+    
+    def __init__(self, lines=[]):
+        """
+        Create a pbs job script.
+        """
+        self.re_nodes    = re.compile(r'nodes=(\d+)')
+        self.re_ppn      = re.compile(r'ppn=(\d+)')
+        self.re_walltime = re.compile(r'walltime=(\d+):(\d\d):(\d\d)')
+        self.re_variable = re.compile(r'\$\{(\w+)\}')
+        if lines:
+            self.parse(lines)
+        else:
+            empty_script_lines = [ shebang
+                                 , "\n" 
+                                 , "\ncd $PBS_O_WORKDIR" 
+                                 ]
+            self.parse(empty_script_lines)
+        
+    def parse(self,lines):
+        '''
+        lines is a list of lines
+        a trailing '\n' is appended to lines without one.  
+        '''
+        self.parsed=[]
+        self.values = {}
+        for line in lines:
+            self.parse1(line)
+        #pprint.pprint(self.parsed)
+
+    def parse1(self,line):
+        if isinstance(line,(str,unicode)):
+            split_line = line.split()
+        else:
+            split_line = self.parsed[line].split()
+            
+        if not split_line:
+            parsed_line = line
+        else:
+            # not an empty line
+            if split_line[0]=="#PBS":
+                #this is a pbs option
+                try:
+                    key   = split_line[1]
+                    value = split_line[2:]
+                    if key=='-l':
+                        for iv,v in enumerate(value):
+                            value[iv] = self.re_nodes   .sub(self.repl_nodes   ,value[iv])
+                            value[iv] = self.re_ppn     .sub(self.repl_ppn     ,value[iv])
+                            value[iv] = self.re_walltime.sub(self.repl_walltime,value[iv])
+                    elif key=='-M' and value:
+                        var = 'notify_address'
+                        self.values[var] = value[0]
+                        value[0] = '${%s}'%var
+                    elif key=='-m' and value:
+                        var = 'notify_abe'
+                        self.values[var] = value[0]
+                        value[0] = '${%s}'%var
+                    elif key=='-N':
+                        var = 'job_name'
+                        self.values[var] = value[0]
+                        value[0] = '${%s}'%var
+                    parsed_line = split_line[0]+' '+split_line[1]
+                    for v in value:
+                        parsed_line += ' '+v
+                    parsed_line += '\n'
+                except:
+                    parsed_line = '???'+line
+            else:
+                if line.startswith("#L#"):
+                    parsed_line = ''
+                else:
+                    parsed_line = line
+        if isinstance(line,(str,unicode)):
+            self.parsed.append(parsed_line)
+        else:
+            self.parsed[line] = parsed_line
+        #pprint.pprint(self.parsed)
+    
+    def repl_nodes(self,matchobj):
+        value = int(matchobj.group(1))
+        key = 'n_nodes'
+        self.values[key] =  value
+        return 'nodes=${%s}'%key 
+
+    def repl_ppn(self,matchobj):
+        value = int(matchobj.group(1))
+        key = 'n_cores_per_node'
+        self.values[key] =  value
+        return 'ppn=${%s}'%key 
+
+    def repl_walltime(self,matchobj):
+        value = int(matchobj.group(1))*3600 + int(matchobj.group(2))*60 + int(matchobj.group(3))
+        key = 'walltime_seconds'
+        self.values[key] = value
+        return 'walltime=${%s}'%key 
+
+    def add_pbs_option(self,option,value):
+        s = '#PBS '+option+' '+value
+        if not s.endswith('\n'):
+            s+='\n'
+        pos = 1 if self.parsed[0].startswith('#!') else 0
+        self.parsed.insert(pos,s)
+        self.parse1(pos)
+        
+#     def _process_mpirun_cmd(self,cmd):
+#         """
+#         All commands containing mpirun which do not already specify the number
+#         of processes to run, are given command line arguments:
+#           
+#            - -np <number_of_processes>
+#            - -cpus-per-proc <cores_per_mpi_process> TODO
+#            
+#         (This is automatically called by the constructor.)
+#         """
+#         if 'mpirun' in cmd:
+#             if not '-c'   in cmd and not '-np'  in cmd and not '--np' in cmd: 
+#                 cmd = cmd.replace('mpirun','mpirun -np '+str(getattr(self,'n_cores')))
+#         return cmd 
+    
+    def compose(self):
+        if not self.values:
+            return self.parsed
+        script = []
+        for line in self.parsed:
+            s = self.re_variable.sub(self.repl_variable,line)
+            script.append(s)
+        return script
+        
+    def repl_variable(self,matchobj):
+        key = matchobj.group(1)
+        try:
+            val = self.values[key]
+            if key=='walltime_seconds':
+                v = walltime_seconds_to_str(val)
+            else:
+                v = str(val)
+        except KeyError:
+            v = '${%s!not_found!}'%key
+        return v
+
+    def __str__(self, *args, **kwargs):
+        """
+        Construct the job script
+        :return: string containing the jobscript 
+        """
+        n_cores_total = self.n_nodes*self.n_cores_per_node
+        gb_total      = n_cores_total*self.gb_per_core
+
+        stream = StringIO()
+
+        if hasattr(self,'job_name'):
+            stream.write("for job '{}'".format(getattr(self,'job_name')))
+        if hasattr(self,'N'):
+            stream.write('\n#PBS -N '+getattr(self,'N'))
+            
+#         stream.write('\n#PBS -q batch')
+
+        stream.write('\n#PBS -l walltime=%s'%format_walltime(getattr(self,'walltime','1 m')))
+         
+        stream.write('\n#PBS -l nodes={}:ppn={}\n'.format(self.n_nodes,self.n_cores_per_node) )
+    
+        if hasattr(self, 'M'):
+            stream.write('\n#PBS -M {}'.format(self.M) )
+        if hasattr(self, 'm') and self.m:
+            stream.write('\n#PBS -m {}    '.format(self.m) )
+            
+        return stream.getvalue()
+
+        
+    
+    def qsub(self):
+        """
+        Construct a job script and submit it.
+         
+        Extract the job id and the hpc system.
+        
+        Run the epilogue. TODO
+        """
+            
+        job_name = getattr(self,'job_name','job.pbs')
+        f = open(job_name,'w+')
+        f.write(str(self))
+        f.close()
+        qsub_args = ['qsub',job_name]
+        if self.verbosity>1:
+            print os.getcwd(),'>',qsub_args
+        if self.verbosity>2:
+            print 'PATH=',os.environ['PATH']
+            print 'PYTHONPATH=',os.environ['PYTHONPATH']
+            
+        p = subprocess.Popen(qsub_args,stdout=subprocess.PIPE,stderr=subprocess.PIPE)
+        stdout,stderr = p.communicate()
+        if self.verbosity>1:
+            if stderr:
+                print stderr
+            print '<<\n',stdout,'\n>>'
+            
+        self.jobid_system = stdout.strip() 
+        jobid_pattern=re.compile(r'(\d*)([\w.]*)')
+        match = jobid_pattern.match(self.jobid_system)
+        if match:
+            self.jobid = match.groups()[0]
+            
+if __name__=='__main__':
+    print 'small test'
+    raise NotImplemented("pbs.py __main__")
+    
