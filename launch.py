@@ -6,6 +6,11 @@ import paramiko
 import pbs
 
 import wx
+USE_WX_SPINCTRLDOUBLE = False
+if not USE_WX_SPINCTRLDOUBLE:
+    import xx
+    import wx.lib.newevent
+
 from BashEditor import PbsEditor
 
 """
@@ -192,7 +197,10 @@ class Launcher(wx.Frame):
         self.bind('wNNodesRequested'        , 'EVT_SPINCTRL')
         self.bind('wNCoresPerNodeRequested' , 'EVT_SPINCTRL')
         self.bind('wNCoresRequested'        , 'EVT_SPINCTRL')
-        self.bind('wGbPerCoreRequested'     , 'EVT_SPINCTRLDOUBLE')
+        if USE_WX_SPINCTRLDOUBLE:
+            self.bind('wGbPerCoreRequested' , 'EVT_SPINCTRLDOUBLE')            
+        else:
+            self.Bind(xx.EVT_SPINCTRLDOUBLE,self.wGbPerCoreRequested_EVT_SPINCTRLDOUBLE)
         self.bind('wNodeSet'                , 'EVT_COMBOBOX')
         self.bind('wSelectModule'           , 'EVT_COMBOBOX')
         self.bind('wScript'                 , 'EVT_SET_FOCUS')
@@ -251,9 +259,14 @@ class Launcher(wx.Frame):
         if isinstance(event,(str,unicode)):
             print(event)
         else:
-            print("\nEvent.type ",type(event))
-            print(  "     .object.name :",event.GetEventObject().GetName())
-            print(  "     .object.class:",event.GetEventObject().GetClassName())
+            t = str(type(event))
+            print("\nEvent.type ",t)
+            if "wx.lib.newevent._Event" in t:
+                print("custom event")
+                print(event.__dict__)
+            else:
+                print(  "     .object.name :",event.GetEventObject().GetName())
+                print(  "     .object.class:",event.GetEventObject().GetClassName())
         self.SetStatusText("")
     
     ### event handlerss ###
@@ -469,7 +482,7 @@ class Launcher(wx.Frame):
         lst3.append( wx.StaticText    (self.wNotebookPageResources,label='Number of cores:') )
         lst3.append( wx.SpinCtrl      (self.wNotebookPageResources ) )
         lst3.append( wx.StaticText    (self.wNotebookPageResources,label='Memory per core [GB]:') )
-        lst3.append( wx.SpinCtrlDouble(self.wNotebookPageResources ) )
+        lst3.append( xx.SpinCtrlDouble(self.wNotebookPageResources ) )
         lst3.append( wx.StaticText    (self.wNotebookPageResources,label='Memory total [GB]:') )
         lst3.append( wx.TextCtrl      (self.wNotebookPageResources,style=wx.TE_READONLY|wx.TE_RIGHT) )
         self.wNCoresRequested    = lst3[1]
@@ -692,12 +705,12 @@ class Launcher(wx.Frame):
         print('launch-2.py - begin of log - '+str(datetime.datetime.now()))
         print("\nVersion info of used components")
         print("===============================")
+        print("Python version:")
         print(sys.version)
         print("wxPython version:",wx.version())
         print("paramiko version:",paramiko.__version__)
         print("Launcher version:",subprocess.check_output(["git","describe","HEAD"]))
-        
-        
+        print("Platform:",sys.platform)
         if old_log:
             print("\nRenaming previous log file 'Launcher.log' to\n    '{}'.".format(old_log))
 
@@ -843,28 +856,34 @@ class Launcher(wx.Frame):
     def request_nodes_cores(self):
         node_set = self.get_node_set()
         n_cores,gb_per_core = node_set.request_nodes_cores(self.wNNodesRequested.Value,self.wNCoresPerNodeRequested.Value)
-        self.wNCoresRequested   .Value = n_cores
-        self.wGbPerCoreRequested.Value = gb_per_core
-        self.wGbTotalGranted    .Value = str(gb_per_core*n_cores)
+        self.wNCoresRequested   .SetValue(n_cores)
+        self.wGbPerCoreRequested.SetValue(gb_per_core)
+        self.wGbTotalGranted    .SetValue(str(gb_per_core*n_cores))
 
         self.wNNodesRequested       .SetForegroundColour(wx.BLUE)
         self.wNCoresPerNodeRequested.SetForegroundColour(wx.BLUE)        
         self.wNCoresRequested       .SetForegroundColour(wx.BLACK)
-        self.wGbPerCoreRequested    .SetForegroundColour(wx.BLACK)
-            
+        if USE_WX_SPINCTRLDOUBLE:
+            self.wGbPerCoreRequested.SetForegroundColour(wx.BLACK)
+        else:
+            self.wGbPerCoreRequested.spinner.SetForegroundColour(wx.BLACK)
+
     def request_cores_memory(self):
         node_set = self.get_node_set()
-        n_nodes, n_cores, n_cores_per_node, gb_per_core, gb = node_set.request_cores_memory(self.wNCoresRequested.Value,self.wGbPerCoreRequested.Value)
+        n_nodes, n_cores, n_cores_per_node, gb_per_core, gb = node_set.request_cores_memory(self.wNCoresRequested.Value,self.wGbPerCoreRequested.GetValue())
         self.wNNodesRequested       .Value = n_nodes
         self.wNCoresRequested       .Value = n_cores
         self.wNCoresPerNodeRequested.Value = n_cores_per_node
-        self.wGbPerCoreRequested    .Value = gb_per_core
+        self.wGbPerCoreRequested    .SetValue(gb_per_core)
         self.wGbTotalGranted        .Value = str(gb)
 
         self.wNNodesRequested       .SetForegroundColour(wx.BLACK)
         self.wNCoresPerNodeRequested.SetForegroundColour(wx.BLACK)        
         self.wNCoresRequested       .SetForegroundColour(wx.BLUE)
-        self.wGbPerCoreRequested    .SetForegroundColour(wx.BLUE)
+        if USE_WX_SPINCTRLDOUBLE:
+            self.wGbPerCoreRequested.SetForegroundColour(wx.BLUE)
+        else:
+            self.wGbPerCoreRequested.spinner.SetForegroundColour(wx.BLUE)
         
     def get_remote_file_location(self):
         ssh = self.open_ssh_connection()
