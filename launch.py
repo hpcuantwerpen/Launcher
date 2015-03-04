@@ -1,17 +1,14 @@
 from __future__ import print_function
-import shutil
-import math,re,os,pickle,random,pprint,errno,sys,cStringIO,datetime,argparse,subprocess
+import shutil,math,re,os,pickle,random,pprint,errno
+import sys,cStringIO,datetime,argparse,subprocess,traceback
 
 import paramiko
-import pbs
-
 import wx
-USE_WX_SPINCTRLDOUBLE = False
-if not USE_WX_SPINCTRLDOUBLE:
-    import xx
-    import wx.lib.newevent
+import xx
+import wx.lib.newevent
 
 from BashEditor import PbsEditor
+import pbs
 
 """
     todo suggesties door franky
@@ -25,6 +22,7 @@ from BashEditor import PbsEditor
     - test on linux ubuntu
     - document installation procedure
 """
+
 ######################
 ### some constants ###
 ######################
@@ -42,7 +40,6 @@ FJR_NOT_FINISHED =2
 FJR_NO_CONNECTION=3
 FJR_ERROR        =4
 
-
 #####################################
 ### some wx convenience functions ###
 #####################################
@@ -55,7 +52,7 @@ def add_wNotebook_page(wNotebook,title):
     wNotebook.AddPage(page, title)
     return page
 
-def create_staticbox(parent,label='',orient=wx.VERTICAL, colour=wx.RED):
+def create_staticbox(parent,label='',orient=wx.VERTICAL, colour=wx.Colour(20,40,120)):
     """
     return a wx.StaticBoxSizer containing a wx.StaticBox 
     """
@@ -136,6 +133,12 @@ def make_tree_output_relative(arg):
         clean.append(a[2:-1])        
     return clean
 
+def log_exception(exception):
+    print("\n### Exception raised: #############################################################")
+    traceback.print_exc(file=sys.stdout)
+    print( exception )
+    print(  "###################################################################################")
+    
 ################################################################################
 ### Launcher classes                                                         ###
 ################################################################################
@@ -144,7 +147,8 @@ class Config(object):
     Launcher configuration
     """
     def __init__(self):
-        home = os.environ['HOME']
+        env_home = "HOMEPATH" if sys.platform=="win32" else "HOME"
+        home = os.environ[env_home]
         if not home or not os.path.exists(home):
             msg = "Error: environmaent variable '$HOME' not found."
             raise EnvironmentError(msg)
@@ -157,7 +161,9 @@ class Config(object):
         try:
             self.attributes = pickle.load(open(cfg_file))
         except:
+            log_exception(e)
             self.attributes = {}
+
         default_attributes = { 'cluster' : 'Hopper'
                              , 'mail_to' : 'your mail address goes here'
                              , 'walltime_unit' : 'hours'
@@ -191,7 +197,7 @@ class Launcher(wx.Frame):
         if sys.platform=='darwin':
             sz = wx.Size(600,760)
         elif sys.platform=='win32':
-            sz = wx.Size(600,750)
+            sz = wx.Size(540,580)
         else:
             sz = wx.Size(600,750)
             
@@ -203,17 +209,16 @@ class Launcher(wx.Frame):
         self.init_ui()
         self.set_names()
         
-        self.Bind(wx.EVT_CLOSE, self.close)
+        self.Bind(wx.EVT_CLOSE, self.self_EVT_CLOSE)
+        
         self.bind('wCluster'                , 'EVT_COMBOBOX')
         self.bind('wNodeSet'                , 'EVT_COMBOBOX')
 
         self.bind('wNNodesRequested'        , 'EVT_SPINCTRL')
         self.bind('wNCoresPerNodeRequested' , 'EVT_SPINCTRL')
         self.bind('wNCoresRequested'        , 'EVT_SPINCTRL')
-        self.bind('wGbPerCoreRequested' , 'EVT_SPINCTRL')            
-#         if USE_WX_SPINCTRLDOUBLE:
-#         else:
-#             self.Bind(xx.EVT_SPINCTRL,self.wGbPerCoreRequested_EVT_SPINCTRL)
+        self.bind('wGbPerCoreRequested'     , 'EVT_SPINCTRL')            
+
         self.bind('wNodeSet'                , 'EVT_COMBOBOX')
         self.bind('wSelectModule'           , 'EVT_COMBOBOX')
         self.bind('wScript'                 , 'EVT_SET_FOCUS')
@@ -314,6 +319,11 @@ class Launcher(wx.Frame):
         self.request_cores_memory()
         self.is_resources_modified = True
         
+    def wGbPerCoreRequested_EVT_SPINCTRL(self,event):
+        self.log_event(event)
+        self.request_cores_memory()
+        self.is_resources_modified = True
+
     def wGbPerCoreRequested_EVT_SPINCTRL(self,event):
         self.log_event(event)
         self.request_cores_memory()
@@ -439,14 +449,15 @@ class Launcher(wx.Frame):
         self.log_event(event)
         self.remote_location_has_changed()
 
-    def close(self,event=None):
+    def self_EVT_CLOSE(self,event=None):
         self.log_event(event)
         print('\nlauncher closing - '+str(datetime.datetime.now()))
+        self.set_status_text("current size is "+str(self.GetSize()))
         print('\nsaving config file.')
         self.config.save()
         self.Destroy()
         print('\nlaunch-2.py - end of log')
-            
+             
     ### the widgets ###
     def init_ui(self):        
         self.CreateStatusBar()
@@ -489,40 +500,38 @@ class Launcher(wx.Frame):
         self.wCluster = wx.ComboBox(self.wNotebookPageResources, wx.ID_ANY
                                    , choices=pbs.clusters
                                    , value=cluster
-                                   , style=wx.CB_DROPDOWN|wx.CB_READONLY|wx.CB_SIMPLE
+                                   , style=wx.CB_DROPDOWN|wx.CB_READONLY|wx.CB_SIMPLE|wx.EXPAND
                                    )
         self.wNodeSet = wx.ComboBox(self.wNotebookPageResources, wx.ID_ANY, choices=["thin_nodes (64GB)", "fat_nodes (256GB)"]
                                    , style=wx.CB_DROPDOWN|wx.CB_READONLY|wx.CB_SIMPLE|wx.EXPAND
                                    )
-        #h = self.wNodeSet.GetSize()[1]
         sizer_1.Add(grid_layout([self.wCluster,[self.wNodeSet,1,wx.EXPAND]],growable_cols=[1]),1,wx.EXPAND,0 )        
-        
+       
         #sizer_2a and sizer_2b
-        txt2a0                        = wx.StaticText    (self.wNotebookPageResources,label='Number of nodes:')
-        self.wNNodesRequested        = xx.SpinCtrl      (self.wNotebookPageResources )
-        txt2a2                        = wx.StaticText    (self.wNotebookPageResources,label='Cores per node:') 
-        self.wNCoresPerNodeRequested = xx.SpinCtrl      (self.wNotebookPageResources ) 
-        txt2a4                        = wx.StaticText    (self.wNotebookPageResources,label='Memory per node [GB]:') 
-        self.wGbPerNodeGranted       = wx.TextCtrl      (self.wNotebookPageResources,style=wx.TE_READONLY|wx.TE_RIGHT) 
+        txt2a0                       = wx.StaticText(self.wNotebookPageResources,label='Number of nodes:')
+        self.wNNodesRequested        = xx.SpinCtrl  (self.wNotebookPageResources )
+        txt2a2                       = wx.StaticText(self.wNotebookPageResources,label='Cores per node:') 
+        self.wNCoresPerNodeRequested = xx.SpinCtrl  (self.wNotebookPageResources ) 
+        txt2a4                       = wx.StaticText(self.wNotebookPageResources,label='Memory per node [GB]:') 
+        self.wGbPerNodeGranted       = wx.TextCtrl  (self.wNotebookPageResources,style=wx.TE_READONLY|wx.TE_RIGHT) 
         
-        txt2b0                        = wx.StaticText    (self.wNotebookPageResources,label='Number of cores:')
-        self.wNCoresRequested        = xx.SpinCtrl      (self.wNotebookPageResources )
-        txt2b2                        = wx.StaticText    (self.wNotebookPageResources,label='Memory per core [GB]:')
-        self.wGbPerCoreRequested     = wx.SpinCtrlDouble(self.wNotebookPageResources ) if USE_WX_SPINCTRLDOUBLE else \
-                                       xx.SpinCtrl(self.wNotebookPageResources,converter=float ) 
-        txt2b4                        = wx.StaticText    (self.wNotebookPageResources,label='Memory total [GB]:')
-        self.wGbTotalGranted         = wx.TextCtrl      (self.wNotebookPageResources,style=wx.TE_READONLY|wx.TE_RIGHT)
+        txt2b0                       = wx.StaticText(self.wNotebookPageResources,label='Number of cores:')
+        self.wNCoresRequested        = xx.SpinCtrl  (self.wNotebookPageResources )
+        txt2b2                       = wx.StaticText(self.wNotebookPageResources,label='Memory per core [GB]:')
+        self.wGbPerCoreRequested     = xx.SpinCtrl  (self.wNotebookPageResources,converter=float ) 
+        txt2b4                       = wx.StaticText(self.wNotebookPageResources,label='Memory total [GB]:')
+        self.wGbTotalGranted         = wx.TextCtrl  (self.wNotebookPageResources,style=wx.TE_READONLY|wx.TE_RIGHT)
         
         lst2a = [txt2a0, self.wNNodesRequested
                 ,txt2a2, self.wNCoresPerNodeRequested
                 ,txt2a4, self.wGbPerNodeGranted    ]
         lst2b = [txt2b0, self.wNCoresRequested
                 ,txt2b2, self.wGbPerCoreRequested
-                ,txt2b4, self.wGbTotalGranted    ]
+                ,txt2b4, self.wGbTotalGranted      ]
 
-        txt2a4                 .SetForegroundColour(wx.TheColourDatabase.Find('GREY'))
+        txt2a4                .SetForegroundColour(wx.TheColourDatabase.Find('GREY'))
         self.wGbPerNodeGranted.SetForegroundColour(wx.TheColourDatabase.Find('GREY'))
-        txt2b4                 .SetForegroundColour(wx.TheColourDatabase.Find('GREY'))
+        txt2b4                .SetForegroundColour(wx.TheColourDatabase.Find('GREY'))
         self.wGbTotalGranted  .SetForegroundColour(wx.TheColourDatabase.Find('GREY'))
        
         h = 0
@@ -645,15 +654,12 @@ class Launcher(wx.Frame):
     
         #self.wNotebookPageRetrieve
         self.fixed_pitch_font = wx.Font(10,wx.FONTFAMILY_MODERN,wx.FONTSTYLE_NORMAL,wx.FONTWEIGHT_NORMAL)
+        
         sizer_1 = create_staticbox(self.wNotebookPageRetrieve, "Retrieved jobs")
         self.wJobsRetrieved = wx.TextCtrl(self.wNotebookPageRetrieve, style=wx.TE_MULTILINE|wx.EXPAND|wx.TE_MULTILINE|wx.HSCROLL|wx.TE_DONTWRAP|wx.TE_READONLY)
-        # todo:
-        #   wx.HSCROLL|wx.TE_DONTWRAP don't seem to work on OSX. suggest to use StyledTextCtrl which
-        #   might als be interesting for wScript
         self.wJobsRetrieved.SetDefaultStyle(wx.TextAttr(font=self.fixed_pitch_font))
         sizer_1.Add(self.wJobsRetrieved,1,wx.EXPAND,0) 
         sizer_2 = create_staticbox(self.wNotebookPageRetrieve, "Submitted jobs")
-        
         self.wJobsSubmitted = wx.TextCtrl(self.wNotebookPageRetrieve, style=wx.TE_MULTILINE|wx.EXPAND|wx.TE_MULTILINE|wx.HSCROLL|wx.TE_DONTWRAP|wx.TE_READONLY)
         self.wJobsSubmitted.SetDefaultStyle(wx.TextAttr(font=self.fixed_pitch_font))
         sizer_2.Add(self.wJobsSubmitted,1,wx.EXPAND,0) 
@@ -742,6 +748,7 @@ class Launcher(wx.Frame):
         print("paramiko version:",paramiko.__version__)
         print("Launcher version:",subprocess.check_output(["git","describe","HEAD"]))
         print("Platform:",sys.platform)
+
         if old_log:
             print("\nRenaming previous log file 'Launcher.log' to\n    '{}'.".format(old_log))
 
@@ -840,6 +847,12 @@ class Launcher(wx.Frame):
     def get_cluster(self):
         return self.wCluster.GetValue()
     
+    def get_user_id(self):
+        user_id = self.wUserId.Value
+        pattern=re.compile(r'vsc\d{5}')
+        m = pattern.match(user_id)
+        return (not m is None)
+    
     def cluster_has_changed(self):
         self.set_node_set_items(pbs.node_sets[self.get_cluster()])        
         self.wSelectModule.SetItems(self.get_module_avail())
@@ -893,10 +906,7 @@ class Launcher(wx.Frame):
         self.wNNodesRequested       .GetTextCtrl().SetForegroundColour(wx.BLUE)
         self.wNCoresPerNodeRequested.GetTextCtrl().SetForegroundColour(wx.BLUE)        
         self.wNCoresRequested       .GetTextCtrl().SetForegroundColour(wx.BLACK)
-        if USE_WX_SPINCTRLDOUBLE:
-            self.wGbPerCoreRequested.SetForegroundColour(wx.BLACK)
-        else:
-            self.wGbPerCoreRequested.GetTextCtrl().SetForegroundColour(wx.BLACK)
+        self.wGbPerCoreRequested    .GetTextCtrl().SetForegroundColour(wx.BLACK)
 
     def request_cores_memory(self):
         node_set = self.get_node_set()
@@ -907,13 +917,10 @@ class Launcher(wx.Frame):
         self.wGbPerCoreRequested    .SetValue(gb_per_core)
         self.wGbTotalGranted        .SetValue(str(gb))
 
-        self.wNNodesRequested       .SetForegroundColour(wx.BLACK)
-        self.wNCoresPerNodeRequested.SetForegroundColour(wx.BLACK)        
-        self.wNCoresRequested       .SetForegroundColour(wx.BLUE)
-        if USE_WX_SPINCTRLDOUBLE:
-            self.wGbPerCoreRequested.SetForegroundColour(wx.BLUE)
-        else:
-            self.wGbPerCoreRequested.spinner.SetForegroundColour(wx.BLUE)
+        self.wNNodesRequested       .GetTextCtrl().SetForegroundColour(wx.BLACK)
+        self.wNCoresPerNodeRequested.GetTextCtrl().SetForegroundColour(wx.BLACK)        
+        self.wNCoresRequested       .GetTextCtrl().SetForegroundColour(wx.BLUE)
+        self.wGbPerCoreRequested    .GetTextCtrl().SetForegroundColour(wx.BLUE)
         
     def get_remote_file_location(self):
         ssh = self.open_ssh_connection()
@@ -930,7 +937,8 @@ class Launcher(wx.Frame):
                 if self.wRemoteLocation.GetValue()=='$VSC_DATA':
                     location = self.vsc_data_folder 
                 ssh.close()
-            except:
+            except Exception as e:
+                log_exception(e)
                 location = self.wRemoteLocation.GetValue()
         else:
             location = self.wRemoteLocation.GetValue()
@@ -1165,7 +1173,6 @@ class Launcher(wx.Frame):
             #todo dialog
             self.set_status_text("Job script not saved: job name missing.")
             return False
-
         self.update_script_from_resources()
         self.set_status_text("Saving job script to '{}' ...".format(self.wJobName.GetValue()))
         my_makedirs(self.wLocalFileLocation.GetValue())
@@ -1200,7 +1207,8 @@ class Launcher(wx.Frame):
         try:
             ssh = self.open_ssh_connection()
             ssh_ftp = ssh.open_sftp()
-        except:
+        except Exception as e:
+            log_exception(e)
             msg = 'FJR_ERROR: copy_to_remote_location : no connection.'
             print(msg)
             self.set_status_text(msg)
@@ -1233,7 +1241,8 @@ class Launcher(wx.Frame):
                         src = os.path.join(folder,file)
                         dst = os.path.join(remote,file)
                         ssh_ftp.put(src,dst)
-        except:
+        except Exception as e:
+            log_exception(e)
             msg = "Failed copying local folder ('{}') contents to remote folder '{}'.".format(local_folder,remote_folder)
         else:
             msg = "Successfully copied local folder ('{}') contents to remote folder '{}'.".format(local_folder,remote_folder)
@@ -1294,7 +1303,8 @@ class Launcher(wx.Frame):
         try:
             ssh = self.open_ssh_connection()
             ssh_ftp = ssh.open_sftp()
-        except:
+        except Exception as e:
+            log_exception(e)
             self.set_status_text("Failed to retrieve job {} : '{}': No connection established.".format(job_id,job_name))
             job_data['status'] = 'not retrieved due to no connection (ssh).'
             return FJR_NO_CONNECTION
@@ -1409,37 +1419,78 @@ class Launcher(wx.Frame):
             self.set_status_text("Trying to make ssh connection ...")
             cluster = self.get_cluster()
             user_id = self.wUserId.GetValue()
+            pattern=re.compile(r'vsc\d{5}')
+            m = pattern.match(user_id)
+            if not m:
+                msg ="Invalid user_id: "+user_id
+                wx.MessageBox(msg, 'Error',wx.OK | wx.ICON_WARNING)
+                return
+            
             user_at_login = "{}@{}".format(user_id,pbs.logins[cluster])
     
-            try:
-                ssh = paramiko.SSHClient()
-                ssh.load_system_host_keys()
-                # Create the ProgressDialog
-                msg = "ssh "+user_at_login+"\n\nPlease be patient for {} seconds :-).".format(str(SSH_TIMEOUT))
-                dialog = wx.ProgressDialog("Attempting to connect ...",msg,maximum=100,parent=self,style=wx.PD_APP_MODAL)
-                #dialog.Update(0)
-                ssh.connect(pbs.logins[cluster], username=user_id,timeout=SSH_TIMEOUT)
-            except:
-                if dialog:
-                    dialog.Destroy()                
-                self.set_status_text("Unable to connect via ssh to "+user_at_login)
-                self.last_try_success = False
-                ssh = None
-                msg ="Unable to connect via ssh to "+user_at_login
-                msg+="\nPossible causes are:"
-                msg+="\n  - no internet connection."
-                msg+="\n  - you are not connected to your home institution (VPN connection needed?)."
-                wx.MessageBox(msg, 'No ssh connection.',wx.OK | wx.ICON_INFORMATION)
-            else:
-                if dialog:
-                    dialog.Destroy()                
-                self.set_status_text("Connected via ssh to "+user_at_login)
-                self.last_try_success = True
+            ssh = None
+            pwd = None
+            while True:
+                try:
+                    if not ssh:
+                        ssh = paramiko.SSHClient()
+                        ssh.load_system_host_keys()
+                    if pwd is None:
+                        ssh.connect(pbs.logins[cluster], username=user_id,timeout=SSH_TIMEOUT)
+                    else:
+                        ssh.connect(pbs.logins[cluster], username=user_id,timeout=SSH_TIMEOUT,password=pwd)
                 
-            self.last_try = datetime.datetime.now()
+                except paramiko.ssh_exception.PasswordRequiredException as e:
+                    log_exception(e)
+                    dlg = wx.PasswordEntryDialog(self,"Enter pass phrase to unlock your key:")
+                    res = dlg.ShowModal()
+                    if res==wx.ID_OK:
+                        pwd = dlg.GetValue()
+                        del dlg
+                    else:
+                        del ssh
+                        ssh = None
+                        self.last_try = datetime.datetime.now()
+                        self.set_status_text("No password provided")
+                        break
+
+                except paramiko.ssh_exception.AuthenticationException as e:
+                    #todo: test this
+                    log_exception(e)
+                    dlg = wx.PasswordEntryDialog(self,"Wrong password, retry ...\nEnter pass phrase to unlock your key:")
+                    res = dlg.ShowModal()
+                    if res==wx.ID_OK:
+                        pwd = dlg.GetValue()
+                        del dlg
+                    else:
+                        del ssh
+                        ssh = None
+                        self.last_try = datetime.datetime.now()
+                        self.set_status_text("No password provided")
+                        break
+                
+                except Exception as e:
+                    log_exception(e)
+                    print("No ssh connection:",e)
+                    self.set_status_text("Unable to connect via ssh to "+user_at_login)
+                    self.last_try_success = False
+                    ssh = None
+                    msg ="Unable to connect via ssh to "+user_at_login
+                    msg+="\nPossible causes are:"
+                    msg+="\n  - no internet connection."
+                    msg+="\n  - you are not connected to your home institution (VPN connection needed?)."
+                    wx.MessageBox(msg, 'No ssh connection.',wx.OK | wx.ICON_INFORMATION)
+                    self.last_try = datetime.datetime.now()
+                    break
+                    
+                else:
+                    self.set_status_text("Connected via ssh to "+user_at_login)
+                    self.last_try_success = True
+                    break
+                
         else:
             # don't retry to make ssh connection
-            ssh = False
+            ssh = None
         
         return ssh
         
