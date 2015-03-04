@@ -104,6 +104,8 @@ class SpinCtrl(wx.FlexGridSizer):
                 self.spinner_EVT_SPIN_UP()
             else:
                 self.spinner_EVT_SPIN_DOWN()
+        elif key == wx.WXK_RETURN:
+            self.post_EVT_SPINCTRL()
         elif key < 256:
             char= chr(key)
             is_digit = char.isdigit()
