@@ -85,13 +85,13 @@ class PbsEditor(wx.stc.StyledTextCtrl):
 #           ]
 #         print max(l),l
 
-        self.StyleSetSpec(wx.stc.STC_STYLE_DEFAULT  ,"fore:#000000,back:#FFFFFF,face:Courier New,size:16")
+        self.StyleSetSpec(wx.stc.STC_STYLE_DEFAULT  ,"fore:#000000,back:#FFFFFF,face:Courier New,size:12")
         self.StyleClearAll()
-        self.StyleSetSpec(wx.stc.STC_SH_DEFAULT     ,"fore:#333333,back:#FFFFFF,face:Courier New,size:16")
-        self.StyleSetSpec(wx.stc.STC_SH_COMMENTLINE ,"fore:#009944,back:#FFFFFF,face:Courier New,size:16,")
+        self.StyleSetSpec(wx.stc.STC_SH_DEFAULT     ,"fore:#333333,back:#FFFFFF,face:Courier New,size:12")
+        self.StyleSetSpec(wx.stc.STC_SH_COMMENTLINE ,"fore:#009944,back:#FFFFFF,face:Courier New,size:12,")
   
-        self.StyleSetSpec(PbsLexer.STC_PBS_DEFAULT  ,"fore:#94071F,back:#FFFFFF,face:Courier New,size:16,bold")
-        self.StyleSetSpec(PbsLexer.STC_PBS_KEYWORD  ,"fore:#4B8AD1,back:#FFFFFF,face:Courier New,size:16,bold")
+        self.StyleSetSpec(PbsLexer.STC_PBS_DEFAULT  ,"fore:#94071F,back:#FFFFFF,face:Courier New,size:12,bold")
+        self.StyleSetSpec(PbsLexer.STC_PBS_KEYWORD  ,"fore:#4B8AD1,back:#FFFFFF,face:Courier New,size:12,bold")
 
         map_theme_to_style(self,'comment'   , wx.stc.STC_SH_COMMENTLINE)
         map_theme_to_style(self,'number'     , wx.stc.STC_SH_NUMBER)
@@ -152,7 +152,7 @@ class PbsEditor(wx.stc.StyledTextCtrl):
         parsed = "".join([parsed[i] for i in range(1, len(parsed), 2)])
         self.SetStyleBytes(len(parsed), parsed)
 
-def map_theme_to_style(wx_styled_text_ctrl,style_str,wx_style_id,theme='White',face="Courier New",size=16):
+def map_theme_to_style(wx_styled_text_ctrl,style_str,wx_style_id,theme='White',face="Courier New",size=12):
     if style_str.startswith('STC_STYLE_'):
         key = style_str
     else:
