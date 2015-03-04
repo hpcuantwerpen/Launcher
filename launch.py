@@ -183,7 +183,7 @@ class Launcher(wx.Frame):
     the Launcher gui
     """    
     def __init__(self, parent, title):
-        super(Launcher,self).__init__(parent,title=title,size=wx.Size(600,670))
+        super(Launcher,self).__init__(parent,title=title,size=wx.Size(600,700))
 
         self.config = Config()
         self.open_log_file()
@@ -200,7 +200,7 @@ class Launcher(wx.Frame):
         if USE_WX_SPINCTRLDOUBLE:
             self.bind('wGbPerCoreRequested' , 'EVT_SPINCTRLDOUBLE')            
         else:
-            self.Bind(xx.EVT_SPINCTRLDOUBLE,self.wGbPerCoreRequested_EVT_SPINCTRLDOUBLE)
+            self.Bind(xx.EVT_SPINCTRL,self.wGbPerCoreRequested_EVT_SPINCTRL)
         self.bind('wNodeSet'                , 'EVT_COMBOBOX')
         self.bind('wSelectModule'           , 'EVT_COMBOBOX')
         self.bind('wScript'                 , 'EVT_SET_FOCUS')
@@ -263,7 +263,7 @@ class Launcher(wx.Frame):
             print("\nEvent.type ",t)
             if "wx.lib.newevent._Event" in t:
                 print("custom event")
-                print(event.__dict__)
+                pprint.pprint(event.__dict__)
             else:
                 print(  "     .object.name :",event.GetEventObject().GetName())
                 print(  "     .object.class:",event.GetEventObject().GetClassName())
@@ -295,7 +295,7 @@ class Launcher(wx.Frame):
         self.request_cores_memory()
         self.is_resources_modified = True
         
-    def wGbPerCoreRequested_EVT_SPINCTRLDOUBLE(self,event):
+    def wGbPerCoreRequested_EVT_SPINCTRL(self,event):
         self.log_event(event)
         self.request_cores_memory()
         self.is_resources_modified = True
@@ -477,45 +477,58 @@ class Launcher(wx.Frame):
                                    )
         #h = self.wNodeSet.GetSize()[1]
         sizer_1.Add(grid_layout([self.wCluster,[self.wNodeSet,1,wx.EXPAND]],growable_cols=[1]),1,wx.EXPAND,0 )        
-        #sizer_2
-        lst3 = []
-        lst3.append( wx.StaticText    (self.wNotebookPageResources,label='Number of cores:') )
-        lst3.append( wx.SpinCtrl      (self.wNotebookPageResources ) )
-        lst3.append( wx.StaticText    (self.wNotebookPageResources,label='Memory per core [GB]:') )
-        lst3.append( xx.SpinCtrlDouble(self.wNotebookPageResources ) )
-        lst3.append( wx.StaticText    (self.wNotebookPageResources,label='Memory total [GB]:') )
-        lst3.append( wx.TextCtrl      (self.wNotebookPageResources,style=wx.TE_READONLY|wx.TE_RIGHT) )
-        self.wNCoresRequested    = lst3[1]
-        self.wGbPerCoreRequested = lst3[3]
-        self.wGbTotalGranted     = lst3[5]
-        lst3[4]               .SetForegroundColour(wx.TheColourDatabase.Find('GREY'))
-        self.wGbTotalGranted  .SetForegroundColour(wx.TheColourDatabase.Find('GREY'))
-        h = lst3[0].GetSize()[1]
-        w = 0
-        for i in lst3[0::2]:
-            w = max(w,i.GetSize()[0])
-        #sizer_3
-        lst4 = []
-        lst4.append( wx.StaticText (self.wNotebookPageResources,label='Number of nodes:') )
-        lst4.append( wx.SpinCtrl   (self.wNotebookPageResources ) )
-        lst4.append( wx.StaticText(self.wNotebookPageResources,label='Cores per node:') )
-        lst4.append( wx.SpinCtrl  (self.wNotebookPageResources ) )
-        lst4.append( wx.StaticText    (self.wNotebookPageResources,label='Memory per node [GB]:') )
-        lst4.append( wx.TextCtrl      (self.wNotebookPageResources,style=wx.TE_READONLY|wx.TE_RIGHT) )
-        self.wNNodesRequested        = lst4[1]
-        self.wNCoresPerNodeRequested = lst4[3]
-        self.wGbPerNodeGranted       = lst4[5]
-        lst4[4]               .SetForegroundColour(wx.TheColourDatabase.Find('GREY'))
+        
+        #sizer_2a and sizer_2b
+        txt2a0                        = wx.StaticText    (self.wNotebookPageResources,label='Number of nodes:')
+        self.wNNodesRequested        = wx.SpinCtrl      (self.wNotebookPageResources )
+        txt2a2                        = wx.StaticText    (self.wNotebookPageResources,label='Cores per node:') 
+        self.wNCoresPerNodeRequested = wx.SpinCtrl      (self.wNotebookPageResources ) 
+        txt2a4                        = wx.StaticText    (self.wNotebookPageResources,label='Memory per node [GB]:') 
+        self.wGbPerNodeGranted       = wx.TextCtrl      (self.wNotebookPageResources,style=wx.TE_READONLY|wx.TE_RIGHT) 
+        
+        txt2b0                        = wx.StaticText    (self.wNotebookPageResources,label='Number of cores:')
+        self.wNCoresRequested        = wx.SpinCtrl      (self.wNotebookPageResources )
+        txt2b2                        = wx.StaticText    (self.wNotebookPageResources,label='Memory per core [GB]:')
+        self.wGbPerCoreRequested     = wx.SpinCtrlDouble(self.wNotebookPageResources ) if USE_WX_SPINCTRLDOUBLE else \
+                                       xx.SpinCtrl(self.wNotebookPageResources,converter=float ) 
+        txt2b4                        = wx.StaticText    (self.wNotebookPageResources,label='Memory total [GB]:')
+        self.wGbTotalGranted         = wx.TextCtrl      (self.wNotebookPageResources,style=wx.TE_READONLY|wx.TE_RIGHT)
+        
+        lst2a = [txt2a0, self.wNNodesRequested
+                ,txt2a2, self.wNCoresPerNodeRequested
+                ,txt2a4, self.wGbPerNodeGranted    ]
+        lst2b = [txt2b0, self.wNCoresRequested
+                ,txt2b2, self.wGbPerCoreRequested
+                ,txt2b4, self.wGbTotalGranted    ]
+
+        txt2a4                 .SetForegroundColour(wx.TheColourDatabase.Find('GREY'))
         self.wGbPerNodeGranted.SetForegroundColour(wx.TheColourDatabase.Find('GREY'))
-        for i in lst4[0::2]:
-            w = max(w,i.GetSize()[0])
-        for i in lst3[0::2]:
-            i.SetMinSize(wx.Size(w,h))
-        for i in lst4[0::2]:
-            i.SetMinSize(wx.Size(w,h))
-        #(interchange position of 3 and 4) 
-        sizer_2b.Add(grid_layout(lst3,ncols=2),0,wx.EXPAND,0 )
-        sizer_2a.Add(grid_layout(lst4,ncols=2),0,wx.EXPAND,0 )   
+        txt2b4                 .SetForegroundColour(wx.TheColourDatabase.Find('GREY'))
+        self.wGbTotalGranted  .SetForegroundColour(wx.TheColourDatabase.Find('GREY'))
+       
+        h = 0
+        w = 0
+        for i in lst2a:
+            sz = i.GetSize()
+            w = max(w,sz[0])
+            h = max(h,sz[1])
+            print(sz,(w,h))
+        for i in lst2a[1:6:2]:
+            h =i.GetSize()[1]
+            i.SetMinSize(wx.Size(100,h))
+        h = 0
+        w = 0
+        for i in lst2b:
+            sz = i.GetSize()
+            w = max(w,sz[0])
+            h = max(h,sz[1])
+            print(sz,(w,h))
+        for i in lst2b[1:6:2]:
+            h =i.GetSize()[1]
+            i.SetMinSize(wx.Size(100,h))
+
+        sizer_2a.Add(grid_layout(lst2a,ncols=2),0,wx.EXPAND,0 )
+        sizer_2b.Add(grid_layout(lst2b,ncols=2),0,wx.EXPAND,0 )   
         #sizer_4
         self.walltime_units    = ['seconds','minutes','hours','days ']
         self.walltime_unit_max = [ 60*60   , 60*24   , 24*7  , 7    ]
@@ -531,7 +544,6 @@ class Launcher(wx.Frame):
         lst = [ wx.StaticText(self.wNotebookPageResources,label='wall time:') ]
         lst.append( self.wWalltime )
         lst.append( self.wWalltimeUnit )
-        lst[0].SetMinSize(wx.Size(w,h))
         sizer_4.Add(grid_layout(lst),0,wx.EXPAND,0 )
         #sizer_5
         sizer_5a = wx.BoxSizer(wx.HORIZONTAL)
@@ -840,7 +852,7 @@ class Launcher(wx.Frame):
         self.wNCoresPerNodeRequested.SetRange(1,node_set.n_cores_per_node)
         self.wNCoresPerNodeRequested.Value = node_set.n_cores_per_node
         self.wGbPerNodeGranted      .Value = str(node_set.gb_per_node)
-        self.wGbPerCoreRequested    .SetRange(0,node_set.gb_per_node)
+        self.wGbPerCoreRequested    .SetRange((0,node_set.gb_per_node))
         self.wNCoresRequested       .SetRange(1,node_set.n_cores_per_node*node_set.n_nodes)
         self.request_nodes_cores()
         
