@@ -6,7 +6,7 @@ some extensions to wxPython which are present in wxPython 2.9 but not in 2.8.10
 import wx
 
 import wx.lib.newevent
-SpinDoubleEvent, EVT_SPINCTRL = wx.lib.newevent.NewCommandEvent()
+SpinEvent, EVT_SPINCTRL = wx.lib.newevent.NewCommandEvent()
 
 def get_frame(window):
     """Return the frame of a wx widbget (or None)"""
@@ -50,6 +50,9 @@ class SpinCtrl(wx.FlexGridSizer):
         self.txtctrl.Bind(wx.EVT_KEY_DOWN  , self.txtctrl_EVT_KEY_DOWN)
         self.txtctrl.Bind(wx.EVT_KILL_FOCUS, self.txtctrl_EVT_KILL_FOCUS)
     
+    def GetTextCtrl(self):
+        return self.txtctrl
+    
     def SetValue(self,value):
         v = str(self.converter(value))
         self.txtctrl.SetValue(v)
@@ -58,24 +61,30 @@ class SpinCtrl(wx.FlexGridSizer):
     def GetValue(self):
         return self.converter(self.txtctrl.GetValue())
 
-    def SetRange(self,r):
-        assert isinstance(r,tuple),"expecting tuple of length 2 or 3."
-        l = len(r)
-        assert l>1                ,"expecting tuple of length 2 or 3."
-        
-        self.lwr_bound = r[0]
-        self.upr_bound = r[1]
-        self.increment = r[2] if (l>2) else \
-                         self.converter( (r[1]-r[0])/100. )
-        self.SetValue(r[0])
+    def SetRange(self,lwr,upr=None,inc=None):
+        if isinstance(lwr, tuple):
+            self.SetRange(*lwr)
+        else:
+            assert not upr is None, "Upper bound of range is missing."
+            self.lwr_bound = self.converter( lwr )
+            self.upr_bound = self.converter( upr )
+            self.increment = self.converter( (upr-lwr)/100. ) if (inc is None) else \
+                             self.converter( inc )
+            if self.increment == 0:
+                self.increment = 1 
+            self.SetValue(lwr)
         
     def post_EVT_SPINCTRL(self):
-        event = SpinDoubleEvent(wx.ID_ANY)
-        event.type = "xx.SpinDoubleEvent"
+        event = SpinEvent(wx.ID_ANY)
+        event.type = "xx.SpinEvent{}".format(type(self.converter))
+        event.converter = self.converter
         event.value = self.txtctrl.GetValue()
         event.source = self.GetName()
-        wx.PostEvent(self.frame, event)
-        print "xx.EVT_SPINCTRL posted, current value is",self.txtctrl.GetValue()
+        wx.PostEvent(self.txtctrl, event)
+        print "\nxx.EVT_SPINCTRL posted, current value is",self.txtctrl.GetValue()
+        
+    def Bind(self,EVT,handler):
+        self.txtctrl.Bind(EVT,handler)
         
     def spinner_EVT_SPIN_UP(self,event=None):
         v = min(self.upr_bound,self.GetValue()+self.increment)

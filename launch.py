@@ -55,13 +55,17 @@ def add_wNotebook_page(wNotebook,title):
     wNotebook.AddPage(page, title)
     return page
 
-def add_staticbox(parent,label='',orient=wx.VERTICAL):
+def create_staticbox(parent,label='',orient=wx.VERTICAL, colour=wx.RED):
     """
     return a wx.StaticBoxSizer containing a wx.StaticBox 
     """
-    staticbox = wx.StaticBox(parent, wx.ID_ANY, label=label)
-    staticbox.Lower()
+    staticbox = wx.StaticBox(parent, wx.ID_ANY)
+    if not colour is None:
+        #TODO: colour doesn't seem to work on darwin...
+        staticbox.SetForegroundColour(colour)
+    staticbox.SetLabel(label)
     sizer = wx.StaticBoxSizer(staticbox, orient=orient)
+    #staticbox.Lower()
     return sizer
 
 def grid_layout(items,ncols=0,gap=0,growable_rows=[],growable_cols=[]):
@@ -183,7 +187,15 @@ class Launcher(wx.Frame):
     the Launcher gui
     """    
     def __init__(self, parent, title):
-        super(Launcher,self).__init__(parent,title=title,size=wx.Size(600,700))
+        
+        if sys.platform=='darwin':
+            sz = wx.Size(600,760)
+        elif sys.platform=='win32':
+            sz = wx.Size(600,750)
+        else:
+            sz = wx.Size(600,750)
+            
+        super(Launcher,self).__init__(parent,title=title,size=sz)
 
         self.config = Config()
         self.open_log_file()
@@ -194,13 +206,14 @@ class Launcher(wx.Frame):
         self.Bind(wx.EVT_CLOSE, self.close)
         self.bind('wCluster'                , 'EVT_COMBOBOX')
         self.bind('wNodeSet'                , 'EVT_COMBOBOX')
+
         self.bind('wNNodesRequested'        , 'EVT_SPINCTRL')
         self.bind('wNCoresPerNodeRequested' , 'EVT_SPINCTRL')
         self.bind('wNCoresRequested'        , 'EVT_SPINCTRL')
-        if USE_WX_SPINCTRLDOUBLE:
-            self.bind('wGbPerCoreRequested' , 'EVT_SPINCTRLDOUBLE')            
-        else:
-            self.Bind(xx.EVT_SPINCTRL,self.wGbPerCoreRequested_EVT_SPINCTRL)
+        self.bind('wGbPerCoreRequested' , 'EVT_SPINCTRL')            
+#         if USE_WX_SPINCTRLDOUBLE:
+#         else:
+#             self.Bind(xx.EVT_SPINCTRL,self.wGbPerCoreRequested_EVT_SPINCTRL)
         self.bind('wNodeSet'                , 'EVT_COMBOBOX')
         self.bind('wSelectModule'           , 'EVT_COMBOBOX')
         self.bind('wScript'                 , 'EVT_SET_FOCUS')
@@ -239,7 +252,11 @@ class Launcher(wx.Frame):
         - the event is <event_name>
         - the event handler is self.<object_name>_<event_name>
         """
-        s = "self.{}.Bind(wx.{},self.{}_{})".format(object_name,event_name,object_name,event_name)
+        type_str = str( type(eval("self."+object_name)) )
+        if type_str.startswith("<class 'xx."):
+            s = "self.{}.GetTextCtrl().Bind(xx.{},self.{}_{})".format(object_name,event_name,object_name,event_name)
+        else:
+            s = "self.{}.Bind(wx.{},self.{}_{})".format(object_name,event_name,object_name,event_name)
         eval(s)
         
     def set_names(self):
@@ -256,17 +273,19 @@ class Launcher(wx.Frame):
         """
         log information about the event
         """
+        print("\n<<  Launcher.log_event():")
         if isinstance(event,(str,unicode)):
             print(event)
         else:
             t = str(type(event))
-            print("\nEvent.type ",t)
+            print("Event.type ",t)
             if "wx.lib.newevent._Event" in t:
                 print("custom event")
                 pprint.pprint(event.__dict__)
             else:
                 print(  "     .object.name :",event.GetEventObject().GetName())
                 print(  "     .object.class:",event.GetEventObject().GetClassName())
+        print(">>")
         self.SetStatusText("")
     
     ### event handlerss ###
@@ -443,18 +462,18 @@ class Launcher(wx.Frame):
         self.wNotebookPageRetrieve  = add_wNotebook_page(self.wNotebook, "Retrieve")
    
         #self.wNotebookPageResources
-        sizer_1 = add_staticbox(self.wNotebookPageResources, "Requests resources from")
-        sizer_2a= add_staticbox(self.wNotebookPageResources, "Requests nodes and cores per node")
-        sizer_2b= add_staticbox(self.wNotebookPageResources, "Requests cores and memory per core")
+        sizer_1 = create_staticbox(self.wNotebookPageResources, "Requests resources from")
+        sizer_2a= create_staticbox(self.wNotebookPageResources, "Requests nodes and cores per node")
+        sizer_2b= create_staticbox(self.wNotebookPageResources, "Requests cores and memory per core")
         sizer_2 = wx.BoxSizer(wx.HORIZONTAL)
         sizer_2.Add(sizer_2a,1,wx.EXPAND,0)
         sizer_2.Add(sizer_2b,1,wx.EXPAND,0)
-        sizer_4 = add_staticbox(self.wNotebookPageResources, "Request compute time")
-        sizer_5 = add_staticbox(self.wNotebookPageResources, "Notify")
-        sizer_6 = add_staticbox(self.wNotebookPageResources, "Job name (=used as the parent folder)")
-        sizer_7 = add_staticbox(self.wNotebookPageResources, "Local file location")
-        sizer_8 = add_staticbox(self.wNotebookPageResources, "Remote file location",orient=wx.VERTICAL)
-        sizer_9 = add_staticbox(self.wNotebookPageResources, "Job management",orient=wx.HORIZONTAL)
+        sizer_4 = create_staticbox(self.wNotebookPageResources, "Request compute time")
+        sizer_5 = create_staticbox(self.wNotebookPageResources, "Notify")
+        sizer_6 = create_staticbox(self.wNotebookPageResources, "Job name (=used as the parent folder)")
+        sizer_7 = create_staticbox(self.wNotebookPageResources, "Local file location")
+        sizer_8 = create_staticbox(self.wNotebookPageResources, "Remote file location",orient=wx.VERTICAL)
+        sizer_9 = create_staticbox(self.wNotebookPageResources, "Job management",orient=wx.HORIZONTAL)
         self.wNotebookPageResources.SetSizer( grid_layout( [ [sizer_1,1,wx.EXPAND]
                                                            , [sizer_2,1,wx.EXPAND]
                                                            , [sizer_4,1,wx.EXPAND]
@@ -480,14 +499,14 @@ class Launcher(wx.Frame):
         
         #sizer_2a and sizer_2b
         txt2a0                        = wx.StaticText    (self.wNotebookPageResources,label='Number of nodes:')
-        self.wNNodesRequested        = wx.SpinCtrl      (self.wNotebookPageResources )
+        self.wNNodesRequested        = xx.SpinCtrl      (self.wNotebookPageResources )
         txt2a2                        = wx.StaticText    (self.wNotebookPageResources,label='Cores per node:') 
-        self.wNCoresPerNodeRequested = wx.SpinCtrl      (self.wNotebookPageResources ) 
+        self.wNCoresPerNodeRequested = xx.SpinCtrl      (self.wNotebookPageResources ) 
         txt2a4                        = wx.StaticText    (self.wNotebookPageResources,label='Memory per node [GB]:') 
         self.wGbPerNodeGranted       = wx.TextCtrl      (self.wNotebookPageResources,style=wx.TE_READONLY|wx.TE_RIGHT) 
         
         txt2b0                        = wx.StaticText    (self.wNotebookPageResources,label='Number of cores:')
-        self.wNCoresRequested        = wx.SpinCtrl      (self.wNotebookPageResources )
+        self.wNCoresRequested        = xx.SpinCtrl      (self.wNotebookPageResources )
         txt2b2                        = wx.StaticText    (self.wNotebookPageResources,label='Memory per core [GB]:')
         self.wGbPerCoreRequested     = wx.SpinCtrlDouble(self.wNotebookPageResources ) if USE_WX_SPINCTRLDOUBLE else \
                                        xx.SpinCtrl(self.wNotebookPageResources,converter=float ) 
@@ -538,8 +557,8 @@ class Launcher(wx.Frame):
         i_unit = self.walltime_units.index(self.config.attributes['walltime_unit'])
         self.wWalltimeUnit.Select(i_unit)
         self.wWalltime.SetRange(1,self.walltime_unit_max[i_unit]) 
-        self.wWalltime.Value = self.config.attributes['walltime_value']
-        self.walltime_seconds = self.wWalltime.Value*self.walltime_unit_sec[i_unit]
+        self.wWalltime.SetValue( self.config.attributes['walltime_value'] )
+        self.walltime_seconds = self.wWalltime.GetValue()*self.walltime_unit_sec[i_unit]
         
         lst = [ wx.StaticText(self.wNotebookPageResources,label='wall time:') ]
         lst.append( self.wWalltime )
@@ -561,7 +580,7 @@ class Launcher(wx.Frame):
         
 #         lst = [[self.wNotifyAddress,1,wx.EXPAND], self.wNotifyBegin, self.wNotifyEnd, self.wNotifyAbort]
 #         sizer_5.Add(grid_layout(lst,ncols=1,growable_cols=[0]),1,wx.EXPAND,0 )
-        if not is_valid_mail_address(self.wNotifyAddress.Value):
+        if not is_valid_mail_address(self.wNotifyAddress.GetValue()):
             self.wNotifyAddress.SetForegroundColour(wx.TheColourDatabase.Find('GREY'))
         #sizer_6
         self.wJobName = wx.TextCtrl(self.wNotebookPageResources,style=wx.EXPAND|wx.TE_PROCESS_ENTER|wx.TE_PROCESS_TAB)
@@ -606,7 +625,7 @@ class Launcher(wx.Frame):
         sizer_9.Add(sizer_9a        ,1,wx.EXPAND,0)
 
         #self.wNotebookPageScript
-        sizer_0 = add_staticbox(self.wNotebookPageScript, "Job script")     
+        sizer_0 = create_staticbox(self.wNotebookPageScript, "Job script")     
         self.wNotebookPageScript.SetSizer( grid_layout( [ [sizer_0,1,wx.EXPAND] ]
                                                   , ncols=1
                                                   , growable_rows=[0]
@@ -626,14 +645,14 @@ class Launcher(wx.Frame):
     
         #self.wNotebookPageRetrieve
         self.fixed_pitch_font = wx.Font(10,wx.FONTFAMILY_MODERN,wx.FONTSTYLE_NORMAL,wx.FONTWEIGHT_NORMAL)
-        sizer_1 = add_staticbox(self.wNotebookPageRetrieve, "Retrieved jobs")
+        sizer_1 = create_staticbox(self.wNotebookPageRetrieve, "Retrieved jobs")
         self.wJobsRetrieved = wx.TextCtrl(self.wNotebookPageRetrieve, style=wx.TE_MULTILINE|wx.EXPAND|wx.TE_MULTILINE|wx.HSCROLL|wx.TE_DONTWRAP|wx.TE_READONLY)
         # todo:
         #   wx.HSCROLL|wx.TE_DONTWRAP don't seem to work on OSX. suggest to use StyledTextCtrl which
         #   might als be interesting for wScript
         self.wJobsRetrieved.SetDefaultStyle(wx.TextAttr(font=self.fixed_pitch_font))
         sizer_1.Add(self.wJobsRetrieved,1,wx.EXPAND,0) 
-        sizer_2 = add_staticbox(self.wNotebookPageRetrieve, "Submitted jobs")
+        sizer_2 = create_staticbox(self.wNotebookPageRetrieve, "Submitted jobs")
         
         self.wJobsSubmitted = wx.TextCtrl(self.wNotebookPageRetrieve, style=wx.TE_MULTILINE|wx.EXPAND|wx.TE_MULTILINE|wx.HSCROLL|wx.TE_DONTWRAP|wx.TE_READONLY)
         self.wJobsSubmitted.SetDefaultStyle(wx.TextAttr(font=self.fixed_pitch_font))
@@ -738,24 +757,24 @@ class Launcher(wx.Frame):
     def remote_subfolder_has_changed(self):
         v = self.remote_location
         
-        remote_subfolder = self.wRemoteSubfolder.Value
+        remote_subfolder = self.wRemoteSubfolder.GetValue()
         if not remote_subfolder in ['','.','./']:
-            v = os.path.join(v,self.wRemoteSubfolder.Value)
+            v = os.path.join(v,self.wRemoteSubfolder.GetValue())
             self.remote_location_subfolder = v
     
-        jobname = self.wJobName.Value
+        jobname = self.wJobName.GetValue()
         if jobname:
             v = os.path.join(v,jobname)
         self.wRemoteFileLocation.SetValue(v)
     
     def job_name_has_changed(self):
-        if self.wJobName.Value:
-            self.wLocalFileLocation.Value = os.path.join(self.local_parent_folder,self.wJobName.Value)
+        if self.wJobName.GetValue():
+            self.wLocalFileLocation.SetValue( os.path.join(self.local_parent_folder,self.wJobName.GetValue()) )
             self.wLocalFileLocation.SetForegroundColour(wx.BLUE)
             if not hasattr(self,'remote_location_subfolder'):
                 self.remote_location_subfolder = self.get_remote_file_location()
-            self.wRemoteFileLocation.Value = os.path.join(self.remote_location_subfolder,self.wJobName.Value)
-            f_script = os.path.join(self.wLocalFileLocation.Value,'pbs.sh')
+            self.wRemoteFileLocation.SetValue( os.path.join(self.remote_location_subfolder,self.wJobName.GetValue()) )
+            f_script = os.path.join(self.wLocalFileLocation.GetValue(),'pbs.sh')
             if os.path.exists(f_script):
                 msg = "Found script '{}'.\nDo you want to load it?".format(f_script)
                 answer = wx.MessageBox(msg, 'Script found',wx.YES|wx.NO | wx.ICON_QUESTION)
@@ -766,7 +785,7 @@ class Launcher(wx.Frame):
                     self.load_job()
                     self.set_status_text("Script '{}' is loaded.".format(f_script))
         else:
-            self.wLocalFileLocation.Value = self.local_parent_folder
+            self.wLocalFileLocation.SetValue( self.local_parent_folder )
             self.wLocalFileLocation.SetForegroundColour(wx.BLACK)
             self.SetStatusText('')
         
@@ -777,14 +796,14 @@ class Launcher(wx.Frame):
     
     def local_parent_folder_set_focus(self):
         self.wLocalFileLocation.SetForegroundColour(wx.BLACK)
-        self.wLocalFileLocation.Value = self.local_parent_folder
+        self.wLocalFileLocation.SetValue( self.local_parent_folder )
         self.set_status_text('Modify the local location. Do NOT add the Job name.')
         
     def local_parent_folder_has_changed(self):
-        if self.wLocalFileLocation.Value:
-            v = self.wLocalFileLocation.Value
+        if self.wLocalFileLocation.GetValue():
+            v = self.wLocalFileLocation.GetValue()
             vsplit = os.path.split(v)
-            if vsplit[-1]==self.wJobName.Value:
+            if vsplit[-1]==self.wJobName.GetValue():
                 msg = "The parent folder is equal to the job name.\n:Is that OK?"
                 answer = wx.MessageBox(msg, 'Warning',wx.NO|wx.YES | wx.ICON_WARNING)
                 if  answer==wx.NO:
@@ -792,8 +811,8 @@ class Launcher(wx.Frame):
         else:
             v = self.local_parent_folder
         self.local_parent_folder = v
-        if self.wJobName.Value:
-            self.wLocalFileLocation.Value = os.path.join(self.local_parent_folder,self.wJobName.Value)
+        if self.wJobName.GetValue():
+            self.wLocalFileLocation.SetValue( os.path.join(self.local_parent_folder,self.wJobName.GetValue()) )
             self.wLocalFileLocation.SetForegroundColour(wx.BLUE)
         else:
             self.wLocalFileLocation.SetForegroundColour(wx.BLACK)
@@ -803,7 +822,7 @@ class Launcher(wx.Frame):
         key_code = event.GetKeyCode()
         if key_code == wx.WXK_ESCAPE:
             #print 'escape'
-            self.wLocalFileLocation.Value=self.local_parent_folder
+            self.wLocalFileLocation.SetValue(self.local_parent_folder)
             self.local_parent_folder_has_changed()
         elif key_code == wx.WXK_RETURN:
             #print 'enter'
@@ -819,7 +838,7 @@ class Launcher(wx.Frame):
         self.cluster_has_changed()
                 
     def get_cluster(self):
-        return self.wCluster.Value
+        return self.wCluster.GetValue()
     
     def cluster_has_changed(self):
         self.set_node_set_items(pbs.node_sets[self.get_cluster()])        
@@ -848,11 +867,10 @@ class Launcher(wx.Frame):
         self.wNodeSet.Select(i)
         node_set = self.get_node_set()
         self.wNNodesRequested.SetRange(1,node_set.n_nodes)
-        self.wNNodesRequested.Value = 1
         self.wNCoresPerNodeRequested.SetRange(1,node_set.n_cores_per_node)
-        self.wNCoresPerNodeRequested.Value = node_set.n_cores_per_node
-        self.wGbPerNodeGranted      .Value = str(node_set.gb_per_node)
-        self.wGbPerCoreRequested    .SetRange((0,node_set.gb_per_node))
+        self.wNCoresPerNodeRequested.SetValue(node_set.n_cores_per_node)
+        self.wGbPerNodeGranted      .SetValue(str(node_set.gb_per_node))
+        self.wGbPerCoreRequested    .SetRange(0,node_set.gb_per_node)
         self.wNCoresRequested       .SetRange(1,node_set.n_cores_per_node*node_set.n_nodes)
         self.request_nodes_cores()
         
@@ -867,27 +885,27 @@ class Launcher(wx.Frame):
             
     def request_nodes_cores(self):
         node_set = self.get_node_set()
-        n_cores,gb_per_core = node_set.request_nodes_cores(self.wNNodesRequested.Value,self.wNCoresPerNodeRequested.Value)
+        n_cores,gb_per_core = node_set.request_nodes_cores(self.wNNodesRequested.GetValue(),self.wNCoresPerNodeRequested.GetValue())
         self.wNCoresRequested   .SetValue(n_cores)
         self.wGbPerCoreRequested.SetValue(gb_per_core)
         self.wGbTotalGranted    .SetValue(str(gb_per_core*n_cores))
 
-        self.wNNodesRequested       .SetForegroundColour(wx.BLUE)
-        self.wNCoresPerNodeRequested.SetForegroundColour(wx.BLUE)        
-        self.wNCoresRequested       .SetForegroundColour(wx.BLACK)
+        self.wNNodesRequested       .GetTextCtrl().SetForegroundColour(wx.BLUE)
+        self.wNCoresPerNodeRequested.GetTextCtrl().SetForegroundColour(wx.BLUE)        
+        self.wNCoresRequested       .GetTextCtrl().SetForegroundColour(wx.BLACK)
         if USE_WX_SPINCTRLDOUBLE:
             self.wGbPerCoreRequested.SetForegroundColour(wx.BLACK)
         else:
-            self.wGbPerCoreRequested.spinner.SetForegroundColour(wx.BLACK)
+            self.wGbPerCoreRequested.GetTextCtrl().SetForegroundColour(wx.BLACK)
 
     def request_cores_memory(self):
         node_set = self.get_node_set()
-        n_nodes, n_cores, n_cores_per_node, gb_per_core, gb = node_set.request_cores_memory(self.wNCoresRequested.Value,self.wGbPerCoreRequested.GetValue())
-        self.wNNodesRequested       .Value = n_nodes
-        self.wNCoresRequested       .Value = n_cores
-        self.wNCoresPerNodeRequested.Value = n_cores_per_node
+        n_nodes, n_cores, n_cores_per_node, gb_per_core, gb = node_set.request_cores_memory(self.wNCoresRequested.GetValue(),self.wGbPerCoreRequested.GetValue())
+        self.wNNodesRequested       .SetValue(n_nodes)
+        self.wNCoresRequested       .SetValue(n_cores)
+        self.wNCoresPerNodeRequested.SetValue(n_cores_per_node)
         self.wGbPerCoreRequested    .SetValue(gb_per_core)
-        self.wGbTotalGranted        .Value = str(gb)
+        self.wGbTotalGranted        .SetValue(str(gb))
 
         self.wNNodesRequested       .SetForegroundColour(wx.BLACK)
         self.wNCoresPerNodeRequested.SetForegroundColour(wx.BLACK)        
@@ -901,7 +919,7 @@ class Launcher(wx.Frame):
         ssh = self.open_ssh_connection()
         if not ssh is None:
             try:
-                stdout, stderr = self.ssh_command(ssh, 'echo '+self.wRemoteLocation.Value, verbose=True)
+                stdout, stderr = self.ssh_command(ssh, 'echo '+self.wRemoteLocation.GetValue(), verbose=True)
                 location = stdout.readlines()[0].strip()
                 stdout, stderr = self.ssh_command(ssh, 'echo $VSC_DATA', verbose=True)
                 self.vsc_data_folder = stdout.readlines()[0].strip()
@@ -909,17 +927,17 @@ class Launcher(wx.Frame):
                 del stderr
                 self.vsc_scratch_folder = stdout.readlines()[0].strip()
                 location = self.vsc_scratch_folder 
-                if self.wRemoteLocation.Value=='$VSC_DATA':
+                if self.wRemoteLocation.GetValue()=='$VSC_DATA':
                     location = self.vsc_data_folder 
                 ssh.close()
             except:
-                location = self.wRemoteLocation.Value
+                location = self.wRemoteLocation.GetValue()
         else:
-            location = self.wRemoteLocation.Value
+            location = self.wRemoteLocation.GetValue()
 
         self.remote_location = location
-        if not self.wRemoteSubfolder.Value in ['.','./']:
-            location = os.path.join(location,self.wRemoteSubfolder.Value) 
+        if not self.wRemoteSubfolder.GetValue() in ['.','./']:
+            location = os.path.join(location,self.wRemoteSubfolder.GetValue()) 
         return location
         
     def get_module_avail(self):
@@ -959,7 +977,7 @@ class Launcher(wx.Frame):
         return module_list
     
     def update_resources_from_script(self,event=None):
-        lines = self.wScript.Value.splitlines(True)
+        lines = self.wScript.GetValue().splitlines(True)
         self.script.parse(lines)
         self.set_default_pbs_parameters()
         self.update_resources()
@@ -972,17 +990,18 @@ class Launcher(wx.Frame):
         if not hasattr(self, 'script'):
             self.script = pbs.Script()
         if not 'n_nodes' in self.script.values: 
-            self.script.add_pbs_option('-l','nodes={}:ppn={}'.format(self.wNNodesRequested.Value,self.wNCoresPerNodeRequested.Value))
+            self.script.add_pbs_option('-l','nodes={}:ppn={}'.format(self.wNNodesRequested.GetValue()
+                                                                    ,self.wNCoresPerNodeRequested.GetValue()))
         else:
-            self.script.values['n_nodes'         ] = self.wNNodesRequested       .Value
-            self.script.values['n_cores_per_node'] = self.wNCoresPerNodeRequested.Value
+            self.script.values['n_nodes'         ] = self.wNNodesRequested       .GetValue()
+            self.script.values['n_cores_per_node'] = self.wNCoresPerNodeRequested.GetValue()
         
         if not 'walltime_seconds' in self.script.values:
             self.script.add_pbs_option('-l', 'walltime='+pbs.walltime_seconds_to_str(self.walltime_seconds))
         else:
             self.script.values['walltime_seconds'] = self.walltime_seconds
             
-        if self.wNotifyAddress.Value: 
+        if self.wNotifyAddress.GetValue(): 
             abe = ''
             if self.wNotifyAbort.IsChecked():
                 abe+='a'
@@ -992,17 +1011,17 @@ class Launcher(wx.Frame):
                 abe+='e'
             if abe: 
                 if not 'notify_address' in self.script.values:
-                    self.script.add_pbs_option('-M',self.wNotifyAddress.Value)
+                    self.script.add_pbs_option('-M',self.wNotifyAddress.GetValue())
                     self.script.add_pbs_option('-m',abe)
                 else:
-                    self.script.values['notify_address'] = self.wNotifyAddress.Value
+                    self.script.values['notify_address'] = self.wNotifyAddress.GetValue()
                     self.script.values['notify_abe'    ] = abe
                 
-        if self.wJobName.Value:
+        if self.wJobName.GetValue():
             if not 'job_name' in self.script.values:
-                self.script.add_pbs_option('-N',self.wJobName.Value)
+                self.script.add_pbs_option('-N',self.wJobName.GetValue())
             else:
-                self.script.values['job_name'] = self.wJobName.Value
+                self.script.values['job_name'] = self.wJobName.GetValue()
                 
         lines = self.script.compose()
         self.format_script(lines)
@@ -1042,10 +1061,10 @@ class Launcher(wx.Frame):
             value = self.script.values[varname]
             if not function is None:
                 value = function(value)
-            if ctrl.Value == value:
+            if ctrl.GetValue() == value:
                 return False
             else:
-                ctrl.Value = value
+                ctrl.SetValue(value)
                 return True
         else:
             return False
@@ -1060,52 +1079,52 @@ class Launcher(wx.Frame):
         self.wWalltimeUnit.Select(i_unit)
         us = self.walltime_unit_sec[i_unit]
         n  = seconds/us
-        self.wWalltime.Value = n        
+        self.wWalltime.SetValue(n)        
         self.walltime_has_changed()
            
     def walltime_has_changed(self):
-        self.walltime_seconds = self.wWalltime.Value * self.walltime_unit_sec[self.wWalltimeUnit.Selection]
+        self.walltime_seconds = self.wWalltime.GetValue() * self.walltime_unit_sec[self.wWalltimeUnit.Selection]
  
     def walltime_unit_has_changed(self,event=None):
         unit_sec = self.walltime_unit_sec[self.wWalltimeUnit.Selection]
         if self.walltime_seconds%unit_sec:
-            self.wWalltime.Value = (self.walltime_seconds/unit_sec + 1)
-            self.walltime_seconds = self.wWalltime.Value*unit_sec
+            self.wWalltime.SetValue(self.walltime_seconds/unit_sec + 1)
+            self.walltime_seconds = self.wWalltime.GetValue()*unit_sec
         else:
-            self.wWalltime.Value = self.walltime_seconds/unit_sec 
+            self.wWalltime.SetValue( self.walltime_seconds/unit_sec ) 
             self.is_resources_modified = True
 
     def notify_address_has_changed(self,event=None):
         #print "event handler 'notify_address_has_changed (event={})'".format(event)
 
         pattern=re.compile(r'\b[a-z0-9._%+-]+@[a-z0-9.-]+\.[a-z]{2,4}\b')
-        s = self.wNotifyAddress.Value.lower()
+        s = self.wNotifyAddress.GetValue().lower()
         match = pattern.match(s)
         if not match:            
             self.wNotifyAddress.SetForegroundColour(wx.RED)
             #todo -> dialog
-            self.wNotifyAddress.Value = 'Enter a valid e-mail address'
+            self.wNotifyAddress.SetValue('Enter a valid e-mail address')
         else:
             self.wNotifyAddress.SetForegroundColour(wx.BLACK)
-            self.wNotifyAddress.Value = s
+            self.wNotifyAddress.SetValue(s)
             self.is_script_up_to_date = False
         if not event is None:
             event.Skip()
 
     def add_module(self):
-        module = self.wSelectModule.Value
+        module = self.wSelectModule.GetValue()
         if module.startswith("--"):
             self.set_status_text('No module selected.')
         else:
-            self.wScript.AddText("\nmodule load "+self.wSelectModule.Value)
+            self.wScript.AddText("\nmodule load "+self.wSelectModule.GetValue())
                             
     def user_id_has_changed(self):
         self.config.attributes['user_id'] = self.wUserId.GetValue()
-        self.wRemoteFileLocation.Value = self.get_remote_file_location()
+        self.wRemoteFileLocation.SetValue( self.get_remote_file_location() )
     
     def load_job(self):
         self.is_resources_modified = False
-        s = self.wLocalFileLocation.Value
+        s = self.wLocalFileLocation.GetValue()
         if os.path.isdir(s):
             s = os.path.join(s,'pbs.sh')
         if os.path.isfile(s):
@@ -1129,7 +1148,7 @@ class Launcher(wx.Frame):
         
 #PBS -l advres=fat-reservation.31           
     def check_job_name_present(self):
-        if not self.wJobName.Value:
+        if not self.wJobName.GetValue():
             random_job_name = 'job-'+str(random.random())[2:]
             msg = "No Job name specified.\n:Press\n  - 'Cancel' to specify a Job name, then retry, or\n  - 'OK' to use '{}' (random).".format(random_job_name)
             answer = wx.MessageBox(msg, 'Warning',wx.CANCEL|wx.OK | wx.ICON_WARNING)
@@ -1148,9 +1167,9 @@ class Launcher(wx.Frame):
             return False
 
         self.update_script_from_resources()
-        self.set_status_text("Saving job script to '{}' ...".format(self.wJobName.Value))
-        my_makedirs(self.wLocalFileLocation.Value)
-        fname = os.path.join(self.wLocalFileLocation.Value,'pbs.sh')
+        self.set_status_text("Saving job script to '{}' ...".format(self.wJobName.GetValue()))
+        my_makedirs(self.wLocalFileLocation.GetValue())
+        fname = os.path.join(self.wLocalFileLocation.GetValue(),'pbs.sh')
         self.wScript.SaveFile(fname)
         self.set_status_text("Job script saved to '{}'. Add input files to local location.".format(fname))
         return True
@@ -1176,8 +1195,8 @@ class Launcher(wx.Frame):
 
     def copy_to_remote_location(self,submit=False):
         self.set_status_text('copying ... ')
-        local_folder = self.wLocalFileLocation.Value
-        remote_folder = self.wRemoteFileLocation.Value
+        local_folder = self.wLocalFileLocation.GetValue()
+        remote_folder = self.wRemoteFileLocation.GetValue()
         try:
             ssh = self.open_ssh_connection()
             ssh_ftp = ssh.open_sftp()
@@ -1389,7 +1408,7 @@ class Launcher(wx.Frame):
             #retry to make ssh connection
             self.set_status_text("Trying to make ssh connection ...")
             cluster = self.get_cluster()
-            user_id = self.wUserId.Value
+            user_id = self.wUserId.GetValue()
             user_at_login = "{}@{}".format(user_id,pbs.logins[cluster])
     
             try:
