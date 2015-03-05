@@ -2,10 +2,10 @@ from __future__ import print_function
 import shutil,math,re,os,pickle,random,pprint,errno
 import sys,cStringIO,datetime,argparse,subprocess,traceback
 
-import paramiko
 import wx
 import xx
 import wx.lib.newevent
+import sshtools
 
 from BashEditor import PbsEditor
 import pbs
@@ -23,15 +23,10 @@ import pbs
     - test Launcher.node_set_has_changed 
 """
 
+
 ######################
 ### some constants ###
 ######################
-SSH_TIMEOUT = 15
-#   Number of seconds that paramiko.SSHClient.connect attempts to
-#   to connect.
-SSH_WAIT = 30
-#   the minimum number of sceconds between two successive attempts 
-#   to make an ssh connection if the first attempt was unsuccesful.
 
 # return codes for finished job retrieval (FJR):
 FJR_SUCCESS      =0
@@ -202,6 +197,8 @@ class Launcher(wx.Frame):
         else:
             sz = wx.Size(600,750)
             
+        sshtools.Client.frame = self    
+        
         super(Launcher,self).__init__(parent,title=title,size=sz)
 
         self.config = Config()
@@ -535,23 +532,14 @@ class Launcher(wx.Frame):
         txt2b4                .SetForegroundColour(wx.TheColourDatabase.Find('GREY'))
         self.wGbTotalGranted  .SetForegroundColour(wx.TheColourDatabase.Find('GREY'))
        
-        h = 0
-        w = 0
-        for i in lst2a:
-            sz = i.GetSize()
-            w = max(w,sz[0])
-            h = max(h,sz[1])
-            print(sz,(w,h))
+#        (w,h) = (0,0)
+#         for i in lst2a:
+#             sz = i.GetSize()
+#             w = max(w,sz[0])
+#             h = max(h,sz[1])
         for i in lst2a[1:6:2]:
             h =i.GetSize()[1]
             i.SetMinSize(wx.Size(100,h))
-        h = 0
-        w = 0
-        for i in lst2b:
-            sz = i.GetSize()
-            w = max(w,sz[0])
-            h = max(h,sz[1])
-            print(sz,(w,h))
         for i in lst2b[1:6:2]:
             h =i.GetSize()[1]
             i.SetMinSize(wx.Size(100,h))
@@ -746,7 +734,7 @@ class Launcher(wx.Frame):
         print("Python version:")
         print(sys.version)
         print("wxPython version:",wx.version())
-        print("paramiko version:",paramiko.__version__)
+        print("paramiko version:",sshtools.paramiko.__version__)
         print("Launcher version:",subprocess.check_output(["git","describe","HEAD"]))
         print("Platform:",sys.platform)
 
@@ -785,6 +773,7 @@ class Launcher(wx.Frame):
             f_script = os.path.join(self.wLocalFileLocation.GetValue(),'pbs.sh')
             if os.path.exists(f_script):
                 msg = "Found script '{}'.\nDo you want to load it?".format(f_script)
+                msg+= "\n(If you answer No, it will be overwritten if you continue to work in this local file location.)"
                 answer = wx.MessageBox(msg, 'Script found',wx.YES|wx.NO | wx.ICON_QUESTION)
                 if answer==wx.NO:
                     self.set_status_text("The script was not loaded. It will be overwritten when pressing the 'Save' button.")
@@ -924,16 +913,15 @@ class Launcher(wx.Frame):
         self.wGbPerCoreRequested    .GetTextCtrl().SetForegroundColour(wx.BLUE)
         
     def get_remote_file_location(self):
-        ssh = self.open_ssh_connection()
-        if not ssh is None:
+        ssh = sshtools.Client(self.wUserId.GetValue(),pbs.logins[self.get_cluster()])
+        if ssh.connected():
             try:
-                stdout, stderr = self.ssh_command(ssh, 'echo '+self.wRemoteLocation.GetValue(), verbose=True)
-                location = stdout.readlines()[0].strip()
-                stdout, stderr = self.ssh_command(ssh, 'echo $VSC_DATA', verbose=True)
-                self.vsc_data_folder = stdout.readlines()[0].strip()
-                stdout, stderr = self.ssh_command(ssh, 'echo $VSC_SCRATCH', verbose=True)
+                stdout_dat, stderr = ssh.execute('echo $VSC_DATA')
+                stdout_scr, stderr = ssh.execute('echo $VSC_SCRATCH')
+                #location                = stdout_loc[0].strip()
+                self.vsc_data_folder    = stdout_dat[0].strip()
+                self.vsc_scratch_folder = stdout_scr[0].strip()
                 del stderr
-                self.vsc_scratch_folder = stdout.readlines()[0].strip()
                 location = self.vsc_scratch_folder 
                 if self.wRemoteLocation.GetValue()=='$VSC_DATA':
                     location = self.vsc_data_folder 
@@ -950,9 +938,9 @@ class Launcher(wx.Frame):
         return location
         
     def get_module_avail(self):
-        ssh = self.open_ssh_connection()
-        if not ssh is None:
-            stdout, stderr = self.ssh_command(ssh, 'module avail', verbose=True)
+        ssh = sshtools.Client(self.wUserId.GetValue(),pbs.logins[self.get_cluster()])
+        if ssh.connected():
+            stdout, stderr = ssh.execute('module avail')
             lines = stderr # yes, module avail writes to stderr
             del stdout
             ssh.close()
@@ -1181,31 +1169,12 @@ class Launcher(wx.Frame):
         self.set_status_text("Job script saved to '{}'. Add input files to local location.".format(fname))
         return True
     
-    def ssh_command(self,ssh,cmd,verbose=False):
-        """
-        Run a remote command cmd through ssh
-        Return stdout and stderr (list of strings (=lines) containing eol)
-        """
-        stdin, stdout, stderr = ssh.exec_command(cmd)
-        out = stdout.readlines()
-        err = stderr.readlines()
-        del stdin
-        if verbose or err:
-            print("Executing ssh command:")
-            print("  > ",cmd )
-            print("  > stdout:" )
-            pprint.pprint(out )
-            print("  > stderr:" )
-            pprint.pprint(err )
-            print("  > ssh command done." )
-        return out,err
-
     def copy_to_remote_location(self,submit=False):
-        self.set_status_text('copying ... ')
+        self.set_status_text('Preparing to copy ... ')
         local_folder = self.wLocalFileLocation.GetValue()
         remote_folder = self.wRemoteFileLocation.GetValue()
         try:
-            ssh = self.open_ssh_connection()
+            ssh = sshtools.Client(self.wUserId.GetValue(),pbs.logins[self.get_cluster()])
             ssh_ftp = ssh.open_sftp()
         except Exception as e:
             log_exception(e)
@@ -1213,9 +1182,9 @@ class Launcher(wx.Frame):
             print(msg)
             self.set_status_text(msg)
             return
-        verbose_ssh=True
+        self.set_status_text('Creating remote folder ... ')
         cmd = "mkdir -p "+remote_folder
-        out,err = self.ssh_command(ssh,cmd,verbose=verbose_ssh)
+        out,err = ssh.execute(cmd)
         l=len(local_folder)
         try:
             print("Copying contents of local folder '{}' to remote folder '{}'.".format(local_folder,remote_folder))
@@ -1234,12 +1203,12 @@ class Launcher(wx.Frame):
                     if not sf.startswith('.'):
                         self.set_status_text("  Creating folder '{}'".format(dst))
                         cmd = "mkdir -p "+dst
-                        out,err = self.ssh_command(ssh,cmd,verbose=verbose_ssh)
+                        out,err = ssh.execute(cmd)
                 for f in files:
                     if not f.startswith('.'):
                         self.set_status_text("  Copying file '{}/{}' to '{}'".format(folder,f,remote))
-                        src = os.path.join(folder,file)
-                        dst = os.path.join(remote,file)
+                        src = os.path.join(folder,f)
+                        dst = os.path.join(remote,f)
                         ssh_ftp.put(src,dst)
         except Exception as e:
             log_exception(e)
@@ -1252,7 +1221,7 @@ class Launcher(wx.Frame):
             msg = "Submitting job ..."  
             self.set_status_text(msg)
             cmd = 'cd '+remote_folder+' && qsub pbs.sh'      
-            out,err = self.ssh_command(ssh,cmd,verbose=verbose_ssh)
+            out,err = ssh.execute(cmd)
             if err:
                 msg = 'Failed to submit job.'
             else:
@@ -1269,9 +1238,11 @@ class Launcher(wx.Frame):
                 
         ssh.close()
     
-    def set_status_text(self,msg):
+    def set_status_text(self,msg,colour=wx.BLACK):
         print('\nStatus bar text: '+msg)
         self.SetStatusText(msg)
+        #todo alloe for colored messages?
+        #self.GetStatusBar().SetForeGroundColour(colour)
     
     def submit_job(self):
         if not self.save_job():
@@ -1286,7 +1257,7 @@ class Launcher(wx.Frame):
             FJR_SUCCESS       = success
             FJR_INEXISTING    = remote directory does not exist
             FJR_NOT_FINISHED  = the job is not finished yet
-            FJR_NO_CONNECTION = no ssh connection established
+            FJR_NO_CONNECTION = no sshtools connection established
             FJR_ERROR         = an exception was raised during the copy process
         we need to find a way of knowing all files and folders
         . linux tree cmd
@@ -1301,18 +1272,18 @@ class Launcher(wx.Frame):
         remote_folder= job_data['remote_folder']
         job_name     = job_data['job_name']
         try:
-            ssh = self.open_ssh_connection()
+            ssh = sshtools.Client(self.wUserId.GetValue(),pbs.logins[self.get_cluster()])
             ssh_ftp = ssh.open_sftp()
         except Exception as e:
             log_exception(e)
             self.set_status_text("Failed to retrieve job {} : '{}': No connection established.".format(job_id,job_name))
-            job_data['status'] = 'not retrieved due to no connection (ssh).'
+            job_data['status'] = 'not retrieved due to no connection (Paramiko/SSH).'
             return FJR_NO_CONNECTION
         
         try:
             cmd = 'cd '+remote_folder
             ssh_verbose=True
-            out,err = self.ssh_command(ssh, cmd, ssh_verbose)
+            out,err = ssh.execute(cmd, ssh_verbose)
             if err:
                 ssh.close()
                 self.set_status_text("Failed to retrieve job {} : '{}': remote folder '{}' not found.".format(job_id,job_name,remote_folder))
@@ -1320,7 +1291,7 @@ class Launcher(wx.Frame):
                 return FJR_INEXISTING
             
             cmd += " && tree -fi"
-            out,err = self.ssh_command(ssh, cmd+" --noreport", ssh_verbose)
+            out,err = ssh.execute(cmd+" --noreport", ssh_verbose)
             remote_files_and_folders = make_tree_output_relative(out)
             o = job_name+'.o'+job_id
             if not o in remote_files_and_folders:
@@ -1330,7 +1301,7 @@ class Launcher(wx.Frame):
                 return FJR_NOT_FINISHED
             
             cmd += "d --noreport"
-            out,err = self.ssh_command(ssh, cmd, ssh_verbose)
+            out,err = ssh.execute(cmd, ssh_verbose)
             remote_folders = make_tree_output_relative(out)
             for f in remote_folders:
                 if self.wCopyToLocalDisk.IsChecked():
@@ -1341,7 +1312,7 @@ class Launcher(wx.Frame):
                     lf = os.path.join(self.vsc_data_folder,f)
                     self.set_status_text("Creating $VSC_DATA folder '{}'.".format(lf))
                     cmd = "mkdir -p "+lf
-                    out,err = self.ssh_command(ssh, cmd, ssh_verbose)
+                    out,err = ssh.execute(cmd, ssh_verbose)
                     
             for f in remote_files_and_folders:
                 if not f in remote_folders:
@@ -1354,7 +1325,7 @@ class Launcher(wx.Frame):
                         lf = os.path.join(self.vsc_data_folder,f)
                         self.set_status_text("Copying remote file '{}' to '{}'.".format(rf,lf))
                         cmd = "cp {} {}".format(rf,lf)
-                        out,err = self.ssh_command(ssh, cmd, ssh_verbose)
+                        out,err = ssh.execute(cmd, ssh_verbose)
                     
             ssh.close()
             self.set_status_text("Successfully retrieved job {}. Local folder is {}".format(job_id,local_folder))
@@ -1403,115 +1374,24 @@ class Launcher(wx.Frame):
             self.retrieved_jobs = {}
         self.show_jobs(self.wJobsRetrieved,self.retrieved_jobs)
     
-    def open_ssh_connection(self):
-        """
-        Try to open an ssh connection
-          - if the previous attempt was succesful
-          - or if the previous attempt was not succesful but long enough (SSH_WAIT) ago
-        Return the ssh client or None.
-        """
-        last_try = getattr(self,"last_try",datetime.datetime(2014,12,31))
-        last_try_success = getattr(self,"last_try_success",False)
-        delta = datetime.datetime.now() - last_try
-        
-        if last_try_success or ( not last_try_success and delta.total_seconds() > SSH_WAIT ):
-            #retry to make ssh connection
-            self.set_status_text("Trying to make ssh connection ...")
-            cluster = self.get_cluster()
-            user_id = self.wUserId.GetValue()
-            pattern=re.compile(r'vsc\d{5}')
-            m = pattern.match(user_id)
-            if not m:
-                msg ="Invalid user_id: "+user_id
-                wx.MessageBox(msg, 'Error',wx.OK | wx.ICON_WARNING)
-                return
-            
-            user_at_login = "{}@{}".format(user_id,pbs.logins[cluster])
-    
-            ssh = None
-            pwd = None
-            while True:
-                try:
-                    if not ssh:
-                        ssh = paramiko.SSHClient()
-                        ssh.load_system_host_keys()
-                    if pwd is None:
-                        ssh.connect(pbs.logins[cluster], username=user_id,timeout=SSH_TIMEOUT)
-                    else:
-                        ssh.connect(pbs.logins[cluster], username=user_id,timeout=SSH_TIMEOUT,password=pwd)
-                
-                except paramiko.ssh_exception.PasswordRequiredException as e:
-                    log_exception(e)
-                    dlg = wx.PasswordEntryDialog(self,"Enter pass phrase to unlock your key:")
-                    res = dlg.ShowModal()
-                    if res==wx.ID_OK:
-                        pwd = dlg.GetValue()
-                        del dlg
-                    else:
-                        del ssh
-                        ssh = None
-                        self.last_try = datetime.datetime.now()
-                        self.set_status_text("No password provided")
-                        break
-
-                except paramiko.ssh_exception.AuthenticationException as e:
-                    #todo: test this
-                    log_exception(e)
-                    dlg = wx.PasswordEntryDialog(self,"Wrong password, retry ...\nEnter pass phrase to unlock your key:")
-                    res = dlg.ShowModal()
-                    if res==wx.ID_OK:
-                        pwd = dlg.GetValue()
-                        del dlg
-                    else:
-                        del ssh
-                        ssh = None
-                        self.last_try = datetime.datetime.now()
-                        self.set_status_text("No password provided")
-                        break
-                
-                except Exception as e:
-                    log_exception(e)
-                    print("No ssh connection:",e)
-                    self.set_status_text("Unable to connect via ssh to "+user_at_login)
-                    self.last_try_success = False
-                    ssh = None
-                    msg ="Unable to connect via ssh to "+user_at_login
-                    msg+="\nPossible causes are:"
-                    msg+="\n  - no internet connection."
-                    msg+="\n  - you are not connected to your home institution (VPN connection needed?)."
-                    wx.MessageBox(msg, 'No ssh connection.',wx.OK | wx.ICON_INFORMATION)
-                    self.last_try = datetime.datetime.now()
-                    break
-                    
-                else:
-                    self.set_status_text("Connected via ssh to "+user_at_login)
-                    self.last_try_success = True
-                    break
-                
-        else:
-            # don't retry to make ssh connection
-            ssh = None
-        
-        return ssh
-        
     def show_submitted_jobs(self):
         self.show_jobs(self.wJobsSubmitted,self.config.attributes['submitted_jobs'])        
         last_try = getattr(self,"last_try",datetime.datetime(2014,12,31))
         last_try_success = getattr(self,"last_try_success",False)
         delta = datetime.datetime.now() - last_try
         if delta.total_seconds() > 30 and not last_try_success:
-            ssh = self.open_ssh_connection()
+            ssh = sshtools.Client(self.wUserId.GetValue(),pbs.logins[self.get_cluster()])
         else:
             ssh = False
         if ssh:
             cmd = "qstat -u "+self.wUserId.GetValue()
-            out,err = self.ssh_command(ssh,cmd)
+            out,err = ssh.execute(cmd)
             ssh.close()
             for line in out:
                 self.wJobsSubmitted.AppendText(line)
             del err
         else:
-            msg = 'No info on status of submitted jobs (no ssh connection).'
+            msg = 'No info on status of submitted jobs (no Paramiko/SSH connection).'
             self.set_status_text(msg)
             
     def show_jobs(self,textctrl,jobs):
