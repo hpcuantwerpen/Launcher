@@ -18,9 +18,9 @@ import pbs
     - improve the log
     - [DONE] don't show the log pane by default. instead make it accessible 
       via menu
-    - test on windows
+    - [DONE] test on windows
     - test on linux ubuntu
-    - document installation procedure
+    - test Launcher.node_set_has_changed 
 """
 
 ######################
@@ -59,6 +59,7 @@ def create_staticbox(parent,label='',orient=wx.VERTICAL, colour=wx.Colour(20,40,
     staticbox = wx.StaticBox(parent, wx.ID_ANY)
     if not colour is None:
         #TODO: colour doesn't seem to work on darwin...
+        # it works on win32 though
         staticbox.SetForegroundColour(colour)
     staticbox.SetLabel(label)
     sizer = wx.StaticBoxSizer(staticbox, orient=orient)
@@ -1110,8 +1111,8 @@ class Launcher(wx.Frame):
         match = pattern.match(s)
         if not match:            
             self.wNotifyAddress.SetForegroundColour(wx.RED)
-            #todo -> dialog
-            self.wNotifyAddress.SetValue('Enter a valid e-mail address')
+            msg = "Enter a valid e-mail address."
+            wx.MessageBox(msg, 'Invalid e-mail address',wx.OK | wx.ICON_WARNING)
         else:
             self.wNotifyAddress.SetForegroundColour(wx.BLACK)
             self.wNotifyAddress.SetValue(s)
@@ -1138,8 +1139,8 @@ class Launcher(wx.Frame):
         if os.path.isfile(s):
             fname = s
         else:
-            #todo dialog  
-            print("error: script '{}' not found. See 'Local file location'.".format(s))
+            msg = "No 'pbs.sh' script found at location '{}'.".format(s)
+            wx.MessageBox(msg, 'Error',wx.OK | wx.ICON_ERROR)
             return
         self.wScript.LoadFile(fname)
         lines = self.wScript.GetValue().splitlines(True)
@@ -1170,7 +1171,6 @@ class Launcher(wx.Frame):
         
     def save_job(self):
         if not self.check_job_name_present():
-            #todo dialog
             self.set_status_text("Job script not saved: job name missing.")
             return False
         self.update_script_from_resources()

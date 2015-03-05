@@ -1,4 +1,4 @@
 1. Download the latest version of Enthought Canopy Express
 2. open canopy and go to package manager
 install wxPython > 2.8.10
-install paamiko  > 1.15.2       
+install paramiko  > 1.15.2       
