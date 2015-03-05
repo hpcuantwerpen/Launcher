@@ -1376,14 +1376,8 @@ class Launcher(wx.Frame):
     
     def show_submitted_jobs(self):
         self.show_jobs(self.wJobsSubmitted,self.config.attributes['submitted_jobs'])        
-        last_try = getattr(self,"last_try",datetime.datetime(2014,12,31))
-        last_try_success = getattr(self,"last_try_success",False)
-        delta = datetime.datetime.now() - last_try
-        if delta.total_seconds() > 30 and not last_try_success:
-            ssh = sshtools.Client(self.wUserId.GetValue(),pbs.logins[self.get_cluster()])
-        else:
-            ssh = False
-        if ssh:
+        ssh = sshtools.Client(self.wUserId.GetValue(),pbs.logins[self.get_cluster()])
+        if ssh.connected():
             cmd = "qstat -u "+self.wUserId.GetValue()
             out,err = ssh.execute(cmd)
             ssh.close()

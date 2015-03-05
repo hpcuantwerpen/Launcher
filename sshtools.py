@@ -144,13 +144,13 @@ class Client(object):
                     Client.last_try_success = True
                     break
     
+            msg = "Paramiko/SSH connection established: {}@{}".format(Client.user_id,Client.login_node) if ssh else \
+                  "Paramiko/SSH connection NOT established."
+            self.frame_set_status(msg)
         else:
             # don't retry to make ssh connection
             ssh = None
 
-        msg = "Paramiko/SSH connection established: {}@{}".format(Client.user_id,Client.login_node) if ssh else \
-              "Paramiko/SSH connection NOT established."
-        self.frame_set_status(msg)
         return ssh
     
     def frame_set_status(self,msg,colour=wx.BLACK):
