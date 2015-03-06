@@ -1,4 +1,26 @@
-1. Download the latest version of Enthought Canopy Express
+git needed?
+
+Any standard python distribution satisfying the following requirements will do:
+- python version 2.7.x. (python 3.x was not tested). You can check the version with
+  > python --version
+- installed package: paramiko, version>1.15.2
+- installed package: wxPython, version>2.8.10
+on Linux/this can be easily arranged trhough
+> pip install paramiko
+> pip install wxPython
+if your python distribution does not already have pip follow the guidelines at https://pip.pypa.io/en/latest/installing.html
+
+
+1. Download and install the latest version of Enthought Canopy Express from 
+	https://www.enthought.com/canopy-express/downloads
+   Select your operating system (Windows,Linux,Mac) and version (64-bit,32-bit) and click "DOWNLOAD Canopy Express"
+   Execute the downloaded file
+   
 2. open canopy and go to package manager
-install wxPython > 2.8.10
-install paramiko  > 1.15.2       
+   if you do not have a Canopy account create one and log to be able to install these packages
+   install wxPython > 2.8.10
+   install paramiko > 1.15.2
+
+Working from home
+=================
+If you want to use the Launcher from home you must connect to vpnua.ua.ac.be using a VPN client as always.

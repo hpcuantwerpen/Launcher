@@ -2,7 +2,8 @@ from __future__ import print_function
 import paramiko,wx
 import datetime,re,pprint
 
-SSH_KEEP_CLIENT = True
+SSH_WORK_OFFLINE = True
+SSH_KEEP_CLIENT = False
 SSH_TIMEOUT = 15
 #   Number of seconds that paramiko.SSHClient.connect attempts to
 #   to connect.
@@ -10,7 +11,6 @@ SSH_WAIT = 30
 #   the minimum number of sceconds between two successive attempts 
 #   to make an ssh connection if the first attempt was unsuccesful.
 SSH_VERBOSE = True
-_regexp_userid = re.compile(r'vsc\d{5}')
 
 class Client(object):
     user_id          = None
@@ -21,6 +21,10 @@ class Client(object):
     frame            = None
     
     def __init__(self,user_id,login_node):
+        if SSH_WORK_OFFLINE:
+            self  .paramiko_client = None
+            Client.paramiko_client = None
+            return
         if (Client.user_id!=user_id) or (Client.login_node!=login_node) or (not SSH_KEEP_CLIENT):
             #Close old client
             if Client.paramiko_client:
@@ -79,15 +83,9 @@ class Client(object):
         delta = datetime.datetime.now() - last_try
         
         if last_try_success or ( not last_try_success and delta.total_seconds() > SSH_WAIT ):
-            #retry to make ssh connection
+            #retry to make ssh connection    
             msg ="Creating and opening Paramiko/SSH client (SSH_KEEP_CLIENT=={}).".format(("True" if SSH_KEEP_CLIENT else "False"))
             self.frame_set_status(msg)
-            m = _regexp_userid.match(user_id)
-            if not m:
-                msg ="Invalid user_id: "+user_id
-                wx.MessageBox(msg, 'Error',wx.OK | wx.ICON_WARNING)
-                return
-    
             ssh = None
             pwd = None
             while True:
@@ -95,6 +93,7 @@ class Client(object):
                     if not ssh:
                         ssh = paramiko.SSHClient()
                         ssh.load_system_host_keys()
+                        #ssh.load_system_keys("/home/Users/etijskens/.ssh/newkey")
                     if pwd is None:
                         ssh.connect(login_node, username=user_id)
     #                         ssh.connect(login_node, username=user_id,timeout=SSH_TIMEOUT)

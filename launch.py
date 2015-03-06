@@ -10,20 +10,6 @@ import sshtools
 from BashEditor import PbsEditor
 import pbs
 
-"""
-    todo suggesties door franky
-    - [DONE] $VSC_HOME weglaten 
-    - [DONE] move results from VSC_SCRATCH to VSC_DATA
-    todo
-    - improve the log
-    - [DONE] don't show the log pane by default. instead make it accessible 
-      via menu
-    - [DONE] test on windows
-    - test on linux ubuntu
-    - test Launcher.node_set_has_changed 
-"""
-
-
 ######################
 ### some constants ###
 ######################
@@ -35,10 +21,12 @@ FJR_NOT_FINISHED =2
 FJR_NO_CONNECTION=3
 FJR_ERROR        =4
 
+__VERSION__ = (0,1)
+
 #####################################
 ### some wx convenience functions ###
 #####################################
-def add_wNotebook_page(wNotebook,title):
+def add_notebook_page(wNotebook,title):
     """
     Add a notebook page to a wx.Notebook
     Return the notebook page object (wx.Panel)
@@ -97,12 +85,15 @@ class ContainsString(object):
     Functor that tests if the argument contains a string
     """
     def __init__(self,look_for):
+        """set the string to look for"""
         self.look_for = look_for
     def __call__(self,string):
+        """test if string contains string self.look_for"""
         return self.look_for in string
 
 def my_makedirs(path):
     """
+    Check if a directory exists and create it if necessary
     http://stackoverflow.com/questions/273192/check-if-a-directory-exists-and-create-it-if-necessary
     """
     try:
@@ -144,27 +135,28 @@ class Config(object):
     """
     def __init__(self):
         env_home = "HOMEPATH" if sys.platform=="win32" else "HOME"
-        home = os.environ[env_home]
-        if not home or not os.path.exists(home):
-            msg = "Error: environmaent variable '$HOME' not found."
+        user_home = os.environ[env_home]
+        if not user_home or not os.path.exists(user_home):
+            msg = "Error: environmaent variable '${}' not found.".format(env_home)
             raise EnvironmentError(msg)
-        home = os.path.join(home,'Launcher')
-        if not os.path.exists(home):
-            os.mkdir(home)
-        self.launcher_home =  home
-        cfg_file = os.path.join(home,'Launcher.config')
-
+        launcher_home = os.path.join(user_home,'Launcher')
+        if not os.path.exists(launcher_home):
+            os.mkdir(launcher_home)
+        self.launcher_home = launcher_home
+        
+        cfg_file = os.path.join(launcher_home,'Launcher.config')
         try:
             self.attributes = pickle.load(open(cfg_file))
-        except:
+        except Exception as e:
             log_exception(e)
             self.attributes = {}
+        self.cfg_file = cfg_file
 
         default_attributes = { 'cluster' : 'Hopper'
                              , 'mail_to' : 'your mail address goes here'
                              , 'walltime_unit' : 'hours'
                              , 'walltime_value' : 1
-                             , 'local_files' : os.path.join(home,'jobs')
+                             , 'local_files' : os.path.join(launcher_home,'jobs')
                              , 'user_id' : 'your_user_id'
                              , 'remote_subfolder' : '.'
                              , 'module_lists':{}
@@ -173,8 +165,6 @@ class Config(object):
 #         if 'submitted' in self.attributes:
 #             del self.attributes['submitted']
         self.add_default_attributes(default_attributes)
-        self.home = home
-        self.cfg_file = cfg_file
         
     def add_default_attributes(self,default_attributes):
         for k,v in default_attributes.iteritems():
@@ -184,34 +174,36 @@ class Config(object):
     def save(self):
         pickle.dump(self.attributes,open(self.cfg_file,'w+'))
 
+
 class Launcher(wx.Frame):
     """
     the Launcher gui
-    """    
-    def __init__(self, parent, title):
-        
-        if sys.platform=='darwin':
-            sz = wx.Size(600,760)
-        elif sys.platform=='win32':
-            sz = wx.Size(540,580)
-        else:
-            sz = wx.Size(600,750)
-            
-        sshtools.Client.frame = self    
-        
-        super(Launcher,self).__init__(parent,title=title,size=sz)
+    """
+    regexp_userid = re.compile(r'vsc\d{5}')
 
+    def __init__(self, parent, title):
         self.config = Config()
-        self.open_log_file()
+        #set the window size
+        #TODO : if the last size is stored in Launcher.config this can be removed.
+        frame_size = self.config.attributes.get("frame_size",(500,500))
+   
+        #allow sshtools to set the statusbar of the Launcher    
+        sshtools.Client.frame = self
+            
+        self.open_log_file()        
+        
+#        self.validate_user_id(self.config.attributes.get("user_id","your_user_id"))
+
+        super(Launcher,self).__init__(parent,title=title,size=frame_size)
         
         self.init_ui()
         self.set_names()
         
-        self.Bind(wx.EVT_CLOSE, self.self_EVT_CLOSE)
+        self.Bind(wx.EVT_CLOSE, self.on_EVT_CLOSE)
         
         self.bind('wCluster'                , 'EVT_COMBOBOX')
         self.bind('wNodeSet'                , 'EVT_COMBOBOX')
-
+        self.bind('wNotebook'               , 'EVT_NOTEBOOK_PAGE_CHANGED')
         self.bind('wNNodesRequested'        , 'EVT_SPINCTRL')
         self.bind('wNCoresPerNodeRequested' , 'EVT_SPINCTRL')
         self.bind('wNCoresRequested'        , 'EVT_SPINCTRL')
@@ -291,10 +283,11 @@ class Launcher(wx.Frame):
         print(">>")
         self.SetStatusText("")
     
-    ### event handlerss ###
+    ### event handlerss ###        
     def wCluster_EVT_COMBOBOX(self,event):
         self.log_event(event)
         self.cluster_has_changed()
+
         self.is_resources_modified = True
     
     def wNodeSet_EVT_COMBOBOX(self,event):
@@ -331,6 +324,12 @@ class Launcher(wx.Frame):
         self.log_event(event)
         self.add_module()
         
+    def wNotebook_EVT_NOTEBOOK_PAGE_CHANGED(self,event):
+        self.log_event(event)
+        print(event.GetSelection())
+        if event.GetSelection()==1:
+            self.update_script_from_resources()
+
     def wScript_EVT_SET_FOCUS(self,event):
         self.log_event(event)
         self.update_script_from_resources()
@@ -447,10 +446,12 @@ class Launcher(wx.Frame):
         self.log_event(event)
         self.remote_location_has_changed()
 
-    def self_EVT_CLOSE(self,event=None):
+    def on_EVT_CLOSE(self,event=None):
         self.log_event(event)
         print('\nlauncher closing - '+str(datetime.datetime.now()))
-        self.set_status_text("current size is "+str(self.GetSize()))
+        frame_size = self.GetSize()
+        self.config.attributes['frame_size'] = frame_size
+        print("\nframe_size =",frame_size)
         print('\nsaving config file.')
         self.config.save()
         self.Destroy()
@@ -466,9 +467,9 @@ class Launcher(wx.Frame):
         self.wNotebook = wx.Notebook(self.panel, wx.ID_ANY)
         self.main_sizer.Add(self.wNotebook, 1, wx.EXPAND, 0)
         
-        self.wNotebookPageResources = add_wNotebook_page(self.wNotebook, 'Resources')
-        self.wNotebookPageScript    = add_wNotebook_page(self.wNotebook, "PBS script")
-        self.wNotebookPageRetrieve  = add_wNotebook_page(self.wNotebook, "Retrieve")
+        self.wNotebookPageResources = add_notebook_page(self.wNotebook, 'Resources')
+        self.wNotebookPageScript    = add_notebook_page(self.wNotebook, "PBS script")
+        self.wNotebookPageRetrieve  = add_notebook_page(self.wNotebook, "Retrieve")
    
         #self.wNotebookPageResources
         sizer_1 = create_staticbox(self.wNotebookPageResources, "Requests resources from")
@@ -670,11 +671,12 @@ class Launcher(wx.Frame):
                                                           , growable_rows=[0,1]
                                                           , growable_cols=[0] ) )
              
-#         # Setup the Menu
-#         menu_bar = wx.MenuBar()
-#         # Tools Menu
-#         tools_menu = wx.Menu()
+        # Setup the Menu
+        menu_bar = wx.MenuBar()
+        # Tools Menu
+        tools_menu = wx.Menu()
 #         tools_menu.Append(ID_TOOLS_MENU_SHOW_LOG, "Open Log\tCtrl+L")
+
 #         menu_bar.Append(tools_menu, "&Tools")
 #         self.SetMenuBar(menu_bar)
 #         # Event Handlers
@@ -690,7 +692,7 @@ class Launcher(wx.Frame):
 #             action()
 #             
 
-    def InitData(self):
+    def InitData(self):            
         items=[]
         for item in pbs.node_sets.iterkeys():
             items.append(item)
@@ -735,7 +737,10 @@ class Launcher(wx.Frame):
         print(sys.version)
         print("wxPython version:",wx.version())
         print("paramiko version:",sshtools.paramiko.__version__)
-        print("Launcher version:",subprocess.check_output(["git","describe","HEAD"]))
+        try:
+            print("Launcher version:",subprocess.check_output(["git","describe","HEAD"]))
+        except:
+            print("Launcher version: v{}.{}".format(*__VERSION__))
         print("Platform:",sys.platform)
 
         if old_log:
@@ -844,7 +849,11 @@ class Launcher(wx.Frame):
         return (not m is None)
     
     def cluster_has_changed(self):
-        self.set_node_set_items(pbs.node_sets[self.get_cluster()])        
+        cluster = self.get_cluster()
+        self.set_node_set_items(pbs.node_sets[cluster])
+        self.login_node = pbs.logins[cluster]
+        self.login_node = "login1-hopper.uantwerpen.be"
+         
         self.wSelectModule.SetItems(self.get_module_avail())
         self.is_resources_modified = True
             
@@ -911,9 +920,12 @@ class Launcher(wx.Frame):
         self.wNCoresPerNodeRequested.GetTextCtrl().SetForegroundColour(wx.BLACK)        
         self.wNCoresRequested       .GetTextCtrl().SetForegroundColour(wx.BLUE)
         self.wGbPerCoreRequested    .GetTextCtrl().SetForegroundColour(wx.BLUE)
+
+    def get_user_id(self):
+        return self.validate_user_id(self.wUserId.GetValue())
         
     def get_remote_file_location(self):
-        ssh = sshtools.Client(self.wUserId.GetValue(),pbs.logins[self.get_cluster()])
+        ssh = sshtools.Client(self.get_user_id(),self.login_node)
         if ssh.connected():
             try:
                 stdout_dat, stderr = ssh.execute('echo $VSC_DATA')
@@ -938,7 +950,7 @@ class Launcher(wx.Frame):
         return location
         
     def get_module_avail(self):
-        ssh = sshtools.Client(self.wUserId.GetValue(),pbs.logins[self.get_cluster()])
+        ssh = sshtools.Client(self.get_user_id(),self.login_node)
         if ssh.connected():
             stdout, stderr = ssh.execute('module avail')
             lines = stderr # yes, module avail writes to stderr
@@ -974,13 +986,14 @@ class Launcher(wx.Frame):
         return module_list
     
     def update_resources_from_script(self,event=None):
-        lines = self.wScript.GetValue().splitlines(True)
+        lines = self.wScript.GetText().splitlines(True)
         self.script.parse(lines)
         self.set_default_pbs_parameters()
         self.update_resources()
         
     def update_script_from_resources(self):       
         if not self.is_resources_modified:
+            print('yououdj;fj')
             return
         print('  resources modified, updating script')
         #make sure all values are transferred to self.script.values
@@ -1116,8 +1129,9 @@ class Launcher(wx.Frame):
             self.wScript.AddText("\nmodule load "+self.wSelectModule.GetValue())
                             
     def user_id_has_changed(self):
-        self.config.attributes['user_id'] = self.wUserId.GetValue()
-        self.wRemoteFileLocation.SetValue( self.get_remote_file_location() )
+        user_id = self.validate_user_id(self.wUserId.GetValue())
+        if user_id:
+            self.wRemoteFileLocation.SetValue( self.get_remote_file_location() )
     
     def load_job(self):
         self.is_resources_modified = False
@@ -1174,7 +1188,7 @@ class Launcher(wx.Frame):
         local_folder = self.wLocalFileLocation.GetValue()
         remote_folder = self.wRemoteFileLocation.GetValue()
         try:
-            ssh = sshtools.Client(self.wUserId.GetValue(),pbs.logins[self.get_cluster()])
+            ssh = sshtools.Client(self.get_user_id(),self.login_node)
             ssh_ftp = ssh.open_sftp()
         except Exception as e:
             log_exception(e)
@@ -1272,7 +1286,7 @@ class Launcher(wx.Frame):
         remote_folder= job_data['remote_folder']
         job_name     = job_data['job_name']
         try:
-            ssh = sshtools.Client(self.wUserId.GetValue(),pbs.logins[self.get_cluster()])
+            ssh = sshtools.Client(self.get_user_id(),self.login_node)
             ssh_ftp = ssh.open_sftp()
         except Exception as e:
             log_exception(e)
@@ -1376,7 +1390,7 @@ class Launcher(wx.Frame):
     
     def show_submitted_jobs(self):
         self.show_jobs(self.wJobsSubmitted,self.config.attributes['submitted_jobs'])        
-        ssh = sshtools.Client(self.wUserId.GetValue(),pbs.logins[self.get_cluster()])
+        ssh = sshtools.Client(self.get_user_id(),self.login_node)
         if ssh.connected():
             cmd = "qstat -u "+self.wUserId.GetValue()
             out,err = ssh.execute(cmd)
@@ -1402,6 +1416,23 @@ class Launcher(wx.Frame):
         else:
             textctrl.SetValue('-- none --')
 
+    def validate_user_id(self,user_id):
+        msg ="Enter a valid VSC user_id (e.g. vscDDDDD)\nor press Cancel: "
+        m = Launcher.regexp_userid.match(user_id)
+        while not m:
+            dlg = wx.TextEntryDialog(self,msg,caption="Invalid user_id",defaultValue=user_id)
+            res = dlg.ShowModal()
+            if res==wx.ID_OK:
+                user_id = dlg.GetValue()
+                del dlg
+                m = Launcher.regexp_userid.match(user_id)
+                if m:
+                    print("\nStoring valid user_id '{}'".format(user_id))
+                    self.config.attributes['user_id'] = user_id
+                    self.wUserId.SetValue(user_id)                    
+            else:
+                return None
+        return user_id
             
 class RedirectStdStreams(object):
     def __init__(self, stdout=None, stderr=None):
