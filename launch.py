@@ -203,7 +203,8 @@ class Launcher(wx.Frame):
         
         self.bind('wCluster'                , 'EVT_COMBOBOX')
         self.bind('wNodeSet'                , 'EVT_COMBOBOX')
-        self.bind('wNotebook'               , 'EVT_NOTEBOOK_PAGE_CHANGED')
+        if sys.platform in ("win32","linux2"):
+            self.bind('wNotebook'           , 'EVT_NOTEBOOK_PAGE_CHANGED')
         self.bind('wNNodesRequested'        , 'EVT_SPINCTRL')
         self.bind('wNCoresPerNodeRequested' , 'EVT_SPINCTRL')
         self.bind('wNCoresRequested'        , 'EVT_SPINCTRL')
@@ -325,10 +326,17 @@ class Launcher(wx.Frame):
         self.add_module()
         
     def wNotebook_EVT_NOTEBOOK_PAGE_CHANGED(self,event):
+        #this event handler takes care of updating and showing the contents of the notebook pages
+        #on sindowe and linux
+        assert sys.platform not in ("darwin"), "This event handler must not be bound on MacOSX"
+        
         self.log_event(event)
         print(event.GetSelection())
         if event.GetSelection()==1:
             self.update_script_from_resources()
+        elif event.GetSelection()==2:
+            self.wJobsRetrieved_EVT_SET_FOCUS("wNotebook_EVT_NOTEBOOK_PAGE_CHANGED() calling wJobsRetrieved_EVT_SET_FOCUS()")
+        
 
     def wScript_EVT_SET_FOCUS(self,event):
         self.log_event(event)
@@ -401,7 +409,7 @@ class Launcher(wx.Frame):
     def wRetrieveJobs2_EVT_BUTTON(self,event):
         self.log_event(event)
         self.retrieve_finished_jobs()
-        self.wJobsRetrieved_EVT_SET_FOCUS("wRetrieveJobs2_EVT_BUTTON calling wJobsRetrieved_EVT_SET_FOCUS")
+        self.wJobsRetrieved_EVT_SET_FOCUS("wRetrieveJobs2_EVT_BUTTON() calling wJobsRetrieved_EVT_SET_FOCUS()")
         
     def wDeleteJob_EVT_BUTTON(self,event):
         self.log_event(event)
@@ -421,7 +429,7 @@ class Launcher(wx.Frame):
             answer = wx.MessageBox(msg, 'No job was selected.',wx.OK | wx.ICON_INFORMATION)
         self.show_submitted_jobs()
             
-    def wJobsRetrieved_EVT_SET_FOCUS(self,event):
+    def wJobsRetrieved_EVT_SET_FOCUS(self,event=None):
         self.log_event(event)
         self.show_retrieved_jobs()
         self.show_submitted_jobs()
