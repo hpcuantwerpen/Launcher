@@ -1,6 +1,7 @@
 from __future__ import print_function
 import paramiko,wx
 import datetime,re,pprint
+import wxtools
 
 SSH_WORK_OFFLINE = True
 SSH_KEEP_CLIENT = False
@@ -155,3 +156,60 @@ class Client(object):
     def frame_set_status(self,msg,colour=wx.BLACK):
         if Client.frame:
             Client.frame.set_status_text(msg,colour)
+
+            
+class SSHPreferencesDialog(wx.Dialog):
+    def __init__(self, parent, title="SSH preferences"):
+        super(SSHPreferencesDialog,self).__init__(parent, title=title)
+
+        lst=[]
+        tip="Check this box to avoid the timeout while trying to connect to the host."
+        lst.extend(wxtools.pair(self, label="SSH_WORK_OFFLINE", value=SSH_WORK_OFFLINE,tip=tip,style0=wx.ALIGN_RIGHT))
+        lst[-2]=[lst[-2],0,wx.ALIGN_RIGHT]
+        tip="Connect once to the host and keep the connection alive during the entire session."
+        lst.extend(wxtools.pair(self, label="SSH_KEEP_CLIENT", value=SSH_KEEP_CLIENT ,tip=tip))
+        lst[-2]=[lst[-2],0,wx.ALIGN_RIGHT]
+        tip="Verbose logging of SSH actions"
+        lst.extend(wxtools.pair(self, label="SSH_VERBOSE", value=SSH_VERBOSE     ,tip=tip))
+        lst[-2]=[lst[-2],0,wx.ALIGN_RIGHT]
+        tip="Give up trying to connect to the host after this many seconds."
+        lst.extend(wxtools.pair(self, label="SSH_TIMEOUT", value=SSH_TIMEOUT, value_range=(0,120, 1), tip=tip))
+        lst[-2]=[lst[-2],0,wx.ALIGN_RIGHT]
+        tip="Do not retry to connect before this many seconds"
+        lst.extend(wxtools.pair(self, label="SSH_WAIT", value=SSH_WAIT, value_range=(0,360,10), tip=tip))
+        lst[-2]=[lst[-2],0,wx.ALIGN_RIGHT]
+        lst.append([wx.Button(self, wx.ID_CANCEL),1,wx.EXPAND])
+        lst.append([wx.Button(self, wx.ID_OK    ),1,wx.EXPAND])
+        sizer =  wxtools.grid_layout(lst, ncols=2, growable_cols=[0,1])
+        self.SetSizer(sizer)
+        self.lst = lst
+    
+    def GetValue(self,item=None):
+        value = None
+        n = len(self.lst)
+        if item is None:
+            value = [w.GetValue() for w in self.lst[1:2:n]]
+        else:
+            for i in range(0,n,2):
+                if self.lst[i].GetLabel()==item:
+                    value = self.lst[i+1].GetValue()
+        return value 
+    
+    def update_preferences(self):
+        print("\nUpdating SSH preferences:")
+        changed = False
+        changed |= self.update_preference("SSH_WORK_OFFLINE")    
+        changed |= self.update_preference("SSH_KEEP_CLIENT")    
+        changed |= self.update_preference("SSH_TIMEOUT")    
+        changed |= self.update_preference("SSH_WAIT")    
+        changed |= self.update_preference("SSH_VERBOSE")
+        if not changed:
+            print("  nothing changed.")
+        
+    def update_preference(self,varname):
+        v = self.GetValue(varname)
+        changed = eval("{}!={}".format(varname,v))
+        if changed:
+            exec("{} = {}".format(varname,v))
+            print("SSH preferences updated : {} = {}".format(varname,v))
+        return changed

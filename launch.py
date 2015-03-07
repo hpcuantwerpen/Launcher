@@ -1,11 +1,13 @@
 from __future__ import print_function
-import shutil,math,re,os,pickle,random,pprint,errno
+import shutil,re,os,pickle,random,pprint,errno
 import sys,cStringIO,datetime,argparse,subprocess,traceback
 
 import wx
 import xx
 import wx.lib.newevent
 import sshtools
+
+from wxtools import *
 
 from BashEditor import PbsEditor
 import pbs
@@ -26,53 +28,6 @@ __VERSION__ = (0,1)
 #####################################
 ### some wx convenience functions ###
 #####################################
-def add_notebook_page(wNotebook,title):
-    """
-    Add a notebook page to a wx.Notebook
-    Return the notebook page object (wx.Panel)
-    """
-    page = wx.Panel(wNotebook, wx.ID_ANY)
-    wNotebook.AddPage(page, title)
-    return page
-
-def create_staticbox(parent,label='',orient=wx.VERTICAL, colour=wx.Colour(20,40,120)):
-    """
-    return a wx.StaticBoxSizer containing a wx.StaticBox 
-    """
-    staticbox = wx.StaticBox(parent, wx.ID_ANY)
-    if not colour is None:
-        #TODO: colour doesn't seem to work on darwin...
-        # it works on win32 though
-        staticbox.SetForegroundColour(colour)
-    staticbox.SetLabel(label)
-    sizer = wx.StaticBoxSizer(staticbox, orient=orient)
-    #staticbox.Lower()
-    return sizer
-
-def grid_layout(items,ncols=0,gap=0,growable_rows=[],growable_cols=[]):
-    """
-    return a wx.FlexGridSizer with ncols colums and enough rows to 
-    contain all items in the items list. Growable rows and columns 
-    can be set.
-    ncols=0 corresponds to all items on a single row. To put all 
-    items on a single column specify ncols=1.
-    """
-    nitems = len(items)
-    ncols_ = ncols if ncols>0 else nitems 
-    nrows_ = int(math.ceil(float(nitems)/ncols_))
-    szr = wx.FlexGridSizer(nrows_,ncols_,gap,gap)
-    for r in growable_rows:
-        if r<nrows_:
-            szr.AddGrowableRow(r)
-    for c in growable_cols:
-        if c<ncols_:
-            szr.AddGrowableCol(c)
-    for item in items:
-        if isinstance(item, list):
-            szr.Add(*item)
-        else:
-            szr.Add(item,0,0)
-    return szr
 
 def is_valid_mail_address(address):
     s = address.lower()
@@ -175,11 +130,13 @@ class Config(object):
         pickle.dump(self.attributes,open(self.cfg_file,'w+'))
 
 
+
 class Launcher(wx.Frame):
     """
     the Launcher gui
     """
     regexp_userid = re.compile(r'vsc\d{5}')
+    ID_MENU_SSH_PREFERENCES = wx.NewId()
 
     def __init__(self, parent, title):
         self.config = Config()
@@ -681,25 +638,30 @@ class Launcher(wx.Frame):
              
         # Setup the Menu
         menu_bar = wx.MenuBar()
+        self.SetMenuBar(menu_bar)
+        self.Bind(wx.EVT_MENU, self.on_EVT_MENU)
+        self.menu_actions = {}
         # Tools Menu
-        tools_menu = wx.Menu()
-#         tools_menu.Append(ID_TOOLS_MENU_SHOW_LOG, "Open Log\tCtrl+L")
+        menu_ssh = wx.Menu()
+        menu_bar.Append(menu_ssh, "&SSH")
+        menu_ssh.Append(Launcher.ID_MENU_SSH_PREFERENCES, "Preferences\tCtrl+P")
 
-#         menu_bar.Append(tools_menu, "&Tools")
-#         self.SetMenuBar(menu_bar)
-#         # Event Handlers
-#         self.Bind(wx.EVT_MENU, self.Evt_Menu)
-# 
-#     def Evt_Menu(self, event):
-#         """Handle menu clicks"""
-#         evt_id = event.GetId()
-#         actions = { ID_TOOLS_MENU_SHOW_LOG  : self.open_log_pane
-#                   }
-#         action = actions.get(evt_id, None)
-#         if action:
-#             action()
-#             
+    def on_EVT_MENU(self, event):
+        """Handle menu clicks"""
+        event_id = event.GetId()
+        if event_id==Launcher.ID_MENU_SSH_PREFERENCES:
+            self.set_ssh_preferences()
+    
 
+             
+    def set_ssh_preferences(self):
+        print("set_ssh_preferences(self)")
+        dlg = sshtools.SSHPreferencesDialog(self)
+        answer = dlg.ShowModal()
+        if answer==wx.ID_OK:
+            dlg.update_preferences()
+        del dlg
+    
     def InitData(self):            
         items=[]
         for item in pbs.node_sets.iterkeys():

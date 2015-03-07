@@ -25,7 +25,7 @@ class SpinCtrl(wx.FlexGridSizer):
     """
     based on a wx.txtctrl and a wx.SpinButton (and the above validator)
     """
-    def __init__(self,parent,style=0,gap=0,converter=int,range_=None):
+    def __init__(self,parent,style=0,gap=0,converter=int,value=None,value_range=None,):
         super(SpinCtrl,self).__init__(1,2,gap,gap)
         self.name = "xx.SpinCtrl{} instance".format(int)
         self.frame = get_frame(parent)
@@ -38,12 +38,15 @@ class SpinCtrl(wx.FlexGridSizer):
         self.Add(self.txtctrl,1,wx.EXPAND)
         self.Add(self.spinner,0,0)
         
-        if range_ is None:
+        if value_range is None:
             default_range = default_ranges[self.converter]
         else:
-            default_range = range_
+            default_range = value_range
         self.SetRange(default_range)
         self.spinner.SetRange(-999999999,999999999)
+
+        if not value is None:
+            self.SetValue(value)
 
         self.spinner.Bind(wx.EVT_SPIN_DOWN , self.spinner_EVT_SPIN_DOWN)
         self.spinner.Bind(wx.EVT_SPIN_UP   , self.spinner_EVT_SPIN_UP  )
@@ -155,6 +158,9 @@ class SpinCtrl(wx.FlexGridSizer):
         
     def GetName(self):
         return self.name
+    
+    def SetToolTipString(self,tip):
+        self.txtctrl.SetToolTipString(tip)
 
 ################################################################################
 ### code below is for testing purposes only        
