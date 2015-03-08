@@ -3,16 +3,28 @@ import paramiko,wx
 import datetime,re,pprint
 import wxtools
 
-SSH_WORK_OFFLINE = True
-SSH_KEEP_CLIENT = False
-SSH_TIMEOUT = 15
+SSH_DEFAULTS = {"SSH_WORK_OFFLINE": True
+               ,"SSH_KEEP_CLIENT" : False
+               ,"SSH_TIMEOUT"     : 15
+               ,"SSH_WAIT"        : 30
+               ,"SSH_VERBOSE"     : True
+               ,"SSH_KEY"         : "''"
+               }
+for k,v in SSH_DEFAULTS.iteritems():
+    exec("{} = {}".format(k,v))
+        
+ID_BUTTON_SSH_RESET = wx.NewId()
+
+# SSH_WORK_OFFLINE = True
+# SSH_KEEP_CLIENT = False
+# SSH_TIMEOUT = 15
 #   Number of seconds that paramiko.SSHClient.connect attempts to
 #   to connect.
-SSH_WAIT = 30
+# SSH_WAIT = 30
 #   the minimum number of sceconds between two successive attempts 
 #   to make an ssh connection if the first attempt was unsuccesful.
-SSH_VERBOSE = True
-SSH_KEY=""
+# SSH_VERBOSE = True
+# SSH_KEY=""
 
 class Client(object):
     user_id          = None
@@ -184,6 +196,9 @@ class SSHPreferencesDialog(wx.Dialog):
         lst[-1]=[lst[-1],1,wx.EXPAND]
         lst[-2]=[lst[-2],0,wx.ALIGN_RIGHT]
         
+        lst.append( wx.StaticText(self) )
+        lst.append([wx.Button(self,ID_BUTTON_SSH_RESET,label="Reset to Defaults"),1,wx.EXPAND])
+
         lst.append([wx.Button(self, wx.ID_CANCEL),1,wx.EXPAND])
         lst.append([wx.Button(self, wx.ID_OK    ),1,wx.EXPAND])
         sizer =  wxtools.grid_layout(lst, ncols=2, growable_cols=[0,1])
