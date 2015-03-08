@@ -651,8 +651,6 @@ class Launcher(wx.Frame):
         event_id = event.GetId()
         if event_id==Launcher.ID_MENU_SSH_PREFERENCES:
             self.set_ssh_preferences()
-    
-
              
     def set_ssh_preferences(self):
         print("set_ssh_preferences(self)")

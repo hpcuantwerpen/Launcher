@@ -12,6 +12,7 @@ SSH_WAIT = 30
 #   the minimum number of sceconds between two successive attempts 
 #   to make an ssh connection if the first attempt was unsuccesful.
 SSH_VERBOSE = True
+SSH_KEY=""
 
 class Client(object):
     user_id          = None
@@ -178,6 +179,11 @@ class SSHPreferencesDialog(wx.Dialog):
         tip="Do not retry to connect before this many seconds"
         lst.extend(wxtools.pair(self, label="SSH_WAIT", value=SSH_WAIT, value_range=(0,360,10), tip=tip))
         lst[-2]=[lst[-2],0,wx.ALIGN_RIGHT]
+        tip="Path and filename of your ssh key for accessing the VSC clusters. If empty, Paramiko tries to find it automatically (not always successful)."
+        lst.extend(wxtools.pair(self, label="SSH_KEY", value=SSH_KEY, tip=tip))
+        lst[-1]=[lst[-1],1,wx.EXPAND]
+        lst[-2]=[lst[-2],0,wx.ALIGN_RIGHT]
+        
         lst.append([wx.Button(self, wx.ID_CANCEL),1,wx.EXPAND])
         lst.append([wx.Button(self, wx.ID_OK    ),1,wx.EXPAND])
         sizer =  wxtools.grid_layout(lst, ncols=2, growable_cols=[0,1])
@@ -197,7 +203,10 @@ class SSHPreferencesDialog(wx.Dialog):
     
     def update_preferences(self):
         print("\nUpdating SSH preferences:")
-        changed = False
+        changed = self.update_preference("SSH_KEY")
+        if changed:
+            del Client.paramiko_client
+            Client.paramiko_client = None
         changed |= self.update_preference("SSH_WORK_OFFLINE")    
         changed |= self.update_preference("SSH_KEEP_CLIENT")    
         changed |= self.update_preference("SSH_TIMEOUT")    
