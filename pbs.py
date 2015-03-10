@@ -200,6 +200,9 @@ class Script(object):
                         var = 'job_name'
                         self.values[var] = value[0]
                         value[0] = '${%s}'%var
+                    elif key=='-W':
+                        self.values['enforce_n_nodes'] = ('x=nmatchpolicy:exactnode' in value)
+                        
                     parsed_line = split_line[0]+' '+split_line[1]
                     for v in value:
                         parsed_line += ' '+v

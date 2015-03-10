@@ -1,4 +1,3 @@
-from __future__ import print_function
 import shutil,re,os,pickle,random,pprint,errno
 import sys,cStringIO,datetime,argparse,subprocess,traceback
 
@@ -137,6 +136,7 @@ class Launcher(wx.Frame):
     """
     regexp_userid = re.compile(r'vsc\d{5}')
     ID_MENU_SSH_PREFERENCES = wx.NewId()
+    ID_MENU_SSH_CONNECT     = wx.NewId()
 
     def __init__(self, parent, title):
         self.config = Config()
@@ -166,6 +166,8 @@ class Launcher(wx.Frame):
         self.bind('wNCoresPerNodeRequested' , 'EVT_SPINCTRL')
         self.bind('wNCoresRequested'        , 'EVT_SPINCTRL')
         self.bind('wGbPerCoreRequested'     , 'EVT_SPINCTRL')            
+        self.bind('wEnforceNNodes'          , 'EVT_CHECKBOX')
+#         self.bind('wNAccessPolicy'          , 'EVT_CHECKBOX')
 
         self.bind('wNodeSet'                , 'EVT_COMBOBOX')
         self.bind('wSelectModule'           , 'EVT_COMBOBOX')
@@ -273,9 +275,12 @@ class Launcher(wx.Frame):
         self.request_cores_memory()
         self.is_resources_modified = True
 
-    def wGbPerCoreRequested_EVT_SPINCTRL(self,event):
+    def wEnforceNNodes_EVT_CHECKBOX(self,event):
         self.log_event(event)
-        self.request_cores_memory()
+        self.is_resources_modified = True
+
+    def wNAccessPolicy_EVT_CHECKBOX(self,event):
+        self.log_event(event)
         self.is_resources_modified = True
  
     def wSelectModule_EVT_COMBOBOX(self,event):
@@ -443,6 +448,7 @@ class Launcher(wx.Frame):
         sizer_2 = wx.BoxSizer(wx.HORIZONTAL)
         sizer_2.Add(sizer_2a,1,wx.EXPAND,0)
         sizer_2.Add(sizer_2b,1,wx.EXPAND,0)
+        #sizer_3 = create_staticbox(self.wNotebookPageResources, "Node policies", orient=wx.HORIZONTAL)
         sizer_4 = create_staticbox(self.wNotebookPageResources, "Request compute time")
         sizer_5 = create_staticbox(self.wNotebookPageResources, "Notify")
         sizer_6 = create_staticbox(self.wNotebookPageResources, "Job name (=used as the parent folder)")
@@ -451,6 +457,7 @@ class Launcher(wx.Frame):
         sizer_9 = create_staticbox(self.wNotebookPageResources, "Job management",orient=wx.HORIZONTAL)
         self.wNotebookPageResources.SetSizer( grid_layout( [ [sizer_1,1,wx.EXPAND]
                                                            , [sizer_2,1,wx.EXPAND]
+                                                          #, [sizer_3,1,wx.EXPAND]
                                                            , [sizer_4,1,wx.EXPAND]
                                                            , [sizer_5,1,wx.EXPAND]
                                                            , [sizer_6,1,wx.EXPAND]
@@ -478,7 +485,9 @@ class Launcher(wx.Frame):
         self.wNCoresPerNodeRequested = xx.SpinCtrl  (self.wNotebookPageResources ) 
         txt2a4                       = wx.StaticText(self.wNotebookPageResources,label='Memory per node [GB]:') 
         self.wGbPerNodeGranted       = wx.TextCtrl  (self.wNotebookPageResources,style=wx.TE_READONLY|wx.TE_RIGHT) 
-        
+        txt2a6                       = wx.StaticText(self.wNotebookPageResources,label='enforce #nodes') 
+        self.wEnforceNNodes          = wx.CheckBox  (self.wNotebookPageResources)
+
         txt2b0                       = wx.StaticText(self.wNotebookPageResources,label='Number of cores:')
         self.wNCoresRequested        = xx.SpinCtrl  (self.wNotebookPageResources )
         txt2b2                       = wx.StaticText(self.wNotebookPageResources,label='Memory per core [GB]:')
@@ -488,13 +497,15 @@ class Launcher(wx.Frame):
         
         lst2a = [txt2a0, self.wNNodesRequested
                 ,txt2a2, self.wNCoresPerNodeRequested
-                ,txt2a4, self.wGbPerNodeGranted    ]
+                ,txt2a4, self.wGbPerNodeGranted
+                ,txt2a6, self.wEnforceNNodes         ]
         lst2b = [txt2b0, self.wNCoresRequested
                 ,txt2b2, self.wGbPerCoreRequested
-                ,txt2b4, self.wGbTotalGranted      ]
+                ,txt2b4, self.wGbTotalGranted       ]
 
         txt2a4                .SetForegroundColour(wx.TheColourDatabase.Find('GREY'))
         self.wGbPerNodeGranted.SetForegroundColour(wx.TheColourDatabase.Find('GREY'))
+        self.wEnforceNNodes   .SetValue(True)
         txt2b4                .SetForegroundColour(wx.TheColourDatabase.Find('GREY'))
         self.wGbTotalGranted  .SetForegroundColour(wx.TheColourDatabase.Find('GREY'))
        
@@ -512,6 +523,12 @@ class Launcher(wx.Frame):
 
         sizer_2a.Add(grid_layout(lst2a,ncols=2),0,wx.EXPAND,0 )
         sizer_2b.Add(grid_layout(lst2b,ncols=2),0,wx.EXPAND,0 )   
+        #sizer_3
+        
+#         self.wNAccessPolicy = wx.CheckBox(self.wNotebookPageResources,label="enforce single job/node (nacesspolicy)")
+#         self.wNAccessPolicy.SetValue(True)
+#         sizer_3.Add(grid_layout([[self.wEnforceNNodes ,1,wx.EXPAND]
+#                                 ,[self.wNAccessPolicy,1,wx.EXPAND]],growable_cols=[0,1]),1,wx.EXPAND,0)
         #sizer_4
         self.walltime_units    = ['seconds','minutes','hours','days ']
         self.walltime_unit_max = [ 60*60   , 60*24   , 24*7  , 7    ]
@@ -645,12 +662,17 @@ class Launcher(wx.Frame):
         menu_ssh = wx.Menu()
         menu_bar.Append(menu_ssh, "&SSH")
         menu_ssh.Append(Launcher.ID_MENU_SSH_PREFERENCES, "Preferences\tCtrl+P")
+        menu_ssh.Append(Launcher.ID_MENU_SSH_CONNECT    , "Retry to connect\tCtrl+R")
 
     def on_EVT_MENU(self, event):
         """Handle menu clicks"""
         event_id = event.GetId()
         if event_id==Launcher.ID_MENU_SSH_PREFERENCES:
             self.set_ssh_preferences()
+        if event_id==Launcher.ID_MENU_SSH_CONNECT:
+            ssh = sshtools.Client(self.get_user_id(),self.login_node,force=True)
+        else:
+            raise Exception("Unknown menu event id:"+str(event_id))
              
     def set_ssh_preferences(self):
         print("set_ssh_preferences(self)")
@@ -994,7 +1016,11 @@ class Launcher(wx.Frame):
                 else:
                     self.script.values['notify_address'] = self.wNotifyAddress.GetValue()
                     self.script.values['notify_abe'    ] = abe
-                
+                    
+        self.script.values['enforce_n_nodes'] = self.wEnforceNNodes.IsChecked()
+        if self.wEnforceNNodes.IsChecked():
+            self.script.add_pbs_option('-W','x=nmatchpolicy:exactnode')
+
         if self.wJobName.GetValue():
             if not 'job_name' in self.script.values:
                 self.script.add_pbs_option('-N',self.wJobName.GetValue())
@@ -1005,6 +1031,7 @@ class Launcher(wx.Frame):
         self.format_script(lines)
         
     def format_script(self,lines):
+        print("Formatting script.")
         self.wScript.ClearAll()
         for line in lines:
             self.wScript.AddText(line)
@@ -1022,6 +1049,7 @@ class Launcher(wx.Frame):
         new_request|= self.update_value(self.wNCoresPerNodeRequested,'n_cores_per_node')
         if new_request:
             self.request_nodes_cores()
+        self.update_value(self.wEnforceNNodes, '')
         
         v = self.script.values.get('walltime_seconds')
         if v:
@@ -1186,8 +1214,11 @@ class Launcher(wx.Frame):
                         self.set_status_text("  Creating folder '{}'".format(dst))
                         cmd = "mkdir -p "+dst
                         out,err = ssh.execute(cmd)
+                job_name = self.wJobName.GetValue()
                 for f in files:
-                    if not f.startswith('.'):
+                    if  (not f.startswith('.')          ) \
+                    and (not f.startswith(job_name+".o")) \
+                    and (not f.startswith(job_name+".e")):
                         self.set_status_text("  Copying file '{}/{}' to '{}'".format(folder,f,remote))
                         src = os.path.join(folder,f)
                         dst = os.path.join(remote,f)
@@ -1264,8 +1295,7 @@ class Launcher(wx.Frame):
         
         try:
             cmd = 'cd '+remote_folder
-            ssh_verbose=True
-            out,err = ssh.execute(cmd, ssh_verbose)
+            out,err = ssh.execute(cmd)
             if err:
                 ssh.close()
                 self.set_status_text("Failed to retrieve job {} : '{}': remote folder '{}' not found.".format(job_id,job_name,remote_folder))
@@ -1273,7 +1303,7 @@ class Launcher(wx.Frame):
                 return FJR_INEXISTING
             
             cmd += " && tree -fi"
-            out,err = ssh.execute(cmd+" --noreport", ssh_verbose)
+            out,err = ssh.execute(cmd+" --noreport")
             remote_files_and_folders = make_tree_output_relative(out)
             o = job_name+'.o'+job_id
             if not o in remote_files_and_folders:
@@ -1283,7 +1313,7 @@ class Launcher(wx.Frame):
                 return FJR_NOT_FINISHED
             
             cmd += "d --noreport"
-            out,err = ssh.execute(cmd, ssh_verbose)
+            out,err = ssh.execute(cmd)
             remote_folders = make_tree_output_relative(out)
             for f in remote_folders:
                 if self.wCopyToLocalDisk.IsChecked():
@@ -1294,7 +1324,7 @@ class Launcher(wx.Frame):
                     lf = os.path.join(self.vsc_data_folder,f)
                     self.set_status_text("Creating $VSC_DATA folder '{}'.".format(lf))
                     cmd = "mkdir -p "+lf
-                    out,err = ssh.execute(cmd, ssh_verbose)
+                    out,err = ssh.execute(cmd)
                     
             for f in remote_files_and_folders:
                 if not f in remote_folders:
@@ -1307,7 +1337,7 @@ class Launcher(wx.Frame):
                         lf = os.path.join(self.vsc_data_folder,f)
                         self.set_status_text("Copying remote file '{}' to '{}'.".format(rf,lf))
                         cmd = "cp {} {}".format(rf,lf)
-                        out,err = ssh.execute(cmd, ssh_verbose)
+                        out,err = ssh.execute(cmd)
                     
             ssh.close()
             self.set_status_text("Successfully retrieved job {}. Local folder is {}".format(job_id,local_folder))
