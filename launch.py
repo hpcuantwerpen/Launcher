@@ -1,5 +1,5 @@
-import shutil,re,os,pickle,random,pprint,errno
 import sys,cStringIO,datetime,argparse,subprocess,traceback
+import re,os,random,shutil,pprint,errno,pickle
 
 import wx
 import xx
@@ -363,6 +363,7 @@ class Launcher(wx.Frame):
     def wRetrieveJobs_EVT_BUTTON(self,event):
         self.log_event(event)
         self.retrieve_finished_jobs()
+        self.wNotebook.ChangeSelection(2)
 
     def wRefresh_EVT_BUTTON(self,event):
         self.log_event(event)
@@ -451,13 +452,12 @@ class Launcher(wx.Frame):
         #sizer_3 = create_staticbox(self.wNotebookPageResources, "Node policies", orient=wx.HORIZONTAL)
         sizer_4 = create_staticbox(self.wNotebookPageResources, "Request compute time")
         sizer_5 = create_staticbox(self.wNotebookPageResources, "Notify")
-        sizer_6 = create_staticbox(self.wNotebookPageResources, "Job name (=used as the parent folder)")
+        sizer_6 = create_staticbox(self.wNotebookPageResources, "Job name")
         sizer_7 = create_staticbox(self.wNotebookPageResources, "Local file location")
         sizer_8 = create_staticbox(self.wNotebookPageResources, "Remote file location",orient=wx.VERTICAL)
         sizer_9 = create_staticbox(self.wNotebookPageResources, "Job management",orient=wx.HORIZONTAL)
         self.wNotebookPageResources.SetSizer( grid_layout( [ [sizer_1,1,wx.EXPAND]
                                                            , [sizer_2,1,wx.EXPAND]
-                                                          #, [sizer_3,1,wx.EXPAND]
                                                            , [sizer_4,1,wx.EXPAND]
                                                            , [sizer_5,1,wx.EXPAND]
                                                            , [sizer_6,1,wx.EXPAND]
@@ -473,9 +473,11 @@ class Launcher(wx.Frame):
                                    , value=cluster
                                    , style=wx.CB_DROPDOWN|wx.CB_READONLY|wx.CB_SIMPLE|wx.EXPAND
                                    )
+        self.wCluster.SetToolTipString("Select the cluster to which you want to submit a job.")
         self.wNodeSet = wx.ComboBox(self.wNotebookPageResources, wx.ID_ANY, choices=["thin_nodes (64GB)", "fat_nodes (256GB)"]
                                    , style=wx.CB_DROPDOWN|wx.CB_READONLY|wx.CB_SIMPLE|wx.EXPAND
                                    )
+        self.wNodeSet.SetToolTipString("Select the pool of nodes from which resources must be requested.")
         sizer_1.Add(grid_layout([self.wCluster,[self.wNodeSet,1,wx.EXPAND]],growable_cols=[1]),1,wx.EXPAND,0 )        
        
         #sizer_2a and sizer_2b
@@ -495,20 +497,46 @@ class Launcher(wx.Frame):
         txt2b4                       = wx.StaticText(self.wNotebookPageResources,label='Memory total [GB]:')
         self.wGbTotalGranted         = wx.TextCtrl  (self.wNotebookPageResources,style=wx.TE_READONLY|wx.TE_RIGHT)
         
-        lst2a = [txt2a0, self.wNNodesRequested
-                ,txt2a2, self.wNCoresPerNodeRequested
-                ,txt2a4, self.wGbPerNodeGranted
-                ,txt2a6, self.wEnforceNNodes         ]
-        lst2b = [txt2b0, self.wNCoresRequested
-                ,txt2b2, self.wGbPerCoreRequested
-                ,txt2b4, self.wGbTotalGranted       ]
-
+        set_tool_tip_string([txt2a0,self.wNNodesRequested]
+                           ,tip="Number of nodes your job will use."
+                           )
+        set_tool_tip_string([txt2a2,self.wNCoresPerNodeRequested]
+                           ,tip="Number of cores per node your job will use."
+                           )
+        set_tool_tip_string([txt2a4,self.wGbPerNodeGranted]
+                           ,tip="Available memory per node (after substraction of the memory spaced occupied by the operating system)."
+                           )
+        set_tool_tip_string([txt2a6,self.wEnforceNNodes]
+                           ,tip="Prevent cores not requested from being used by another job."
+                           )
+        set_tool_tip_string([txt2b0,self.wNCoresRequested]
+                           ,tip="Enter the total number of cores requested for your job. "\
+                                "After pressing enter, this will show the number of cores granted"
+                           )
+        set_tool_tip_string([txt2b2,self.wGbPerCoreRequested]
+                           ,tip="Enter the memory [Gb] per core you request for your job. "\
+                                "After pressing Enter, this will show the average memory per core available to your job."
+                           )
+        set_tool_tip_string([txt2b4,self.wGbTotalGranted]
+                           ,tip="Total amount of memory [Gb] available to your job."
+                           )    
+    
         txt2a4                .SetForegroundColour(wx.TheColourDatabase.Find('GREY'))
         self.wGbPerNodeGranted.SetForegroundColour(wx.TheColourDatabase.Find('GREY'))
         self.wEnforceNNodes   .SetValue(True)
         txt2b4                .SetForegroundColour(wx.TheColourDatabase.Find('GREY'))
         self.wGbTotalGranted  .SetForegroundColour(wx.TheColourDatabase.Find('GREY'))
-       
+
+        lst2a = [txt2a0, self.wNNodesRequested
+                ,txt2a2, self.wNCoresPerNodeRequested
+                ,txt2a4, self.wGbPerNodeGranted
+                ,txt2a6, self.wEnforceNNodes
+                ]
+        lst2b = [txt2b0, self.wNCoresRequested
+                ,txt2b2, self.wGbPerCoreRequested
+                ,txt2b4, self.wGbTotalGranted
+                ]
+
 #        (w,h) = (0,0)
 #         for i in lst2a:
 #             sz = i.GetSize()
@@ -523,12 +551,6 @@ class Launcher(wx.Frame):
 
         sizer_2a.Add(grid_layout(lst2a,ncols=2),0,wx.EXPAND,0 )
         sizer_2b.Add(grid_layout(lst2b,ncols=2),0,wx.EXPAND,0 )   
-        #sizer_3
-        
-#         self.wNAccessPolicy = wx.CheckBox(self.wNotebookPageResources,label="enforce single job/node (nacesspolicy)")
-#         self.wNAccessPolicy.SetValue(True)
-#         sizer_3.Add(grid_layout([[self.wEnforceNNodes ,1,wx.EXPAND]
-#                                 ,[self.wNAccessPolicy,1,wx.EXPAND]],growable_cols=[0,1]),1,wx.EXPAND,0)
         #sizer_4
         self.walltime_units    = ['seconds','minutes','hours','days ']
         self.walltime_unit_max = [ 60*60   , 60*24   , 24*7  , 7    ]
@@ -541,10 +563,15 @@ class Launcher(wx.Frame):
         self.wWalltime.SetValue( self.config.attributes['walltime_value'] )
         self.walltime_seconds = self.wWalltime.GetValue()*self.walltime_unit_sec[i_unit]
         
-        lst = [ wx.StaticText(self.wNotebookPageResources,label='wall time:') ]
-        lst.append( self.wWalltime )
-        lst.append( self.wWalltimeUnit )
+        lst = [ [wx.StaticText(self.wNotebookPageResources,label='wall time:'),0,wx.ALIGN_CENTER_VERTICAL]
+              , [self.wWalltime,0,wx.ALIGN_CENTER_VERTICAL]
+              , [self.wWalltimeUnit,0,wx.ALIGN_CENTER_VERTICAL]
+              ]
+        set_tool_tip_string([lst[0][0],self.wWalltime], tip="Expected duration of your job (upper bound).")
+        set_tool_tip_string(self.wWalltimeUnit, tip="Unit in which the walltime is expressed.")
+        
         sizer_4.Add(grid_layout(lst),0,wx.EXPAND,0 )
+        
         #sizer_5
         sizer_5a = wx.BoxSizer(wx.HORIZONTAL)
         self.wNotifyAddress      = wx.TextCtrl(self.wNotebookPageResources,style=wx.EXPAND|wx.TE_PROCESS_ENTER|wx.TE_PROCESS_TAB,value=self.config.attributes['mail_to'])
@@ -559,17 +586,28 @@ class Launcher(wx.Frame):
         sizer_5.Add(sizer_5a,1,wx.EXPAND,0)
         sizer_5.Add(sizer_5b,1,wx.EXPAND,0)
         
-#         lst = [[self.wNotifyAddress,1,wx.EXPAND], self.wNotifyBegin, self.wNotifyEnd, self.wNotifyAbort]
-#         sizer_5.Add(grid_layout(lst,ncols=1,growable_cols=[0]),1,wx.EXPAND,0 )
         if not is_valid_mail_address(self.wNotifyAddress.GetValue()):
             self.wNotifyAddress.SetForegroundColour(wx.TheColourDatabase.Find('GREY'))
+        
         #sizer_6
         self.wJobName = wx.TextCtrl(self.wNotebookPageResources,style=wx.EXPAND|wx.TE_PROCESS_ENTER|wx.TE_PROCESS_TAB)
+        set_tool_tip_string(self.wJobName
+                           ,tip="The job name is used as the name of the parent folder where your job script "\
+                                "(pbs.sh) is stored in the local and remote file location. Typically also input "\
+                                "and output file are stored here.\n"\
+                                "If you do not provide a job name Launcher will propose a random name."
+                           )
         sizer_6.Add(self.wJobName,1,wx.EXPAND,0)
+        
         #sizer_7
         self.local_parent_folder = self.config.attributes['local_files']
         self.wLocalFileLocation = wx.TextCtrl(self.wNotebookPageResources,value=self.local_parent_folder)
+        set_tool_tip_string(self.wLocalFileLocation
+                           ,tip="Local folder where your job script/input/output is stored. The parent folder "\
+                                "is based on the job name."
+                           )
         sizer_7.Add(self.wLocalFileLocation,1,wx.EXPAND,0)
+
         #sizer_8
         self.wUserId   = wx.TextCtrl(self.wNotebookPageResources,value=self.config.attributes['user_id'],style=wx.TE_PROCESS_ENTER)
         self.wRemoteLocation = wx.ComboBox(self.wNotebookPageResources,choices=['$VSC_SCRATCH','$VSC_DATA'])
@@ -586,17 +624,47 @@ class Launcher(wx.Frame):
         lst2 = [ [grid_layout(lst1, 3, growable_cols=[2]),1,wx.EXPAND]
                , [self.wRemoteFileLocation,1,wx.EXPAND]
                ]
+        set_tool_tip_string([lst1[0],self.wUserId]
+                           , tip="Your VSC account (vscXXXXX)."
+                           )
+        set_tool_tip_string([lst1[1],self.wRemoteLocation]
+                           , tip="Scratch disk space is the preferred location to run your job."
+                           )
+        set_tool_tip_string([lst1[2],self.wRemoteSubfolder]
+                           , tip="Remote location of your job folder (relative to <location>)."
+                           )
+        set_tool_tip_string(self.wRemoteFileLocation
+                           , tip="Remote location of your job files (<location>/<subfolder>/<jobname>)."
+                           )
         sizer_8.Add( grid_layout(lst2, 1, growable_cols=[0]),1,wx.EXPAND,0)
+        
         #sizer_9
-#         self.wLoadJob   = wx.Button(self.wNotebookPageResources,label="Load")
-#         sizer_9.Add(self.wLoadJob   ,1,wx.EXPAND,0)
-        self.wSaveJob   = wx.Button(self.wNotebookPageResources,label="Save (to local disk)")
+        self.wSaveJob   = wx.Button(self.wNotebookPageResources,label="Save")
         self.wSubmitJob = wx.Button(self.wNotebookPageResources,label="Submit")
         self.wRetrieveJobs  = wx.Button(self.wNotebookPageResources,label="Retrieve results")
         self.wCopyToLocalDisk = wx.CheckBox(self.wNotebookPageResources,label="Copy to local disk")
         self.wCopyToVSCDATA   = wx.CheckBox(self.wNotebookPageResources,label="Copy to $VSC_DATA")
         self.wCopyToLocalDisk.SetValue(True)
         self.wCopyToVSCDATA  .SetValue(False)
+
+        set_tool_tip_string(self.wSaveJob
+                           , tip="Save the job script in the local file location (<local_file_location>/<jobname>/pbs.sh)."\
+                           )
+        set_tool_tip_string(self.wSubmitJob
+                           , tip="Save the job script in the local file location, copy the local job folder to "\
+                                 "the remote file location, and submit the job."
+                           )
+        set_tool_tip_string(self.wRetrieveJobs
+                           , tip="If the job is finished copy the remote job folder back to the local file location and/or "\
+                                 "the $VSC_DATA disk space."
+                           )
+        set_tool_tip_string(self.wCopyToLocalDisk
+                           , tip="Specify that the remote job folder must be copied back to the local file location."
+                           )
+        set_tool_tip_string(self.wRetrieveJobs
+                           , tip="Specify that the remote job folder (if on $VSC_SCRATCH) must be copied back to the $VSC_DATA."
+                           )
+
         sizer_9a = wx.BoxSizer(orient=wx.VERTICAL)
         sizer_9a.Add(self.wRetrieveJobs   ,1,wx.EXPAND,0)
         sizer_9a.Add(self.wCopyToLocalDisk,1,wx.EXPAND,0)
@@ -615,7 +683,7 @@ class Launcher(wx.Frame):
         self.wScript = PbsEditor(self.wNotebookPageScript)
 
         sizer_1 = wx.BoxSizer(wx.HORIZONTAL)
-        sizer_1.Add(wx.StaticText(self.wNotebookPageScript,label="Select module:"),0,wx.ALIGN_CENTER_VERTICAL,1)
+        sizer_1.Add(wx.StaticText(self.wNotebookPageScript,label="Select module to load:"),0,wx.ALIGN_CENTER_VERTICAL,1)
         self.wSelectModule = wx.ComboBox(self.wNotebookPageScript,style=wx.CB_DROPDOWN|wx.CB_READONLY|wx.CB_SIMPLE)
         sizer_1.Add(self.wSelectModule,1,wx.EXPAND,0)
         sizer_0.Add( grid_layout( [ [self.wScript,2,wx.EXPAND], [sizer_1,0,wx.EXPAND] ]
@@ -670,7 +738,8 @@ class Launcher(wx.Frame):
         if event_id==Launcher.ID_MENU_SSH_PREFERENCES:
             self.set_ssh_preferences()
         if event_id==Launcher.ID_MENU_SSH_CONNECT:
-            ssh = sshtools.Client(self.get_user_id(),self.login_node,force=True)
+            sshtools.Client(self.get_user_id(),self.login_node,force=True)
+            # the object is not stored because it is not used 
         else:
             raise Exception("Unknown menu event id:"+str(event_id))
              
@@ -836,7 +905,7 @@ class Launcher(wx.Frame):
         user_id = self.wUserId.Value
         pattern=re.compile(r'vsc\d{5}')
         m = pattern.match(user_id)
-        return (not m is None)
+        return None if (m is None) else user_id
     
     def cluster_has_changed(self):
         cluster = self.get_cluster()
@@ -910,9 +979,6 @@ class Launcher(wx.Frame):
         self.wNCoresPerNodeRequested.GetTextCtrl().SetForegroundColour(wx.BLACK)        
         self.wNCoresRequested       .GetTextCtrl().SetForegroundColour(wx.BLUE)
         self.wGbPerCoreRequested    .GetTextCtrl().SetForegroundColour(wx.BLUE)
-
-    def get_user_id(self):
-        return self.validate_user_id(self.wUserId.GetValue())
         
     def get_remote_file_location(self):
         ssh = sshtools.Client(self.get_user_id(),self.login_node)
@@ -1387,7 +1453,7 @@ class Launcher(wx.Frame):
         self.show_jobs(self.wJobsRetrieved,self.retrieved_jobs)
     
     def show_submitted_jobs(self):
-        self.show_jobs(self.wJobsSubmitted,self.config.attributes['submitted_jobs'])        
+        self.show_jobs(self.wJobsSubmitted,self.config.attributes['submitted_jobs'],none="All finished jobs are retrieved.\n")        
         ssh = sshtools.Client(self.get_user_id(),self.login_node)
         if ssh.connected():
             cmd = "qstat -u "+self.wUserId.GetValue()
@@ -1400,7 +1466,7 @@ class Launcher(wx.Frame):
             msg = 'No info on status of submitted jobs (no Paramiko/SSH connection).'
             self.set_status_text(msg)
             
-    def show_jobs(self,textctrl,jobs):
+    def show_jobs(self,textctrl,jobs,none="-- none --"):
         """
         show information on a set of jobs in textctrl
         """
@@ -1412,7 +1478,7 @@ class Launcher(wx.Frame):
                     textctrl.AppendText("   {:<13} : '{}'\n".format(kk,vv))
                 textctrl.AppendText("\n")
         else:
-            textctrl.SetValue('-- none --')
+            textctrl.SetValue(none)
 
     def validate_user_id(self,user_id):
         msg ="Enter a valid VSC user_id (e.g. vscDDDDD)\nor press Cancel: "

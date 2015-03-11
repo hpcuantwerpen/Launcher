@@ -112,13 +112,15 @@ class Client(object):
             pwd = None
             while True:
                 try:
+                    if not user_id:
+                        raise Exception("invalid user id")
                     if not ssh:
                         ssh = paramiko.SSHClient()
                         if SSH_VARIABLES["SSH_KEY"]:
                             ssh.load_host_keys(SSH_VARIABLES["SSH_KEY"])
                         else:
                             ssh.load_system_host_keys()
-                        #ssh.load_system_keys("/home/Users/etijskens/.ssh/newkey")
+                        
                     if pwd is None:
                         #ssh.connect(login_node, username=user_id)
                         ssh.connect(login_node, username=user_id,timeout=SSH_VARIABLES["SSH_TIMEOUT"])

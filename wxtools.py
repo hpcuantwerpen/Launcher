@@ -72,3 +72,12 @@ def pair(parent,label, value=None, value_range=None,tip=None,style0=0,style1=0):
         text  .SetToolTipString(tip)
         widget.SetToolTipString(tip)
     return [text,widget]
+
+def set_tool_tip_string(controls,tip=""):
+    if not isinstance(controls,(list,tuple)):
+        #a single control
+        controls.SetToolTipString(tip)
+    else:
+        #list of tuple of controls
+        for ctrl in controls:
+            ctrl.SetToolTipString(tip)
