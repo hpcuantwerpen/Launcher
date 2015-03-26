@@ -243,7 +243,9 @@ class Script(object):
         if not s.endswith('\n'):
             s+='\n'
         pos = 1 if self.parsed[0].startswith('#!') else 0
-        self.parsed.insert(pos,s)
+        pprint.pprint(self.parsed)
+        if not s in self.parsed:
+            self.parsed.insert(pos,s)
         self.parse1(pos)
         
 #     def _process_mpirun_cmd(self,cmd):

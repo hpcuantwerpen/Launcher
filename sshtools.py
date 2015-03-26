@@ -129,12 +129,11 @@ class Client(object):
                 
                 except paramiko.ssh_exception.PasswordRequiredException as e:
                     print("Handled exception:",e)
-                    dlg = wx.PasswordEntryDialog(self,"Enter pass phrase to unlock your key:")
+                    dlg = wx.PasswordEntryDialog(None,"Enter pass phrase to unlock your key:")
                     res = dlg.ShowModal()
-                    if res==wx.ID_OK:
-                        pwd = dlg.GetValue()
-                        del dlg
-                    else:
+                    pwd = dlg.GetValue()
+                    dlg.Destroy()
+                    if res!=wx.ID_OK:
                         del ssh
                         ssh = None
                         Client.last_try = datetime.datetime.now()
@@ -145,10 +144,10 @@ class Client(object):
                     print("Handled exception:",e)
                     dlg = wx.PasswordEntryDialog(self,"Wrong password, retry ...\nEnter pass phrase to unlock your key:")
                     res = dlg.ShowModal()
-                    if res==wx.ID_OK:
-                        pwd = dlg.GetValue()
-                        del dlg
-                    else:
+                    pwd = dlg.GetValue()
+                    dlg.Destroy()
+                    if res!=wx.ID_OK:
+                        pwd = None
                         del ssh
                         ssh = None
                         Client.last_try = datetime.datetime.now()

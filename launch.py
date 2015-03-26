@@ -290,16 +290,16 @@ class Launcher(wx.Frame):
         
     def wNotebook_EVT_NOTEBOOK_PAGE_CHANGED(self,event):
         #this event handler takes care of updating and showing the contents of the notebook pages
-        #on sindowe and linux
+        #on windows and linux
         assert sys.platform not in ("darwin"), "This event handler must not be bound on MacOSX"
         
         self.log_event(event)
-        print(event.GetSelection())
+        print("wNotebook_EVT_NOTEBOOK_PAGE_CHANGED to",event.GetSelection())
         if event.GetSelection()==1:
             self.update_script_from_resources()
         elif event.GetSelection()==2:
             self.wJobsRetrieved_EVT_SET_FOCUS("wNotebook_EVT_NOTEBOOK_PAGE_CHANGED() calling wJobsRetrieved_EVT_SET_FOCUS()")
-        
+        event.Skip()
 
     def wScript_EVT_SET_FOCUS(self,event):
         self.log_event(event)
@@ -1050,7 +1050,6 @@ class Launcher(wx.Frame):
         
     def update_script_from_resources(self):       
         if not self.is_resources_modified:
-            print('yououdj;fj')
             return
         print('  resources modified, updating script')
         #make sure all values are transferred to self.script.values
