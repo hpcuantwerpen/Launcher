@@ -141,7 +141,6 @@ class Launcher(wx.Frame):
     def __init__(self, parent, title):
         self.config = Config()
         #set the window size
-        #TODO : if the last size is stored in Launcher.config this can be removed.
         frame_size = self.config.attributes.get("frame_size",(500,500))
    
         #allow sshtools to set the statusbar of the Launcher    
@@ -1320,7 +1319,7 @@ class Launcher(wx.Frame):
     def set_status_text(self,msg,colour=wx.BLACK):
         print('\nStatus bar text: '+msg)
         self.SetStatusText(msg)
-        #todo alloe for colored messages?
+        #todo allow for colored messages? not working on macosx
         #self.GetStatusBar().SetForeGroundColour(colour)
     
     def submit_job(self):
@@ -1516,6 +1515,7 @@ class RedirectStdStreams(object):
 def run_launcher():
     app = wx.App()
     frame = Launcher(None,"launch-4")
+    frame.
     log = frame.log
     app.SetTopWindow(frame)
     app.MainLoop()

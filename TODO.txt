@@ -1,10 +1,13 @@
 TODO LIST
-- store last window size in configuration and use it when the Launcher is reopened.
-- crreate public repository
+- create public repository
 - automatic check for updates
 - improve the log
 - test on linux ubuntu
 - test Launcher.node_set_has_changed
+	nodesets require extra pbs options.
+
 - add menu with some tools to 
 	. edit clusters
 	. login nodes
+
++ store last window size in configuration and use it when the Launcher is reopened.
