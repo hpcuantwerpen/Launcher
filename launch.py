@@ -11,6 +11,8 @@ from wxtools import *
 from BashEditor import PbsEditor
 import pbs
 
+wx.ToolTip.Enable(True)
+
 ######################
 ### some constants ###
 ######################
@@ -1515,7 +1517,6 @@ class RedirectStdStreams(object):
 def run_launcher():
     app = wx.App()
     frame = Launcher(None,"launch-4")
-    frame.
     log = frame.log
     app.SetTopWindow(frame)
     app.MainLoop()
