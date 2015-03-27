@@ -1,10 +1,12 @@
-import sys,cStringIO,datetime,argparse,subprocess,traceback
+from __future__ import print_function
+import sys,cStringIO,datetime,argparse,subprocess,traceback,time
 import re,os,random,shutil,pprint,errno,pickle
 
 import wx
 import xx
 import wx.lib.newevent
 import sshtools
+import indent
 
 from wxtools import *
 
@@ -29,6 +31,9 @@ __VERSION__ = (0,1)
 #####################################
 ### some wx convenience functions ###
 #####################################
+
+
+indented = indent.Indent()
 
 def is_valid_mail_address(address):
     s = address.lower()
@@ -130,8 +135,7 @@ class Config(object):
     def save(self):
         pickle.dump(self.attributes,open(self.cfg_file,'w+'))
 
-
-
+    
 class Launcher(wx.Frame):
     """
     the Launcher gui
@@ -161,8 +165,8 @@ class Launcher(wx.Frame):
         
         self.bind('wCluster'                , 'EVT_COMBOBOX')
         self.bind('wNodeSet'                , 'EVT_COMBOBOX')
-        if sys.platform in ("win32","linux2"):
-            self.bind('wNotebook'           , 'EVT_NOTEBOOK_PAGE_CHANGED')
+        self.bind('wNotebook'               , 'EVT_NOTEBOOK_PAGE_CHANGING')
+        self.bind('wNotebook'               , 'EVT_NOTEBOOK_PAGE_CHANGED')
         self.bind('wNNodesRequested'        , 'EVT_SPINCTRL')
         self.bind('wNCoresPerNodeRequested' , 'EVT_SPINCTRL')
         self.bind('wNCoresRequested'        , 'EVT_SPINCTRL')
@@ -225,25 +229,27 @@ class Launcher(wx.Frame):
             if k[0]=='w' and k[1].isupper():
                 v.SetName(k)
             
-    def log_event(self,event):
+    def log_event(self,event,msg=None):
         """
         log information about the event
         """
-        print("\n<<  Launcher.log_event():")
+        indent.print_item_header("Launcher.log_event():")
         if isinstance(event,(str,unicode)):
-            print(event)
+            print(indented(event,4))
         else:
             t = str(type(event))
-            print("Event.type ",t)
+            print(indented("Event.type "+t,4))
             if "wx.lib.newevent._Event" in t:
-                print("custom event")
-                pprint.pprint(event.__dict__)
+                print("    custom event")
+                print(indented(event.__dict__,4))
             else:
-                print(  "     .object.name :",event.GetEventObject().GetName())
-                print(  "     .object.class:",event.GetEventObject().GetClassName())
-        print(">>")
+                print("         .object.name : "+event.GetEventObject().GetName())
+                print("         .object.class: "+event.GetEventObject().GetClassName())
+        if msg: 
+            print(msg)
+        indent.print_item_footer()
         self.SetStatusText("")
-    
+        
     ### event handlerss ###        
     def wCluster_EVT_COMBOBOX(self,event):
         self.log_event(event)
@@ -288,16 +294,26 @@ class Launcher(wx.Frame):
         self.log_event(event)
         self.add_module()
         
-    def wNotebook_EVT_NOTEBOOK_PAGE_CHANGED(self,event):
-        #this event handler takes care of updating and showing the contents of the notebook pages
-        #on windows and linux
-        assert sys.platform not in ("darwin"), "This event handler must not be bound on MacOSX"
-        
-        self.log_event(event)
-        print("wNotebook_EVT_NOTEBOOK_PAGE_CHANGED to",event.GetSelection())
-        if event.GetSelection()==1:
+    def wNotebook_EVT_NOTEBOOK_PAGE_CHANGING(self,event):
+        #see http://wiki.wxpython.org/Notebooks        
+        old_page = event.GetOldSelection()
+        new_page = event.GetSelection()
+        selected = self.wNotebook.GetSelection()
+        msg='wNotebook_EVT_NOTEBOOK_PAGE_CHANGING():  old_page:%d, new_page:%d, selected:%d' % (old_page, new_page, selected)
+        self.log_event(event,msg=msg)
+        if old_page==0:
             self.update_script_from_resources()
-        elif event.GetSelection()==2:
+        elif old_page==1:
+            self.update_resources_from_script()
+        event.Skip()
+        
+    def wNotebook_EVT_NOTEBOOK_PAGE_CHANGED(self,event):        
+        old_page = event.GetOldSelection()
+        new_page = event.GetSelection()
+        selected = self.wNotebook.GetSelection()
+        msg='wNotebook_EVT_NOTEBOOK_PAGE_CHANGED():  old_page:%d, new_page:%d, selected:%d' % (old_page, new_page, selected)
+        self.log_event(event,msg=msg)
+        if new_page==2:
             self.wJobsRetrieved_EVT_SET_FOCUS("wNotebook_EVT_NOTEBOOK_PAGE_CHANGED() calling wJobsRetrieved_EVT_SET_FOCUS()")
         event.Skip()
 
@@ -420,14 +436,13 @@ class Launcher(wx.Frame):
 
     def on_EVT_CLOSE(self,event=None):
         self.log_event(event)
-        print('\nlauncher closing - '+str(datetime.datetime.now()))
+        indent.print_item_header('Launcher closing')
         frame_size = self.GetSize()
         self.config.attributes['frame_size'] = frame_size
-        print("\nframe_size =",frame_size)
-        print('\nsaving config file.')
+        print('    Saving config file.')
         self.config.save()
         self.Destroy()
-        print('\nlaunch-2.py - end of log')
+        indent.print_item_footer('end of log')
              
     ### the widgets ###
     def init_ui(self):        
@@ -790,22 +805,54 @@ class Launcher(wx.Frame):
             old_log = self.log+str(random.random())[1:]
             shutil.copy(self.log,old_log)
 
-        print('launch-2.py - begin of log - '+str(datetime.datetime.now()))
-        print("\nVersion info of used components")
-        print("===============================")
-        print("Python version:")
-        print(sys.version)
-        print("wxPython version:",wx.version())
-        print("paramiko version:",sshtools.paramiko.__version__)
+        indent.print_item_header('launch.py')
+        print('   begin of log.')
+        indent.print_item_footer()
+        
+        indent.print_item_header("Version info of used components")
+        print("    Python version:")
+        print(indented(sys.version,8))
+        print("    wxPython version:")
+        print(indented(wx.version(),8))
+        print("    paramiko version:")
+        print(indented(sshtools.paramiko.__version__,8))
+        print("    Launcher version:")
         try:
-            print("Launcher version:",subprocess.check_output(["git","describe","HEAD"]))
+            s=subprocess.check_output(["git","describe","HEAD"])
+            if s[-1]=='\n':
+                s = s[:-1]
         except:
-            print("Launcher version: v{}.{}".format(*__VERSION__))
-        print("Platform:",sys.platform)
-
+            s="v{}.{}".format(*__VERSION__)
+        print(indented(s,8))
+        print("    Platform:")
+        print(indented(sys.platform,8))
+        indent.print_item_footer()
+        
+        indent.print_item_header("cleaning log files")
         if old_log:
-            print("\nRenaming previous log file 'Launcher.log' to\n    '{}'.".format(old_log))
-
+            print("    Renaming previous log file 'Launcher.log' to '{}'".format(old_log))
+            
+        remove_logs_older_than = 14 
+        removed=0
+        if remove_logs_older_than:
+            now = time.time()
+            threshold = now - 60*60*24*remove_logs_older_than # Number of seconds in two days
+            for folder,sub_folders,files in os.walk(self.config.launcher_home):
+                if folder==self.config.launcher_home:
+                    for fname in files:
+                        if fname.startswith("Launcher.log."):
+                            fpath = os.path.join(folder,fname)
+                            ftime = os.path.getctime(fpath)
+                            if ftime<threshold:
+                                os.remove(fpath)
+                                removed += 1
+#                                 print('*',fname,ftime)
+#                             else:
+#                                 print(' ',fname,ftime) 
+                    break
+            print("    Removed {} log files older than {} days.".format(removed,remove_logs_older_than))
+        indent.print_item_footer()
+            
     def remote_location_has_changed(self):
         if self.wRemoteLocation.GetValue()=="$VSC_DATA":
             self.wCopyToVSCDATA.SetValue(False)
@@ -844,7 +891,7 @@ class Launcher(wx.Frame):
                     self.set_status_text("The script was not loaded. It will be overwritten when pressing the 'Save' button.")
                     self.is_script_up_to_date = False
                 elif answer==wx.YES:
-                    self.load_job()
+                    self.load_job_script()
                     self.set_status_text("Script '{}' is loaded.".format(f_script))
         else:
             self.wLocalFileLocation.SetValue( self.local_parent_folder )
@@ -911,9 +958,7 @@ class Launcher(wx.Frame):
     def cluster_has_changed(self):
         cluster = self.get_cluster()
         self.set_node_set_items(pbs.node_sets[cluster])
-        self.login_node = pbs.logins[cluster]
-        self.login_node = "login1-hopper.uantwerpen.be"
-         
+        self.login_node = pbs.logins[cluster]         
         self.wSelectModule.SetItems(self.get_module_avail())
         self.is_resources_modified = True
             
@@ -1043,15 +1088,17 @@ class Launcher(wx.Frame):
         return module_list
     
     def update_resources_from_script(self,event=None):
+        indent.print_item_header('update_resources_from_script()')
         lines = self.wScript.GetText().splitlines(True)
         self.script.parse(lines)
         self.set_default_pbs_parameters()
         self.update_resources()
+        indent.print_item_footer()
         
     def update_script_from_resources(self):       
         if not self.is_resources_modified:
             return
-        print('  resources modified, updating script')
+        indent.print_item_header('update_script_from_resources()')
         #make sure all values are transferred to self.script.values
         if not hasattr(self, 'script'):
             self.script = pbs.Script()
@@ -1094,15 +1141,17 @@ class Launcher(wx.Frame):
                 self.script.values['job_name'] = self.wJobName.GetValue()
                 
         lines = self.script.compose()
+        print("    Script updated.")
         self.format_script(lines)
+        indent.print_item_footer()
         
     def format_script(self,lines):
-        print("Formatting script.")
         self.wScript.ClearAll()
         for line in lines:
             self.wScript.AddText(line)
         #self.wScript.Colourise()
         self.is_script_modified = False
+        print("    Script formatted.")
 
     def update_resources(self):
         if not hasattr(self,'script'):
@@ -1195,7 +1244,8 @@ class Launcher(wx.Frame):
         if user_id:
             self.wRemoteFileLocation.SetValue( self.get_remote_file_location() )
     
-    def load_job(self):
+    def load_job_script(self):
+        self.wScript.ClearAll()
         self.is_resources_modified = False
         s = self.wLocalFileLocation.GetValue()
         if os.path.isdir(s):
@@ -1289,6 +1339,12 @@ class Launcher(wx.Frame):
                         src = os.path.join(folder,f)
                         dst = os.path.join(remote,f)
                         ssh_ftp.put(src,dst)
+                        if sys.platform in ("win32"):
+                            cmd = "dos2unix "+dst
+                            ssh.execute(cmd)
+                        elif sys.platform in ("darwin"):
+                            cmd = "dos2unix -c mac "+dst
+                            ssh.execute(cmd)
         except Exception as e:
             log_exception(e)
             msg = "Failed copying local folder ('{}') contents to remote folder '{}'.".format(local_folder,remote_folder)
@@ -1318,11 +1374,13 @@ class Launcher(wx.Frame):
         ssh.close()
     
     def set_status_text(self,msg,colour=wx.BLACK):
-        print('\nStatus bar text: '+msg)
+        indent.print_item_header('Status bar text:')
+        print( indented(msg,4))
         self.SetStatusText(msg)
         #todo allow for colored messages? not working on macosx
         #self.GetStatusBar().SetForeGroundColour(colour)
-    
+        indent.print_item_footer()
+        
     def submit_job(self):
         if not self.save_job():
             self.set_status_text("Job not submitted: failed to save in local folder.")
