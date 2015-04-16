@@ -1,11 +1,4 @@
-"""
-================================================
-Python pbs module - manipulating pbs job scripts
-================================================
-"""
-
-from StringIO import StringIO
-import math,re,subprocess,os,pprint
+import math,re
 
 class RequestFailed(Exception):
     def __init__(self, message):
@@ -23,12 +16,13 @@ class ComputeNodeSet(object):
     :param float gpn: GB of ram per compute node in this set.
     :param float gbOS: GB of ram reserved for the operating system and thus not available for applicatins in this set.    
     """
-    def __init__(self,name,nn,cpn,gpn,gbOS):
+    def __init__(self,name,nn,cpn,gpn,gbOS,script_extras=None):
         self.name = name
         self.n_nodes = int(nn)                   #: number of compute nodes available in this set
         self.n_cores_per_node = int(cpn)         #: number of cores per compute nodes in this set
         self.gb_per_node = float(gpn)-gbOS       #: GB of main memory per compute node in this set
         self.gb_per_core = self.gb_per_node/cpn  #: GB of main memory per core in this set
+        self._script_extras = script_extras
         
     def request_nodes_cores(self,n_nodes,n_cores_per_node):
         if n_nodes>self.n_nodes:
@@ -67,31 +61,18 @@ class ComputeNodeSet(object):
         if n_nodes==1: # respect the number of cores requested instead of returning a full node
             n_cores_per_node = n_cores_requested         
         return (n_nodes, n_cores, n_cores_per_node, gb_per_core, gb)
-        
-hopper_thin_nodes = ComputeNodeSet('hopper_thin_nodes', 96, 20,  64., 6) #: ComputeNodeSet for Hopper's thin nodes
-hopper_fat_nodes  = ComputeNodeSet('hopper_fat_nodes' , 24, 20, 256., 6) #: ComputeNodeSet for Hopper's fat nodes
-turing_harpertown_GbE = ComputeNodeSet('turing_harpertown_GbE', 64,  8, 16., 4) 
-turing_harpertown_IB  = ComputeNodeSet('turing_harpertown_IB' , 32,  8, 16., 4) 
-turing_westmere_GbE   = ComputeNodeSet('turing_westmere_GbE'  , 64, 12, 24., 4) 
-turing_westmere_IB    = ComputeNodeSet('turing_westmere_IB'   ,  8, 12, 24., 4) 
+    
+    def script_extras(self,script=None,remove=False):
+        """ replace this method 
+                my_nodeset.script_extras = some_fun
+            to execute some_fun(script) when the nodeset is set to my_nodeset (this adds
+            some extra lines to the job script required by the nodeset), and to execute 
+            some_fun(script,remove=True) when the nodeset is change from my_nodeset to 
+            another nodeset (which than removes the extra lines).
+        """
+        if self._script_extras:
+            self._script_extras(script,remove)
 
-my_macbook        = ComputeNodeSet('my_macbook' , 1, 8, 7., 0) #: ComputeNodeSet for Hopper's fat nodes
-
-node_sets = {'Hopper' : [hopper_thin_nodes
-                        ,hopper_fat_nodes
-                        ]
-            ,'Turing' : [turing_harpertown_GbE
-                        ,turing_harpertown_IB
-                        ,turing_westmere_GbE
-                        ,turing_westmere_IB
-                        ]
-            }
-logins = {'Hopper' : 'login.hpc.uantwerpen.be'
-         ,'Turing' : 'login.turing.calcua.ua.ac.be'
-         }
-clusters = []
-for k in logins.iterkeys():
-    clusters.append(k)
 #==============================================================================
 walltime_units = {'s':    1
                  ,'m':   60
@@ -247,7 +228,7 @@ class Script(object):
         if not s in self.parsed:
             self.parsed.insert(pos,s)
         self.parse1(pos)
-        
+            
 #     def _process_mpirun_cmd(self,cmd):
 #         """
 #         All commands containing mpirun which do not already specify the number
@@ -346,8 +327,3 @@ class Script(object):
         match = jobid_pattern.match(self.jobid_system)
         if match:
             self.jobid = match.groups()[0]
-            
-if __name__=='__main__':
-    print 'small test'
-    raise NotImplemented("pbs.py __main__")
-    

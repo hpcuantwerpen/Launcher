@@ -1,6 +1,6 @@
 from __future__ import print_function
 import sys,cStringIO,datetime,argparse,subprocess,traceback,time
-import re,os,random,shutil,pprint,errno,pickle
+import re,os,random,shutil,pprint,errno,pickle,inspect
 
 import wx
 import xx
@@ -11,8 +11,8 @@ import indent
 from wxtools import *
 
 from BashEditor import PbsEditor
+import clusters
 import pbs
-
 wx.ToolTip.Enable(True)
 
 ######################
@@ -113,7 +113,7 @@ class Config(object):
             self.attributes = {}
         self.cfg_file = cfg_file
 
-        default_attributes = { 'cluster' : 'Hopper'
+        default_attributes = { 'cluster' : 'some_cluster'
                              , 'mail_to' : 'your mail address goes here'
                              , 'walltime_unit' : 'hours'
                              , 'walltime_value' : 1
@@ -483,14 +483,13 @@ class Launcher(wx.Frame):
                                                          , ncols=1
                                                          , growable_cols=[0] ) )
         #sizer_1
-        cluster = self.config.attributes['cluster']
         self.wCluster = wx.ComboBox(self.wNotebookPageResources, wx.ID_ANY
-                                   , choices=pbs.clusters
-                                   , value=cluster
                                    , style=wx.CB_DROPDOWN|wx.CB_READONLY|wx.CB_SIMPLE|wx.EXPAND
                                    )
         self.wCluster.SetToolTipString("Select the cluster to which you want to submit a job.")
-        self.wNodeSet = wx.ComboBox(self.wNotebookPageResources, wx.ID_ANY, choices=["thin_nodes (64GB)", "fat_nodes (256GB)"]
+        self.current_node_set = None
+        
+        self.wNodeSet = wx.ComboBox(self.wNotebookPageResources, wx.ID_ANY
                                    , style=wx.CB_DROPDOWN|wx.CB_READONLY|wx.CB_SIMPLE|wx.EXPAND
                                    )
         self.wNodeSet.SetToolTipString("Select the pool of nodes from which resources must be requested.")
@@ -769,12 +768,22 @@ class Launcher(wx.Frame):
     
     def InitData(self):            
         items=[]
-        for item in pbs.node_sets.iterkeys():
-            items.append(item)
-        self.wCluster.SetItems(items)
-        self.is_script_up_to_date = False
-        self.set_cluster(self.config.attributes['cluster'])
+#         for item in clusters.node_sets.iterkeys():
+#             items.append(item)
+#         self.wCluster.SetItems(items)
+#         self.set_cluster(self.config.attributes['cluster'])
+
+        cluster = self.config.attributes['cluster']
+        try:
+            i = clusters.cluster_list.index(cluster)
+        except ValueError:
+            i=0
+        cluster = clusters.cluster_list[i]
+        self.wCluster.SetItems(clusters.cluster_list)        
+        self.set_cluster(cluster)
+
         value=self.get_remote_file_location()
+        self.is_script_up_to_date = False
         self.wRemoteFileLocation.SetValue(value)
                 
         n_waiting = len(self.config.attributes['submitted_jobs'])
@@ -788,8 +797,7 @@ class Launcher(wx.Frame):
     
     def set_default_pbs_parameters(self):
         self.wNNodesRequested.SetValue(1)
-        node_set = self.get_node_set()
-        self.wNCoresPerNodeRequested.SetValue(node_set.n_cores_per_node)
+        self.wNCoresPerNodeRequested.SetValue(self.current_node_set.n_cores_per_node)
         self.request_nodes_cores()
         self.wWalltime.SetValue(1)
         self.wWalltimeUnit.Select(self.walltime_units.index('hours'))
@@ -949,6 +957,18 @@ class Launcher(wx.Frame):
     def get_cluster(self):
         return self.wCluster.GetValue()
     
+    def update_cluster_list(self):
+        '''
+        '''
+        clusters = reload(clusters)
+        self.wCluster.SetItems(clusters.cluster_list)        
+        try:
+            i = clusters.cluster_list.index(self.cluster)
+        except ValueError:
+            i = 0
+        cluster = clusters.cluster_list[i]
+        self.set_cluster(cluster)
+    
     def get_user_id(self):
         user_id = self.wUserId.Value
         pattern=re.compile(r'vsc\d{5}')
@@ -956,25 +976,25 @@ class Launcher(wx.Frame):
         return None if (m is None) else user_id
     
     def cluster_has_changed(self):
-        cluster = self.get_cluster()
-        self.set_node_set_items(pbs.node_sets[cluster])
-        self.login_node = pbs.logins[cluster]         
+        self.cluster = self.get_cluster()
+        self.login_node = clusters.login_nodes[self.cluster][0]
+        self.set_node_set_items(clusters.node_set_names(self.cluster))
         self.wSelectModule.SetItems(self.get_module_avail())
         self.is_resources_modified = True
-            
+         
     def set_node_set_items(self,node_sets):
-        if 'node_set' in self.config.attributes:
-            config_node_set = self.config.attributes['node_set']
+        node_set_names = clusters.node_set_names(self.cluster)
+        self.wNodeSet.SetItems(node_set_names)
+        
+        node_set = self.config.attributes.get('node_set','')
+        if node_set:
+            try: 
+                i = node_set_names.index(node_set)
+            except ValueError:
+                i=0
         else:
-            config_node_set =''
-        select_node_set = 0
-        node_set_items=[]
-        for node_set in node_sets:
-            if node_set.name==config_node_set:
-                select_node_set = len(node_set_items)
-            node_set_items.append(node_set.name+' ({}Gb/node, {} cores/node)'.format(node_set.gb_per_node,node_set.n_cores_per_node))
-        self.wNodeSet.SetItems(node_set_items)
-        self.set_node_set(select_node_set)
+            i=0
+        self.set_node_set(i)
 
     def set_node_set(self,node_set):    
         if isinstance(node_set,str):
@@ -982,27 +1002,31 @@ class Launcher(wx.Frame):
         else: # type is int 
             i = node_set
         self.wNodeSet.Select(i)
-        node_set = self.get_node_set()
-        self.wNNodesRequested.SetRange(1,node_set.n_nodes)
-        self.wNCoresPerNodeRequested.SetRange(1,node_set.n_cores_per_node)
-        self.wNCoresPerNodeRequested.SetValue(node_set.n_cores_per_node)
-        self.wGbPerNodeGranted      .SetValue(str(node_set.gb_per_node))
-        self.wGbPerCoreRequested    .SetRange(0,node_set.gb_per_node)
-        self.wNCoresRequested       .SetRange(1,node_set.n_cores_per_node*node_set.n_nodes)
+        self.node_set_has_changed()
+        self.wNNodesRequested.SetRange(1,self.current_node_set.n_nodes)
+        self.wNCoresPerNodeRequested.SetRange(1,  self.current_node_set.n_cores_per_node)
+        self.wNCoresPerNodeRequested.SetValue(    self.current_node_set.n_cores_per_node)
+        self.wGbPerNodeGranted      .SetValue(str(self.current_node_set.gb_per_node))
+        self.wGbPerCoreRequested    .SetRange(0,  self.current_node_set.gb_per_node)
+        self.wNCoresRequested       .SetRange(1,  self.current_node_set.n_cores_per_node*self.current_node_set.n_nodes)
         self.request_nodes_cores()
-        
-    def get_node_set(self):
-        node_sets = pbs.node_sets[self.get_cluster()]
-        i=self.wNodeSet.Selection
-        return node_sets[i]
 
     def node_set_has_changed(self):
-        #todo
+        #remove extras required by previous node set
+        if self.current_node_set and hasattr(self,'script'):
+            self.current_node_set.script_extras(self.script,remove=True)
+        #set current node set
+        i=self.wNodeSet.GetSelection()
+        self.current_node_set = clusters.node_sets[self.cluster][i]
+
+        #add extras required by new node set
+        if self.current_node_set and hasattr(self,'script'):
+            self.current_node_set.script_extras(self.script)
+
         self.is_resources_modified = True
             
     def request_nodes_cores(self):
-        node_set = self.get_node_set()
-        n_cores,gb_per_core = node_set.request_nodes_cores(self.wNNodesRequested.GetValue(),self.wNCoresPerNodeRequested.GetValue())
+        n_cores,gb_per_core = self.current_node_set.request_nodes_cores(self.wNNodesRequested.GetValue(),self.wNCoresPerNodeRequested.GetValue())
         self.wNCoresRequested   .SetValue(n_cores)
         self.wGbPerCoreRequested.SetValue(gb_per_core)
         self.wGbTotalGranted    .SetValue(str(gb_per_core*n_cores))
@@ -1013,8 +1037,7 @@ class Launcher(wx.Frame):
         self.wGbPerCoreRequested    .GetTextCtrl().SetForegroundColour(wx.BLACK)
 
     def request_cores_memory(self):
-        node_set = self.get_node_set()
-        n_nodes, n_cores, n_cores_per_node, gb_per_core, gb = node_set.request_cores_memory(self.wNCoresRequested.GetValue(),self.wGbPerCoreRequested.GetValue())
+        n_nodes, n_cores, n_cores_per_node, gb_per_core, gb = self.current_node_set.request_cores_memory(self.wNCoresRequested.GetValue(),self.wGbPerCoreRequested.GetValue())
         self.wNNodesRequested       .SetValue(n_nodes)
         self.wNCoresRequested       .SetValue(n_cores)
         self.wNCoresPerNodeRequested.SetValue(n_cores_per_node)
@@ -1102,6 +1125,7 @@ class Launcher(wx.Frame):
         #make sure all values are transferred to self.script.values
         if not hasattr(self, 'script'):
             self.script = pbs.Script()
+            self.current_node_set.script_extras(self.script)
         if not 'n_nodes' in self.script.values: 
             self.script.add_pbs_option('-l','nodes={}:ppn={}'.format(self.wNNodesRequested.GetValue()
                                                                     ,self.wNCoresPerNodeRequested.GetValue()))
@@ -1269,7 +1293,6 @@ class Launcher(wx.Frame):
             else:
                 setattr(self,attr,values[name])
         
-#PBS -l advres=fat-reservation.31           
     def check_job_name_present(self):
         if not self.wJobName.GetValue():
             random_job_name = 'job-'+str(random.random())[2:]

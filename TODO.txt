@@ -11,5 +11,6 @@ TODO LIST
 	. edit clusters
 	. login nodes
 - add mpi functionality
+- add option to dos2unix all files transferred (and the other way around)
 
 + store last window size in configuration and use it when the Launcher is reopened.

@@ -1,12 +1,14 @@
 #!/opt/local/bin/python2.7
 
 
+import pprint
 import wx, wx.stc
 
 class PbsLexer(wx.stc.StyledTextCtrl):
     
     STC_PBS_DEFAULT = 14
-    STC_PBS_KEYWORD    = 15
+    STC_PBS_KEYWORD = 15
+    STC_PBS_COMMENT = 16
     
     def __init__(self, parent, ID=-1):
         wx.stc.StyledTextCtrl.__init__(self, parent)
@@ -26,6 +28,7 @@ class PbsLexer(wx.stc.StyledTextCtrl):
         
         text = self.GetTextRange(start_pos,end_pos)
         kw_positions = []
+        #find any keywords to color them differently
         i=0
         for kw in self.keywords:
             try:
@@ -35,9 +38,23 @@ class PbsLexer(wx.stc.StyledTextCtrl):
                     kw_positions.append((start_pos+i+j,l,kw)) 
                     i+=j+l
             except:
-                i=0               
+                i=0
+        #find any comments in the pbs commands
+        #we start looking for '#" at position 5 as text should begin with '#PBS ' anyway
+        i=5
+        len_text=len(text)
+        while i<len_text:
+            if text[i]=='#' and not text[i-1]=='\n':
+                #found a '#' in the middle of a line (at position i), find the end of the line.
+                j = i+text[i:].index('\n')+1
+                kw_positions.append((start_pos+i,j-i,text[i:j]))
+                i=j
+            else:
+                i+=1
+        
+        
         kw_positions.sort( key=lambda tpl: tpl[0]+float(tpl[1])*0.01)
-        #print kw_positions
+        pprint.pprint( kw_positions )
         if not kw_positions:
             self.StartStyling(start_pos,31)
             self.SetStyling(end_pos-start_pos,PbsLexer.STC_PBS_DEFAULT)
@@ -49,7 +66,11 @@ class PbsLexer(wx.stc.StyledTextCtrl):
         last = len(kw_positions)-1
         for t,tpl in enumerate(kw_positions):
             self.StartStyling(tpl[0],31)
-            self.SetStyling(tpl[0],PbsLexer.STC_PBS_KEYWORD)
+            if tpl[2].startswith('#'):
+                style = PbsLexer.STC_PBS_COMMENT
+            else:
+                style = PbsLexer.STC_PBS_KEYWORD
+            self.SetStyling(tpl[0],style)
             if t<last:
                 i1  = tpl[0]+tpl[1]
                 i0n = kw_positions[t+1][0]
@@ -92,6 +113,9 @@ class PbsEditor(wx.stc.StyledTextCtrl):
   
         self.StyleSetSpec(PbsLexer.STC_PBS_DEFAULT  ,"fore:#94071F,back:#FFFFFF,face:Courier New,size:12,bold")
         self.StyleSetSpec(PbsLexer.STC_PBS_KEYWORD  ,"fore:#4B8AD1,back:#FFFFFF,face:Courier New,size:12,bold")
+        self.StyleSetSpec(PbsLexer.STC_PBS_COMMENT  ,"fore:#009944,back:#FFFFFF,face:Courier New,size:12,")
+
+        map_theme_to_style(self,'comment'   , PbsLexer.STC_PBS_COMMENT)
 
         map_theme_to_style(self,'comment'   , wx.stc.STC_SH_COMMENTLINE)
         map_theme_to_style(self,'number'     , wx.stc.STC_SH_NUMBER)
@@ -303,12 +327,13 @@ color_theme = {
 
 _test_string = u"""#!/bin/bash
 #PBS -N s
-#PBS -M engelbert.tijskens@uantwerpen.be
+#PBS -M engelbert.tijskens@uantwerpen.be # this is my e-mail address
 #PBS -l walltime=0:05:00
 #PBS -l nodes=1:ppn=1
 
-cd $PBS_O_WORKDIR
-if [ -d "output" ]; then
+# a comment line
+cd $PBS_O_WORKDIR        # inline comment
+ if [ -d "output" ]; then
     rm -rf output
 fi
 mkdir output
