@@ -1,7 +1,7 @@
 #!/opt/local/bin/python2.7
 
 
-import pprint
+#import pprint
 import wx, wx.stc
 
 class PbsLexer(wx.stc.StyledTextCtrl):
@@ -54,7 +54,7 @@ class PbsLexer(wx.stc.StyledTextCtrl):
         
         
         kw_positions.sort( key=lambda tpl: tpl[0]+float(tpl[1])*0.01)
-        pprint.pprint( kw_positions )
+        #pprint.pprint( kw_positions )
         if not kw_positions:
             self.StartStyling(start_pos,31)
             self.SetStyling(end_pos-start_pos,PbsLexer.STC_PBS_DEFAULT)

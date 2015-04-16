@@ -1,4 +1,5 @@
 import math,re
+import types
 
 class RequestFailed(Exception):
     def __init__(self, message):
@@ -7,6 +8,23 @@ class RequestFailed(Exception):
     def __str__(self):
         return repr(self.value)
 
+class ScriptExtras(object):
+    def __init__(self,pbs_options):
+        self.pbs_options = pbs_options
+    def treat_pbs_options(self,script,remove=False,name=None):
+        for o in self.pbs_options:
+            v = o[1]
+            if name:
+                v += ' #required by ComputeNodeSet '+name 
+            if not remove:
+                script.add_pbs_option(o[0],v)
+            else:
+                s = '#PBS -l '+v+'\n'
+                script.parsed.remove(s)
+    def __call__(self,script,remove=False,name=None):
+        """ overwrite this to do other things than just add/remove pbs options"""
+        self.treat_pbs_options(script, remove=remove, name=name)
+        
 class ComputeNodeSet(object):
     """
     Objects of this class represent a set of compute nodes with identical properties
@@ -23,7 +41,11 @@ class ComputeNodeSet(object):
         self.gb_per_node = float(gpn)-gbOS       #: GB of main memory per compute node in this set
         self.gb_per_core = self.gb_per_node/cpn  #: GB of main memory per core in this set
         self._script_extras = script_extras
-        
+    
+    def script_extras(self,script,remove=False):
+        if self._script_extras:
+            self._script_extras(script,remove=remove,name=self.name)
+            
     def request_nodes_cores(self,n_nodes,n_cores_per_node):
         if n_nodes>self.n_nodes:
             msg = 'Requesting more nodes than physically available ({}).'.format(self.n_nodes)
@@ -62,16 +84,17 @@ class ComputeNodeSet(object):
             n_cores_per_node = n_cores_requested         
         return (n_nodes, n_cores, n_cores_per_node, gb_per_core, gb)
     
-    def script_extras(self,script=None,remove=False):
-        """ replace this method 
-                my_nodeset.script_extras = some_fun
-            to execute some_fun(script) when the nodeset is set to my_nodeset (this adds
-            some extra lines to the job script required by the nodeset), and to execute 
-            some_fun(script,remove=True) when the nodeset is change from my_nodeset to 
-            another nodeset (which than removes the extra lines).
-        """
-        if self._script_extras:
-            self._script_extras(script,remove)
+#     def script_extras(self,script=None,remove=False):
+#         """ replace this method 
+#                 my_nodeset.script_extras = some_fun
+#             to execute some_fun(script) when the nodeset is set to my_nodeset (this adds
+#             some extra lines to the job script required by the nodeset), and to execute 
+#             some_fun(script,remove=True) when the nodeset is change from my_nodeset to 
+#             another nodeset (which than removes the extra lines).
+#         """
+#         pass
+#         if self._script_extras:
+#             self._script_extras(script,remove)
 
 #==============================================================================
 walltime_units = {'s':    1
