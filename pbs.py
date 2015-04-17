@@ -1,5 +1,4 @@
 import math,re
-import types
 
 class RequestFailed(Exception):
     def __init__(self, message):
@@ -9,6 +8,10 @@ class RequestFailed(Exception):
         return repr(self.value)
 
 class ScriptExtras(object):
+    """
+    A function object that stores a list of pbs options that must be added to the job script 
+    for a particular ComputeNodeSet
+    """
     def __init__(self,pbs_options):
         self.pbs_options = pbs_options
     def treat_pbs_options(self,script,remove=False,name=None):
@@ -40,12 +43,13 @@ class ComputeNodeSet(object):
         self.n_cores_per_node = int(cpn)         #: number of cores per compute nodes in this set
         self.gb_per_node = float(gpn)-gbOS       #: GB of main memory per compute node in this set
         self.gb_per_core = self.gb_per_node/cpn  #: GB of main memory per core in this set
-        self._script_extras = script_extras
+        self._script_extras = script_extras      #: a function object that adds/removes requirements 
+        # of the ComputeNodeSet to the script, typically an instance of ScriptExtras (or derived)
     
     def script_extras(self,script,remove=False):
         if self._script_extras:
             self._script_extras(script,remove=remove,name=self.name)
-            
+    
     def request_nodes_cores(self,n_nodes,n_cores_per_node):
         if n_nodes>self.n_nodes:
             msg = 'Requesting more nodes than physically available ({}).'.format(self.n_nodes)
@@ -84,18 +88,6 @@ class ComputeNodeSet(object):
             n_cores_per_node = n_cores_requested         
         return (n_nodes, n_cores, n_cores_per_node, gb_per_core, gb)
     
-#     def script_extras(self,script=None,remove=False):
-#         """ replace this method 
-#                 my_nodeset.script_extras = some_fun
-#             to execute some_fun(script) when the nodeset is set to my_nodeset (this adds
-#             some extra lines to the job script required by the nodeset), and to execute 
-#             some_fun(script,remove=True) when the nodeset is change from my_nodeset to 
-#             another nodeset (which than removes the extra lines).
-#         """
-#         pass
-#         if self._script_extras:
-#             self._script_extras(script,remove)
-
 #==============================================================================
 walltime_units = {'s':    1
                  ,'m':   60
@@ -315,38 +307,3 @@ class Script(object):
             stream.write('\n#PBS -m {}    '.format(self.m) )
             
         return stream.getvalue()
-
-        
-    
-    def qsub(self):
-        """
-        Construct a job script and submit it.
-         
-        Extract the job id and the hpc system.
-        
-        Run the epilogue. TODO
-        """
-            
-        job_name = getattr(self,'job_name','job.pbs')
-        f = open(job_name,'w+')
-        f.write(str(self))
-        f.close()
-        qsub_args = ['qsub',job_name]
-        if self.verbosity>1:
-            print os.getcwd(),'>',qsub_args
-        if self.verbosity>2:
-            print 'PATH=',os.environ['PATH']
-            print 'PYTHONPATH=',os.environ['PYTHONPATH']
-            
-        p = subprocess.Popen(qsub_args,stdout=subprocess.PIPE,stderr=subprocess.PIPE)
-        stdout,stderr = p.communicate()
-        if self.verbosity>1:
-            if stderr:
-                print stderr
-            print '<<\n',stdout,'\n>>'
-            
-        self.jobid_system = stdout.strip() 
-        jobid_pattern=re.compile(r'(\d*)([\w.]*)')
-        match = jobid_pattern.match(self.jobid_system)
-        if match:
-            self.jobid = match.groups()[0]

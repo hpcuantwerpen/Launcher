@@ -143,7 +143,8 @@ class Launcher(wx.Frame):
     regexp_userid = re.compile(r'vsc\d{5}')
     ID_MENU_SSH_PREFERENCES = wx.NewId()
     ID_MENU_SSH_CONNECT     = wx.NewId()
-
+    ID_MENU_LOGIN_NODE      = wx.NewId()
+    
     def __init__(self, parent, title):
         self.config = Config()
         #set the window size
@@ -746,6 +747,7 @@ class Launcher(wx.Frame):
         menu_bar.Append(menu_ssh, "&SSH")
         menu_ssh.Append(Launcher.ID_MENU_SSH_PREFERENCES, "Preferences\tCtrl+P")
         menu_ssh.Append(Launcher.ID_MENU_SSH_CONNECT    , "Retry to connect\tCtrl+R")
+        menu_ssh.Append(Launcher.ID_MENU_LOGIN_NODE     , "Select login node\tCtrl+L")
 
     def on_EVT_MENU(self, event):
         """Handle menu clicks"""
@@ -755,6 +757,8 @@ class Launcher(wx.Frame):
         if event_id==Launcher.ID_MENU_SSH_CONNECT:
             sshtools.Client(self.get_user_id(),self.login_node,force=True)
             # the object is not stored because it is not used 
+        if event_id==Launcher.ID_MENU_LOGIN_NODE:
+            self.select_login_node()
         else:
             raise Exception("Unknown menu event id:"+str(event_id))
              
@@ -765,6 +769,14 @@ class Launcher(wx.Frame):
         if answer==wx.ID_OK:
             dlg.update_preferences()
         del dlg
+        
+    def select_login_node(self):
+        dlg = SelectLoginNodeDialog(self)
+        answer = dlg.ShowModal()
+        if answer==wx.ID_OK:
+            dlg.select()
+        del dlg
+        
     
     def InitData(self):            
         items=[]
@@ -814,7 +826,7 @@ class Launcher(wx.Frame):
             shutil.copy(self.log,old_log)
 
         indent.print_item_header('launch.py')
-        print('   begin of log.')
+        print('    begin of log.')
         indent.print_item_footer()
         
         indent.print_item_header("Version info of used components")
@@ -978,6 +990,10 @@ class Launcher(wx.Frame):
     def cluster_has_changed(self):
         self.cluster = self.get_cluster()
         self.login_node = clusters.login_nodes[self.cluster][0]
+        indent.print_item_header('Accessing cluster:')
+        print('    cluster    = '+self.cluster)
+        print('    login node = '+self.login_node)
+        indent.print_item_footer()
         self.set_node_set_items(clusters.node_set_names(self.cluster))
         self.wSelectModule.SetItems(self.get_module_avail())
         self.is_resources_modified = True
@@ -1386,12 +1402,12 @@ class Launcher(wx.Frame):
                 job_id = out[0].split('.')[0]
                 msg = 'Submitted job : job_id = '+job_id
                 self.config.attributes['submitted_jobs'][job_id] = {'cluster'      : self.get_cluster()
-                                                              ,'user_id'      : self.wUserId.GetValue() 
-                                                              ,'remote_folder': remote_folder
-                                                              ,'local_folder' : local_folder
-                                                              ,'job_name'     : self.wJobName.GetValue()
-                                                              ,'status'       : 'submitted'
-                                                              }
+                                                                   ,'user_id'      : self.wUserId.GetValue() 
+                                                                   ,'remote_folder': remote_folder
+                                                                   ,'local_folder' : local_folder
+                                                                   ,'job_name'     : self.wJobName.GetValue()
+                                                                   ,'status'       : 'submitted'
+                                                                   }
             self.set_status_text(msg)
                 
         ssh.close()
@@ -1578,6 +1594,38 @@ class Launcher(wx.Frame):
             else:
                 return None
         return user_id
+    
+class SelectLoginNodeDialog(wx.Dialog):
+    def __init__(self, parent, title="Select login node"):
+        super(SelectLoginNodeDialog,self).__init__(parent, title=title)
+    
+        login_node = parent.login_node
+        self. choices = wx.ComboBox( self, wx.ID_ANY
+                                   , choices=clusters.login_nodes[parent.cluster], value=login_node
+                                   , style=wx.CB_DROPDOWN|wx.CB_READONLY|wx.CB_SIMPLE|wx.EXPAND
+                                   )
+        buttons = self.CreateSeparatedButtonSizer(wx.CANCEL|wx.OK)
+        self.SetSizer( grid_layout( [ [self.choices,1,wx.EXPAND]
+                                    , wx.StaticText(self)
+                                    , wx.StaticText(self)
+                                    , wx.StaticText(self)
+                                    , wx.StaticText(self)
+                                    , wx.StaticText(self)
+                                    , wx.StaticText(self)
+                                    , wx.StaticText(self)
+                                    , wx.StaticText(self)
+                                    , [buttons,1,wx.EXPAND]
+                                    ]
+                                  , ncols=1, growable_cols=[0] ) )
+    def select(self):
+        login_node = clusters.login_nodes[self.GetParent().cluster][self.choices.GetSelection()]
+        if self.GetParent().login_node == login_node:
+            return 
+        else:
+            self.GetParent().login_node = login_node
+            indent.print_item_header('Selecting login node')
+            print('    selected: '+login_node)
+            indent.print_item_footer()
             
 class RedirectStdStreams(object):
     def __init__(self, stdout=None, stderr=None):

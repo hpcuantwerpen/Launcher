@@ -12,3 +12,4 @@ node_sets = [ hopper_thin_nodes
             ]
 
 login_nodes = ['login.hpc.uantwerpen.be']
+login_nodes.extend(['login{}-hopper.uantwerpen.be'.format(i) for i in range(1,5)])

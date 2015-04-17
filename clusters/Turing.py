@@ -39,3 +39,4 @@ node_sets = [ turing_westmere
             ]
 
 login_nodes = ['login.turing.calcua.ua.ac.be']
+login_nodes.extend(['login{}.turing.calcua.ua.ac.be'.format(i) for i in range(1,3)])
