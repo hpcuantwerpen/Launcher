@@ -86,6 +86,15 @@ def log_exception(exception):
     traceback.print_exc(file=sys.stdout)
     print( exception )
     print(  "###################################################################################")
+
+def print_line(title="",line_length=80,n_white=1,line_char='-',indent=4):
+    if title:
+        line = (indent-n_white)*line_char + (n_white*' ') + title + (n_white*' ')
+        l = len(line)
+        line += (line_length-l)*line_char
+    else:
+        line = line_length*line_char
+    print(line)
     
 ################################################################################
 ### Launcher classes                                                         ###
@@ -146,6 +155,9 @@ class Launcher(wx.Frame):
     ID_MENU_LOGIN_NODE      = wx.NewId()
     
     def __init__(self, parent, title):
+        """
+        Create all the controls in the Launcher window and bind the necessary methods
+        """
         self.config = Config()
         #set the window size
         frame_size = self.config.attributes.get("frame_size",(500,500))
@@ -173,8 +185,6 @@ class Launcher(wx.Frame):
         self.bind('wNCoresRequested'        , 'EVT_SPINCTRL')
         self.bind('wGbPerCoreRequested'     , 'EVT_SPINCTRL')            
         self.bind('wEnforceNNodes'          , 'EVT_CHECKBOX')
-#         self.bind('wNAccessPolicy'          , 'EVT_CHECKBOX')
-
         self.bind('wNodeSet'                , 'EVT_COMBOBOX')
         self.bind('wSelectModule'           , 'EVT_COMBOBOX')
         self.bind('wScript'                 , 'EVT_SET_FOCUS')
@@ -188,7 +198,6 @@ class Launcher(wx.Frame):
         self.bind('wJobName'                , 'EVT_TEXT')
         self.bind('wRemoteSubfolder'        , 'EVT_TEXT')
         self.bind('wUserId'                 , 'EVT_TEXT_ENTER')
-        #self.bind('wLoadJob'                , 'EVT_BUTTON')
         self.bind('wSaveJob'                , 'EVT_BUTTON',)
         self.bind('wSubmitJob'              , 'EVT_BUTTON')
         self.bind('wRetrieveJobs'           , 'EVT_BUTTON')
@@ -202,7 +211,9 @@ class Launcher(wx.Frame):
         self.bind('wRetrieveJobs2'          , 'EVT_BUTTON')
         self.bind('wDeleteJob'              , 'EVT_BUTTON')
         self.Show()
+        #set control data
         self.InitData()
+        self.dump()
     
     def bind(self,object_name,event_name):
         """
@@ -251,6 +262,28 @@ class Launcher(wx.Frame):
         indent.print_item_footer()
         self.SetStatusText("")
         
+    def dump(self):
+        """
+        write all control values and data values 
+        """
+        indent.print_item_header("Dump of all control values:")
+        for k,v in self.__dict__.iteritems():
+            if k[0]=='w' and k[1].isupper(): # a control
+                try:
+                    value = v.GetValue()
+                    print()
+                    print_line(title=k)
+                    pprint.pprint(value)
+                except AttributeError:
+                    pass
+                v.SetName(k)
+            else:                           # a data member
+                print()
+                print_line(title=k)
+                pprint.pprint(v)
+        print_line()
+        indent.print_item_footer()
+            
     ### event handlerss ###        
     def wCluster_EVT_COMBOBOX(self,event):
         self.log_event(event)
@@ -393,6 +426,8 @@ class Launcher(wx.Frame):
         self.wJobsRetrieved_EVT_SET_FOCUS("wRetrieveJobs2_EVT_BUTTON() calling wJobsRetrieved_EVT_SET_FOCUS()")
         
     def wDeleteJob_EVT_BUTTON(self,event):
+        """ Delete a job from the list of jobs to be retrieved.
+        """
         self.log_event(event)
         selected_text = self.wJobsSubmitted.GetStringSelection()
         re_job_id = re.compile(r'job_id=(\d+)')
@@ -553,11 +588,6 @@ class Launcher(wx.Frame):
                 ,txt2b4, self.wGbTotalGranted
                 ]
 
-#        (w,h) = (0,0)
-#         for i in lst2a:
-#             sz = i.GetSize()
-#             w = max(w,sz[0])
-#             h = max(h,sz[1])
         for i in lst2a[1:6:2]:
             h =i.GetSize()[1]
             i.SetMinSize(wx.Size(100,h))
@@ -778,13 +808,11 @@ class Launcher(wx.Frame):
         del dlg
         
     
-    def InitData(self):            
-        items=[]
-#         for item in clusters.node_sets.iterkeys():
-#             items.append(item)
-#         self.wCluster.SetItems(items)
-#         self.set_cluster(self.config.attributes['cluster'])
-
+    def InitData(self):        
+        """
+        Initializte the data elements of the controls of the Launcher window
+        """
+        #select a cluster
         cluster = self.config.attributes['cluster']
         try:
             i = clusters.cluster_list.index(cluster)
@@ -792,12 +820,14 @@ class Launcher(wx.Frame):
             i=0
         cluster = clusters.cluster_list[i]
         self.wCluster.SetItems(clusters.cluster_list)        
-        self.set_cluster(cluster)
+        self.set_cluster(cluster) 
+        # also sets all elements that depend on the cluster, such as nodesets, ...
 
         value=self.get_remote_file_location()
         self.is_script_up_to_date = False
         self.wRemoteFileLocation.SetValue(value)
-                
+        
+        #check if there are any jobs submitted by the user which are ready for copying back   
         n_waiting = len(self.config.attributes['submitted_jobs'])
         if n_waiting>0:
             msg = "There are {} jobs waiting to be retrieved. Start retrieving finished jobs now?".format(n_waiting)
@@ -875,6 +905,7 @@ class Launcher(wx.Frame):
             
     def remote_location_has_changed(self):
         if self.wRemoteLocation.GetValue()=="$VSC_DATA":
+            #Copying job output is meaningless since it is already there
             self.wCopyToVSCDATA.SetValue(False)
             self.wCopyToVSCDATA.Disable()
         else:
@@ -1068,6 +1099,7 @@ class Launcher(wx.Frame):
     def get_remote_file_location(self):
         ssh = sshtools.Client(self.get_user_id(),self.login_node)
         if ssh.connected():
+            #retrieve the values of the environment variables $VSC_DATA and $VSC_SCRATCH 
             try:
                 stdout_dat, stderr = ssh.execute('echo $VSC_DATA')
                 stdout_scr, stderr = ssh.execute('echo $VSC_SCRATCH')
@@ -1078,10 +1110,12 @@ class Launcher(wx.Frame):
                 location = self.vsc_scratch_folder 
                 if self.wRemoteLocation.GetValue()=='$VSC_DATA':
                     location = self.vsc_data_folder 
-                ssh.close()
             except Exception as e:
+                #todo: need to investigate what went wrong
+                print("!!! Something unexpected has happened...")
                 log_exception(e)
                 location = self.wRemoteLocation.GetValue()
+            ssh.close()
         else:
             location = self.wRemoteLocation.GetValue()
 

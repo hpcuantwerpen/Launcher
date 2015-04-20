@@ -244,21 +244,6 @@ class Script(object):
             self.parsed.insert(pos,s)
         self.parse1(pos)
             
-#     def _process_mpirun_cmd(self,cmd):
-#         """
-#         All commands containing mpirun which do not already specify the number
-#         of processes to run, are given command line arguments:
-#           
-#            - -np <number_of_processes>
-#            - -cpus-per-proc <cores_per_mpi_process> TODO
-#            
-#         (This is automatically called by the constructor.)
-#         """
-#         if 'mpirun' in cmd:
-#             if not '-c'   in cmd and not '-np'  in cmd and not '--np' in cmd: 
-#                 cmd = cmd.replace('mpirun','mpirun -np '+str(getattr(self,'n_cores')))
-#         return cmd 
-    
     def compose(self):
         if not self.values:
             return self.parsed
@@ -279,31 +264,3 @@ class Script(object):
         except KeyError:
             v = '${%s!not_found!}'%key
         return v
-
-    def __str__(self, *args, **kwargs):
-        """
-        Construct the job script
-        :return: string containing the jobscript 
-        """
-        n_cores_total = self.n_nodes*self.n_cores_per_node
-        gb_total      = n_cores_total*self.gb_per_core
-
-        stream = StringIO()
-
-        if hasattr(self,'job_name'):
-            stream.write("for job '{}'".format(getattr(self,'job_name')))
-        if hasattr(self,'N'):
-            stream.write('\n#PBS -N '+getattr(self,'N'))
-            
-#         stream.write('\n#PBS -q batch')
-
-        stream.write('\n#PBS -l walltime=%s'%format_walltime(getattr(self,'walltime','1 m')))
-         
-        stream.write('\n#PBS -l nodes={}:ppn={}\n'.format(self.n_nodes,self.n_cores_per_node) )
-    
-        if hasattr(self, 'M'):
-            stream.write('\n#PBS -M {}'.format(self.M) )
-        if hasattr(self, 'm') and self.m:
-            stream.write('\n#PBS -m {}    '.format(self.m) )
-            
-        return stream.getvalue()
