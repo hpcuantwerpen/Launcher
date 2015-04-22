@@ -3,6 +3,7 @@ import paramiko,wx
 import datetime,re,pprint,copy
 import wxtools
 import indent
+import log
 
 SSH_DEFAULTS = {"SSH_WORK_OFFLINE": False
                ,"SSH_KEEP_CLIENT" : False
@@ -79,14 +80,13 @@ class Client(object):
         err = stderr.readlines()
         del stdin
         if SSH_VARIABLES["SSH_VERBOSE"] or err:
-            indented = indent.Indent()
-            indent.print_item_header("Executing Paramiko/SSH command:")
+            log.print_item_header("Executing Paramiko/SSH command:")
             print(" _>",cmd )
             print(" _> stdout:" )
-            print( indented(out,4) )
+            print( Indent(out,4) )
             print(" _> stderr:" )
-            print( indented(err,4) )
-            indent.print_item_footer()
+            print( Indent(err,4) )
+            log.print_item_footer()
         return out,err
 
     def open_sftp(self):

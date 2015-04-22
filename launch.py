@@ -13,6 +13,7 @@ from wxtools import *
 from BashEditor import PbsEditor
 import clusters
 import pbs
+import log
 
 wx.ToolTip.Enable(True)
 
@@ -96,20 +97,6 @@ def print_line(title="",line_length=80,n_white=1,line_char='-',indent=4):
         line = line_length*line_char
     print(line)
     
-_timestamps = []
-def print_item_header(title=""):
-    global _start
-    now = datetime.datetime.now()
-    _timestamps.append(now)
-    print()
-    print(now)
-    print("<<<",title)
-
-def print_item_footer(footer=""):
-    if footer:
-        print(">>>",footer,(datetime.datetime.now()-_timestamps.pop()).total_seconds(),'s')
-    else:
-        print(">>>",(datetime.datetime.now()-_timestamps.pop()).total_seconds(),'s')
         
 #----------------------#
 # below only test code #
@@ -264,7 +251,7 @@ class Launcher(wx.Frame):
         """
         log information about the event
         """
-        print_item_header("Launcher.log_event():")
+        log.print_item_header("Launcher.log_event():")
         if isinstance(event,(str,unicode)):
             print(Indent(event,4))
         else:
@@ -278,14 +265,14 @@ class Launcher(wx.Frame):
                 print("         .object.class: "+event.GetEventObject().GetClassName())
         if msg: 
             print(msg)
-        print_item_footer()
+        log.print_item_footer()
         self.SetStatusText("")
         
     def dump(self):
         """
         write all control values and data values 
         """
-        print_item_header("Dump of all control values:")
+        log.print_item_header("Dump of all control values:")
         for k,v in self.__dict__.iteritems():
             if k[0]=='w' and k[1].isupper(): # a control
                 try:
@@ -306,7 +293,7 @@ class Launcher(wx.Frame):
                 print_line(title=k)
                 print(Indent(v,indent=4))
         print_line()
-        print_item_footer()
+        log.print_item_footer()
             
     ### event handlerss ###        
     def wCluster_EVT_COMBOBOX(self,event):
@@ -496,13 +483,13 @@ class Launcher(wx.Frame):
 
     def on_EVT_CLOSE(self,event=None):
         self.log_event(event)
-        print_item_header('Launcher closing')
+        log.print_item_header('Launcher closing')
         frame_size = self.GetSize()
         self.config.attributes['frame_size'] = frame_size
         print('    Saving config file.')
         self.config.save()
         self.Destroy()
-        print_item_footer('end of log')
+        log.print_item_footer('end of log')
              
     ### the widgets ###
     def init_ui(self):        
@@ -819,8 +806,7 @@ class Launcher(wx.Frame):
             msg = "These cluster modules are installed in folder\n"+clusters.clusters_folder+":\n"
             for m in self.wCluster.GetItems():
                 msg += "\n  - "+m+".py"
-            wx.MessageBox(msg, 'Cluster modules',wx.OK | wx.ICON_INFORMATION)
-
+            answer = wx.MessageBox(msg, 'Cluster modules',wx.OK | wx.ICON_INFORMATION)
         else:
             raise Exception("Unknown menu event id:"+str(event_id))
              
@@ -887,11 +873,11 @@ class Launcher(wx.Frame):
             old_log = self.log+str(random.random())[1:]
             shutil.copy(self.log,old_log)
 
-        print_item_header('launch.py')
+        log.print_item_header('launch.py')
         print('    begin of log.')
-        print_item_footer()
+        log.print_item_footer()
         
-        print_item_header("Version info of used components")
+        log.print_item_header("Version info of used components")
         print("    Python version:")
         print(Indent(sys.version,8))
         print("    wxPython version:")
@@ -908,9 +894,9 @@ class Launcher(wx.Frame):
         print(Indent(s,8))
         print("    Platform:")
         print(Indent(sys.platform,8))
-        print_item_footer()
+        log.print_item_footer()
         
-        print_item_header("cleaning log files")
+        log.print_item_header("cleaning log files")
         if old_log:
             print("    Renaming previous log file 'Launcher.log' to '{}'".format(old_log))
             
@@ -933,7 +919,7 @@ class Launcher(wx.Frame):
 #                                 print(' ',fname,ftime) 
                     break
             print("    Removed {} log files older than {} days.".format(removed,remove_logs_older_than))
-        print_item_footer()
+        log.print_item_footer()
             
     def remote_location_has_changed(self):
         if self.wRemoteLocation.GetValue()=="$VSC_DATA":
@@ -1051,10 +1037,10 @@ class Launcher(wx.Frame):
     def cluster_has_changed(self):
         self.cluster = self.get_cluster()
         self.login_node = clusters.login_nodes[self.cluster][0]
-        print_item_header('Accessing cluster:')
+        log.print_item_header('Accessing cluster:')
         print('    cluster    = '+self.cluster)
         print('    login node = '+self.login_node)
-        print_item_footer()
+        log.print_item_footer()
         self.set_node_set_items(clusters.node_set_names(self.cluster))
         self.wSelectModule.SetItems(self.get_module_avail())
         self.is_resources_modified = True
@@ -1191,17 +1177,17 @@ class Launcher(wx.Frame):
         return module_list
     
     def update_resources_from_script(self,event=None):
-        print_item_header('update_resources_from_script()')
+        log.print_item_header('update_resources_from_script()')
         lines = self.wScript.GetText().splitlines(True)
         self.script.parse(lines)
         self.set_default_pbs_parameters()
         self.update_resources()
-        print_item_footer()
+        log.print_item_footer()
         
     def update_script_from_resources(self):       
         if not self.is_resources_modified:
             return
-        print_item_header('update_script_from_resources()')
+        log.print_item_header('update_script_from_resources()')
         #make sure all values are transferred to self.script.values
         if not hasattr(self, 'script'):
             self.script = pbs.Script()
@@ -1247,7 +1233,7 @@ class Launcher(wx.Frame):
         lines = self.script.compose()
         print("    Script updated.")
         self.format_script(lines)
-        print_item_footer()
+        log.print_item_footer()
         
     def format_script(self,lines):
         self.wScript.ClearAll()
@@ -1477,12 +1463,12 @@ class Launcher(wx.Frame):
         ssh.close()
     
     def set_status_text(self,msg,colour=wx.BLACK):
-        print_item_header('Status bar text:')
+        log.print_item_header('Status bar text:')
         print( Indent(msg,4))
         self.SetStatusText(msg)
         #todo allow for colored messages? not working on macosx
         #self.GetStatusBar().SetForeGroundColour(colour)
-        print_item_footer()
+        log.print_item_footer()
         
     def submit_job(self):
         if not self.save_job():
@@ -1687,9 +1673,9 @@ class SelectLoginNodeDialog(wx.Dialog):
             return 
         else:
             self.GetParent().login_node = login_node
-            print_item_header('Selecting login node')
+            log.print_item_header('Selecting login node')
             print('    selected: '+login_node)
-            print_item_footer()
+            log.print_item_footer()
             
 class RedirectStdStreams(object):
     def __init__(self, stdout=None, stderr=None):
