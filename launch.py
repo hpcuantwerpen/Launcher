@@ -14,7 +14,7 @@ from BashEditor import PbsEditor
 import clusters
 import pbs
 import log
-
+import git
 wx.ToolTip.Enable(True)
 
 ######################

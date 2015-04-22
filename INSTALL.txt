@@ -1,26 +1,110 @@
-git needed?
+1. Dependencies
+================
 
-Any standard python distribution satisfying the following requirements will do:
-- python version 2.7.x. (python 3.x was not tested). You can check the version with
-  > python --version
-- installed package: paramiko, version>1.15.2
-- installed package: wxPython, version>2.8.10
-on Linux/this can be easily arranged trhough
-> pip install paramiko
-> pip install wxPython
-if your python distribution does not already have pip follow the guidelines at https://pip.pypa.io/en/latest/installing.html
+Launcher is a graphical user interface written in Python using wxPython for the 
+graphical components and paramiko for connecting (via SSH) to the VSC clusters. 
+Any standard Python distribution satisfying the following requirements will do:
+  - python version 2.7.x. (python 3.x was not tested). 
+    You can check your Python version with the command
+      > python --version
+  - installed package: paramiko, version > 1.15.2
+  - installed package: wxPython, version > 2.8.10
+These dependencies can be installed separately (see 2.), but it is generally more 
+practical to install a Python distribution that supports these packages out of the
+ box, such as Enthought/Canopy.
 
+2. Installing dependencies separately
+======================================
+2a. Linux, MacOSX
+------------------
+On Mac OS X and most Linux distributions Python is a standard component, and the
+above dependencies can be easily installed by executing (sudo)
+  > pip install paramiko
+  > pip install wxPython
+If you have ar recent Python version (2.7.9 or higher) pip is already on your 
+system. If not, check the pip installation instructions at 
+	https://pip.pypa.io/en/latest/installing.html
+(or google for "pip install").
 
-1. Download and install the latest version of Enthought Canopy Express from 
-	https://www.enthought.com/canopy-express/downloads
-   Select your operating system (Windows,Linux,Mac) and version (64-bit,32-bit) and click "DOWNLOAD Canopy Express"
-   Execute the downloaded file
+2b. Windows
+------------
+The Windows operating systems do not come with Python installed and windows users
+must install a Python distribution first. The most practical way is to opt for a
+Python distribution that already has wxPython and paramiko (see 3.)
+
+3. Installing Enthought/Canopy Python 
+======================================
+This the is recommended approach on Linux/MacOSX/Windows unless you have
+a lot of experience with Python installations
+A very good Python distribution that provides many common Python packages out
+of the box is Enthought/Canopy. Among many other very useful packages for 
+scientific work, it has direct support for wxPython and paramiko. In addition
+it is free.
+Proceed as follows:
+3.1 Download and install the latest version of Enthought Canopy Express from 
+		https://store.enthought.com
+	You will be asked to create an account, don't mind, it is free. You may
+	apply for an academic license to have additional benefits. 
+    Select your operating system (Windows,Linux,Mac) and version (64-bit,32-bit)
+    and click "DOWNLOAD Canopy Express"
+    Execute the downloaded file
+3.2 Open the canopy application and go to the "package manager" in the middle 
+	of the window.
+    install wxPython version > 2.8.10
+    install paramiko version > 1.15.2
+ 
+4. Getting Launcher with git
+=============================
+4.1 Linux/MacOSX
+-----------------
+    1. Open a terminal (Linux/MacOSX)
+    2. cd into your home folder
+    	> cd
+    3. create a Launcher folder and cd into it
+    	> mkdir Launcher
+    	> cd Launcher
+    4. get the launcher files
+        > git clone https://github.com/hpcuantwerpen/Launcher.git
+ 	
+5. Getting Launcher without git
+================================
+1. Download the Launcher-master.zip from https://github.com/hpcuantwerpen/Launcher
+   by pressing the "Download ZIP" button on the right. 
+2. In the file manager of our OS, navigate to your home folder and create
+   a new folder "Launcher"
+3. Navigate to your "Downloads" folder and unzip the Launcher-master.zip. This  
+   will usually create a folder "Launcher-master" with the Launcher files
+4. rename the folder into "Launcher" and move the entire folder into the 
+   "Launcher" folder created above. The folder structure should now look more
+   or less like this:
    
-2. open canopy and go to package manager
-   if you do not have a Canopy account create one and log to be able to install these packages
-   install wxPython > 2.8.10
-   install paramiko > 1.15.2
+   <your_home_folder>
+   +-- Launcher
+   |   +-- Launcher
+   |       +-- clusters
+   |       |   +-- __init__.py
+   |       |   +-- Hopper.py
+   |       |   +-- Turing.py
+   |       |   +-- ...
+   |       +-- BashEditor.py
+   |       +-- INSTALL.txt
+   |       +-- README.md
+   |       +-- TODO.txt
+   |       +-- indent.py
+   |       +-- launch.py
+   |       +-- log.py
+   |       +-- pbs.py
+   |       +-- sshtools.py
+   |       +-- wxtools.py
+   |       +-- xx.py
+   |       +-- ...
+   
+   Note that you should see two levels of Launcher folders.
 
 Working from home
 =================
-If you want to use the Launcher from home you must connect to vpnua.ua.ac.be using a VPN client as always.
+If you want to use the Launcher from anywhere else than at work you must connect
+to your home institution using a VPN client as always. Students and Researchers 
+of the University of Antwerp can find the necessary information at 
+    http://www.ua.ac.be/main.aspx?c=.INFOCENTERSTUDENT&n=77606
+    

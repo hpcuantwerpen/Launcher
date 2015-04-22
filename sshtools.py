@@ -5,6 +5,7 @@ import wxtools
 from indent import Indent
 import log
 
+
 SSH_DEFAULTS = {"SSH_WORK_OFFLINE": False
                ,"SSH_KEEP_CLIENT" : False
                ,"SSH_TIMEOUT"     : 15
@@ -36,6 +37,10 @@ reset_SSH_VARIABLES()
 
 ID_BUTTON_SSH_RESET = wx.NewId()
 
+class InvalidUserIdException(Exception):
+    def __init__(self,*args,**kwargs):
+	    super(InvalidUserIdException).__init__(*args,**kwargs)
+
 class Client(object):
     user_id          = None
     login_node       = None
@@ -60,6 +65,7 @@ class Client(object):
         else:
             #get new client
             Client.user_id = user_id
+            
             Client.login_node = login_node            
             self.paramiko_client = self._connect(user_id,login_node,force)
             if SSH_VARIABLES["SSH_KEEP_CLIENT"]:
@@ -113,8 +119,19 @@ class Client(object):
             pwd = None
             while True:
                 try:
-                    if not user_id:
-                        raise Exception("invalid user id")
+                    if not user_id or not login_node:
+                        Client.last_try_success = False
+                        ssh = None
+                        msg ="Unable to connect via Paramiko/SSH to "+str(user_id)+"@"+str(login_node)
+                        if not user_id:
+                            msg+="\n    invalid user id"
+                        if not login_node:
+                            msg+="\n    invalid login node"
+                            
+                        wx.MessageBox(msg, 'No Paramiko/SSH connection.',wx.OK | wx.ICON_INFORMATION)
+                        Client.last_try = datetime.datetime.now()
+                        break
+
                     if not ssh:
                         ssh = paramiko.SSHClient()
                         if SSH_VARIABLES["SSH_KEY"]:
@@ -153,12 +170,12 @@ class Client(object):
                         ssh = None
                         Client.last_try = datetime.datetime.now()
                         break
-                
+                                        
                 except Exception as e:
-                    print("Handled exception (?):",type(e),e)
+                    print("Unhandled exception (ignored):",type(e),e)
                     Client.last_try_success = False
                     ssh = None
-                    msg ="Unable to connect via Paramiko/SSH to "+user_id+"@"+login_node
+                    msg ="Unable to connect via Paramiko/SSH to "+str(user_id)+"@"+login_node
                     msg+="\nPossible causes are:"
                     msg+="\n  - no internet connection."
                     msg+="\n  - you are not connected to your home institution (VPN connection needed?)."
@@ -170,7 +187,7 @@ class Client(object):
                     Client.last_try_success = True
                     break
     
-            msg = "Paramiko/SSH connection established: {}@{}".format(Client.user_id,Client.login_node) if ssh else \
+            msg = "Paramiko/SSH connection established: {}@{}".format(str(Client.user_id),Client.login_node) if ssh else \
                   "Paramiko/SSH connection NOT established."
             self.frame_set_status(msg)
         else:
