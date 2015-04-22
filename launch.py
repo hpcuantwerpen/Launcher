@@ -219,7 +219,7 @@ class Launcher(wx.Frame):
         self.Show()
         #set control data
         self.InitData()
-        self.dump()
+        self.dump('At end of Launcher Frame constructor')
     
     def bind(self,object_name,event_name):
         """
@@ -251,49 +251,47 @@ class Launcher(wx.Frame):
         """
         log information about the event
         """
-        log.print_item_header("Launcher.log_event():")
-        if isinstance(event,(str,unicode)):
-            print(Indent(event,4))
-        else:
-            t = str(type(event))
-            print(Indent("Event.type "+t,4))
-            if "wx.lib.newevent._Event" in t:
-                print("    custom event")
-                print(Indent(event.__dict__,4))
+        with log.LogItem("Launcher.log_event():"):
+            if isinstance(event,(str,unicode)):
+                print(Indent(event,4))
             else:
-                print("         .object.name : "+event.GetEventObject().GetName())
-                print("         .object.class: "+event.GetEventObject().GetClassName())
-        if msg: 
-            print(msg)
-        log.print_item_footer()
+                t = str(type(event))
+                print(Indent("Event.type "+t,4))
+                if "wx.lib.newevent._Event" in t:
+                    print("    custom event")
+                    print(Indent(event.__dict__,4))
+                else:
+                    print("         .object.name : "+event.GetEventObject().GetName())
+                    print("         .object.class: "+event.GetEventObject().GetClassName())
+            if msg: 
+                print(msg)
         self.SetStatusText("")
         
-    def dump(self):
+    def dump(self,msg=''):
         """
         write all control values and data values 
         """
-        log.print_item_header("Dump of all control values:")
-        for k,v in self.__dict__.iteritems():
-            if k[0]=='w' and k[1].isupper(): # a control
-                try:
-                    value = v.GetValue()
-                    if not value:
-                        if isinstance(v, wx.CheckBox):
-                            value='False'
-                        else:
-                            value = "''"
+        with log.LogItem("Dump of all control values: "+msg):
+            for k,v in self.__dict__.iteritems():
+                if k[0]=='w' and k[1].isupper(): # a control
+                    try:
+                        value = v.GetValue()
+                        if not value:
+                            if isinstance(v, wx.CheckBox):
+                                value='False'
+                            else:
+                                value = "''"
+                        print()
+                        print_line(title=k)
+                        print(Indent(value,indent=4))
+                    except AttributeError:
+                        pass
+                    v.SetName(k)
+                else:                           # a data member
                     print()
                     print_line(title=k)
-                    print(Indent(value,indent=4))
-                except AttributeError:
-                    pass
-                v.SetName(k)
-            else:                           # a data member
-                print()
-                print_line(title=k)
-                print(Indent(v,indent=4))
-        print_line()
-        log.print_item_footer()
+                    print(Indent(v,indent=4))
+            print_line()
             
     ### event handlerss ###        
     def wCluster_EVT_COMBOBOX(self,event):
@@ -483,14 +481,14 @@ class Launcher(wx.Frame):
 
     def on_EVT_CLOSE(self,event=None):
         self.log_event(event)
-        log.print_item_header('Launcher closing')
-        frame_size = self.GetSize()
-        self.config.attributes['frame_size'] = frame_size
-        print('    Saving config file.')
-        self.config.save()
-        self.Destroy()
-        log.print_item_footer('end of log')
-             
+        self.dump('Before closing Launcher Frame')
+        with log.LogItem('Launcher closing'):
+            frame_size = self.GetSize()
+            self.config.attributes['frame_size'] = frame_size
+            print('    Saving config file.')
+            self.config.save()
+            self.Destroy()
+     
     ### the widgets ###
     def init_ui(self):        
         self.CreateStatusBar()
@@ -873,54 +871,50 @@ class Launcher(wx.Frame):
             old_log = self.log+str(random.random())[1:]
             shutil.copy(self.log,old_log)
 
-        log.print_item_header('launch.py')
-        print('    begin of log.')
-        log.print_item_footer()
+        with log.LogItem('launch.py'):
+            print('    begin of log.')
         
-        log.print_item_header("Version info of used components")
-        print("    Python version:")
-        print(Indent(sys.version,8))
-        print("    wxPython version:")
-        print(Indent(wx.version(),8))
-        print("    paramiko version:")
-        print(Indent(sshtools.paramiko.__version__,8))
-        print("    Launcher version:")
-        try:
-            s=subprocess.check_output(["git","describe","HEAD"])
-            if s[-1]=='\n':
-                s = s[:-1]
-        except:
-            s="v{}.{}".format(*__VERSION__)
-        print(Indent(s,8))
-        print("    Platform:")
-        print(Indent(sys.platform,8))
-        log.print_item_footer()
+        with log.LogItem("Version info of used components"):
+            print("    Python version:")
+            print(Indent(sys.version,8))
+            print("    wxPython version:")
+            print(Indent(wx.version(),8))
+            print("    paramiko version:")
+            print(Indent(sshtools.paramiko.__version__,8))
+            print("    Launcher version:")
+            try:
+                s=subprocess.check_output(["git","describe","HEAD"])
+                if s[-1]=='\n':
+                    s = s[:-1]
+            except:
+                s="v{}.{}".format(*__VERSION__)
+            print(Indent(s,8))
+            print("    Platform:")
+            print(Indent(sys.platform,8))
         
-        log.print_item_header("cleaning log files")
-        if old_log:
-            print("    Renaming previous log file 'Launcher.log' to '{}'".format(old_log))
-            
-        remove_logs_older_than = 14 
-        removed=0
-        if remove_logs_older_than:
-            now = time.time()
-            threshold = now - 60*60*24*remove_logs_older_than # Number of seconds in two days
-            for folder,sub_folders,files in os.walk(self.config.launcher_home):
-                if folder==self.config.launcher_home:
-                    for fname in files:
-                        if fname.startswith("Launcher.log."):
-                            fpath = os.path.join(folder,fname)
-                            ftime = os.path.getctime(fpath)
-                            if ftime<threshold:
-                                os.remove(fpath)
-                                removed += 1
-#                                 print('*',fname,ftime)
-#                             else:
-#                                 print(' ',fname,ftime) 
-                    break
-            print("    Removed {} log files older than {} days.".format(removed,remove_logs_older_than))
-        log.print_item_footer()
-            
+        with log.LogItem("cleaning log files"):
+            if old_log:
+                print("    Renaming previous log file 'Launcher.log' to '{}'".format(old_log))
+            remove_logs_older_than = 14 
+            removed=0
+            if remove_logs_older_than:
+                now = time.time()
+                threshold = now - 60*60*24*remove_logs_older_than # Number of seconds in two days
+                for folder,sub_folders,files in os.walk(self.config.launcher_home):
+                    if folder==self.config.launcher_home:
+                        for fname in files:
+                            if fname.startswith("Launcher.log."):
+                                fpath = os.path.join(folder,fname)
+                                ftime = os.path.getctime(fpath)
+                                if ftime<threshold:
+                                    os.remove(fpath)
+                                    removed += 1
+    #                                 print('*',fname,ftime)
+    #                             else:
+    #                                 print(' ',fname,ftime) 
+                        break
+                print("    Removed {} log files older than {} days.".format(removed,remove_logs_older_than))
+    
     def remote_location_has_changed(self):
         if self.wRemoteLocation.GetValue()=="$VSC_DATA":
             #Copying job output is meaningless since it is already there
@@ -1037,10 +1031,11 @@ class Launcher(wx.Frame):
     def cluster_has_changed(self):
         self.cluster = self.get_cluster()
         self.login_node = clusters.login_nodes[self.cluster][0]
-        log.print_item_header('Accessing cluster:')
-        print('    cluster    = '+self.cluster)
-        print('    login node = '+self.login_node)
-        log.print_item_footer()
+        
+        with log.LogItem('Accessing cluster:'):
+            print('    cluster    = '+self.cluster)
+            print('    login node = '+self.login_node)
+        
         self.set_node_set_items(clusters.node_set_names(self.cluster))
         self.wSelectModule.SetItems(self.get_module_avail())
         self.is_resources_modified = True
@@ -1177,63 +1172,61 @@ class Launcher(wx.Frame):
         return module_list
     
     def update_resources_from_script(self,event=None):
-        log.print_item_header('update_resources_from_script()')
-        lines = self.wScript.GetText().splitlines(True)
-        self.script.parse(lines)
-        self.set_default_pbs_parameters()
-        self.update_resources()
-        log.print_item_footer()
+        with log.LogItem('update_resources_from_script()'):
+            lines = self.wScript.GetText().splitlines(True)
+            self.script.parse(lines)
+            self.set_default_pbs_parameters()
+            self.update_resources()
         
     def update_script_from_resources(self):       
         if not self.is_resources_modified:
             return
-        log.print_item_header('update_script_from_resources()')
-        #make sure all values are transferred to self.script.values
-        if not hasattr(self, 'script'):
-            self.script = pbs.Script()
-            self.current_node_set.script_extras(self.script)
-        if not 'n_nodes' in self.script.values: 
-            self.script.add_pbs_option('-l','nodes={}:ppn={}'.format(self.wNNodesRequested.GetValue()
-                                                                    ,self.wNCoresPerNodeRequested.GetValue()))
-        else:
-            self.script.values['n_nodes'         ] = self.wNNodesRequested       .GetValue()
-            self.script.values['n_cores_per_node'] = self.wNCoresPerNodeRequested.GetValue()
-        
-        if not 'walltime_seconds' in self.script.values:
-            self.script.add_pbs_option('-l', 'walltime='+pbs.walltime_seconds_to_str(self.walltime_seconds))
-        else:
-            self.script.values['walltime_seconds'] = self.walltime_seconds
-            
-        if self.wNotifyAddress.GetValue(): 
-            abe = ''
-            if self.wNotifyAbort.IsChecked():
-                abe+='a'
-            if self.wNotifyBegin.IsChecked():
-                abe+='b'
-            if self.wNotifyEnd.IsChecked():
-                abe+='e'
-            if abe: 
-                if not 'notify_address' in self.script.values:
-                    self.script.add_pbs_option('-M',self.wNotifyAddress.GetValue())
-                    self.script.add_pbs_option('-m',abe)
-                else:
-                    self.script.values['notify_address'] = self.wNotifyAddress.GetValue()
-                    self.script.values['notify_abe'    ] = abe
-                    
-        self.script.values['enforce_n_nodes'] = self.wEnforceNNodes.IsChecked()
-        if self.wEnforceNNodes.IsChecked():
-            self.script.add_pbs_option('-W','x=nmatchpolicy:exactnode')
-
-        if self.wJobName.GetValue():
-            if not 'job_name' in self.script.values:
-                self.script.add_pbs_option('-N',self.wJobName.GetValue())
+        with log.LogItem('update_script_from_resources()'):
+            #make sure all values are transferred to self.script.values
+            if not hasattr(self, 'script'):
+                self.script = pbs.Script()
+                self.current_node_set.script_extras(self.script)
+            if not 'n_nodes' in self.script.values: 
+                self.script.add_pbs_option('-l','nodes={}:ppn={}'.format(self.wNNodesRequested.GetValue()
+                                                                        ,self.wNCoresPerNodeRequested.GetValue()))
             else:
-                self.script.values['job_name'] = self.wJobName.GetValue()
+                self.script.values['n_nodes'         ] = self.wNNodesRequested       .GetValue()
+                self.script.values['n_cores_per_node'] = self.wNCoresPerNodeRequested.GetValue()
+            
+            if not 'walltime_seconds' in self.script.values:
+                self.script.add_pbs_option('-l', 'walltime='+pbs.walltime_seconds_to_str(self.walltime_seconds))
+            else:
+                self.script.values['walltime_seconds'] = self.walltime_seconds
                 
-        lines = self.script.compose()
-        print("    Script updated.")
-        self.format_script(lines)
-        log.print_item_footer()
+            if self.wNotifyAddress.GetValue(): 
+                abe = ''
+                if self.wNotifyAbort.IsChecked():
+                    abe+='a'
+                if self.wNotifyBegin.IsChecked():
+                    abe+='b'
+                if self.wNotifyEnd.IsChecked():
+                    abe+='e'
+                if abe: 
+                    if not 'notify_address' in self.script.values:
+                        self.script.add_pbs_option('-M',self.wNotifyAddress.GetValue())
+                        self.script.add_pbs_option('-m',abe)
+                    else:
+                        self.script.values['notify_address'] = self.wNotifyAddress.GetValue()
+                        self.script.values['notify_abe'    ] = abe
+                        
+            self.script.values['enforce_n_nodes'] = self.wEnforceNNodes.IsChecked()
+            if self.wEnforceNNodes.IsChecked():
+                self.script.add_pbs_option('-W','x=nmatchpolicy:exactnode')
+    
+            if self.wJobName.GetValue():
+                if not 'job_name' in self.script.values:
+                    self.script.add_pbs_option('-N',self.wJobName.GetValue())
+                else:
+                    self.script.values['job_name'] = self.wJobName.GetValue()
+                    
+            lines = self.script.compose()
+            print("    Script updated.")
+            self.format_script(lines)
         
     def format_script(self,lines):
         self.wScript.ClearAll()
@@ -1463,12 +1456,11 @@ class Launcher(wx.Frame):
         ssh.close()
     
     def set_status_text(self,msg,colour=wx.BLACK):
-        log.print_item_header('Status bar text:')
-        print( Indent(msg,4))
-        self.SetStatusText(msg)
-        #todo allow for colored messages? not working on macosx
-        #self.GetStatusBar().SetForeGroundColour(colour)
-        log.print_item_footer()
+        with log.LogItem('Status bar text:'):
+            print( Indent(msg,4))
+            self.SetStatusText(msg)
+            #todo allow for colored messages? not working on macosx
+            #self.GetStatusBar().SetForeGroundColour(colour)
         
     def submit_job(self):
         if not self.save_job():
@@ -1591,9 +1583,10 @@ class Launcher(wx.Frame):
         summary.append(summary[5]-summary[0])
         msg='Retrieved={}, removed={}, not finished={}, no connection={}, error={}, total={}, remaining={}'.format(*summary)
         self.set_status_text(msg)
-        print("Retrieved jobs:")
-        pprint.pprint(self.retrieved_jobs)
-    
+        
+        with log.LogItem("Retrieved jobs:"):
+            print(Indent(self.retrieved_jobs,indent=4))
+
     def show_retrieved_jobs(self):
         if not hasattr(self,'retrieved_jobs'):
             self.retrieved_jobs = {}
@@ -1673,9 +1666,8 @@ class SelectLoginNodeDialog(wx.Dialog):
             return 
         else:
             self.GetParent().login_node = login_node
-            log.print_item_header('Selecting login node')
-            print('    selected: '+login_node)
-            log.print_item_footer()
+            with log.LogItem('Selecting login node'):
+                print('    selected: '+login_node)
             
 class RedirectStdStreams(object):
     def __init__(self, stdout=None, stderr=None):
