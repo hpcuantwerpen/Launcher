@@ -1,85 +1,120 @@
 from __future__ import print_function
-import datetime
 
 class Indent(object):
-    def __init__(self,n=None,tab=4):
-        self._indentation=''
-        self.tab=tab
-        self._stack=[]
-        if n:
-            self.indent(n)
-        
-    def indent(self,n=None):
-        tab = n if (n) else self.tab
-        self._indentation += tab*' '
-        self._stack.append(tab)
-        
-    def __iadd__(self,n):
-        self.indent(n)
-        
-    def dedent(self,nlevels=1):
-        len_stack = len(self._stack)
-        if nlevels<0 or nlevels>len_stack:
-            n = len_stack
+    def __init__(self,source,indent=0,tabs=4,default_tab=4):
+        """
+        source : object for which to produce an indented string representation
+        tabs   : replace every occurence of '\t' by the appropriate number of spaces.
+                 If tabs is an integer the text is tabbed at indent, indent+tabs,
+                 indent+2*tabs, ...
+                 If tabs is a list of integers, then the text is tabbes at indent,
+                 indent+tabs[0], indent+tabs[1], ... If the list is exhausted, the
+                 previous scheme takes over as if tabs==default_tab
+        indent : integer, indent spaces are inserted at the beginning of every line        
+        """
+        self.source=source
+        self.indent=indent
+        self.default_tab = default_tab
+        self.tabs=tabs
+        self.extend_tabs(10)
+                    
+    def extend_tabs(self,n):
+        if isinstance(self.tabs, list):
+            self.tabs.sort()
+            for i in range(10):
+                nxt=self.tabs[-1] - self.tabs[-1]%self.default_tab + self.default_tab
+                self.tabs.append(nxt)
         else:
-            n = nlevels
-        for i in range(1,n+1):
-            self._indentation = self._indentation[:-self._stack[-i]]
-        del self._stack[-n:]
-        
-    def __isub__(self,n):
-        self.dedent(n)
-    
-    def reset(self):
-        self.dedent(-1)
-        
-    def __call__(self,text,indent=None,dedent=True):
-        if isinstance(text,(list,dict)):
-            if indent:
-                self.indent(indent)              
-            s = ''
-            if isinstance(text,list):
-                for t in text:
-                    s += self(t)
-            elif isinstance(text,dict):
-                for k,v in text.iteritems():
-                    s += self._indentation+"{} : {}\n".format(k,v)
-                if s:
-                    s = s[:-1]
-            if indent :
-                if dedent is True:
-                    self.dedent()
-            return s
-                
-        if indent:
-            self.indent(indent)
+            self.default_tab=self.tabs
+            self.tabs=[self.default_tab]
+            self.extend_tabs(n-1)
 
-        assert isinstance(text,(str,unicode))
-        lines = text.splitlines(True)
-        indented_text = ''
-        for line in lines:
-            indented_text += self._indentation+line
-        
-        if indent :
-            if dedent is True:
-                self.dedent()
-        
-        return indented_text
+    def __str__(self):
+        s=''
+        s0 = self.indent*' '
+        if isinstance(self.source,dict):
+            s_source = self.dict2str(self.source)
+        if isinstance(self.source,list):
+            s_source = self.list2str(self.source)
+        else:
+            s_source = str(self.source)
+        lines = s_source.splitlines(True)
+        for l in lines:
+            s += s0
+            i=0
+            while True:
+                try:
+                    jtab=l.index('\t')
+                    ll=l[:jtab]
+                    while jtab>self.tabs[i]:
+                        i+=1
+                    ll+=(self.tabs[i]-jtab)*' '
+                    ll+=l[jtab+1:]
+                    l=ll
+                except ValueError:
+                    break
+            s+=l
+        return s
     
-    def format(self,text,indent=None,dedent=True):
-        self(text,indent=None,dedent=True)
-                
-_timestamps = []
-def print_item_header(title=""):
-    global _start
-    now = datetime.datetime.now()
-    _timestamps.append(now)
-    print()
-    print(now)
-    print("<<<",title)
+    def dict2str(self,d):
+        s=str(d)
+        s=s.replace('{','{ ')
+        s=s.replace(':','\t:\n\t')
+        s=s.replace(',', '\n,')
+        s=s.replace('}', '\n}')
+        return s
+        
+    def list2str(self,d):
+        s=str(d)
+        s=s.replace('[','[ ')
+        s=s.replace(',', '\n,')
+        s=s.replace(']', '\n]')
+        return s
+        
+#----------------------#
+# below only test code #
+#----------------------#
 
-def print_item_footer(footer=""):
-    if footer:
-        print(">>>",footer,(datetime.datetime.now()-_timestamps.pop()).total_seconds(),'s')
-    else:
-        print(">>>",(datetime.datetime.now()-_timestamps.pop()).total_seconds(),'s')
+if __name__=="__main__":
+    def print_ruler(s):
+        print('----|----1----|----2----|----3----|----4----|----5----|----6----|----7----|----8')
+        print(s)
+    text="hello\nworld"
+    s=str(Indent(text))
+    lines=s.splitlines(True)
+    print_ruler(s)
+    assert lines[0]=='hello\n'
+    assert lines[1]=='world'
+ 
+    s=str(Indent(text,indent=4))
+    print_ruler(s)
+    lines=s.splitlines(True)
+    assert lines[0]=='    hello\n'
+    assert lines[1]=='    world'
+
+    text="hel\tlo\nmy\tdear\tworld"
+    s=str(Indent(text,indent=6,tabs=4))
+    print_ruler(s)
+    lines=s.splitlines(True)
+    assert lines[0]=='      hel lo\n'
+    assert lines[1]=='      my  dearworld'
+
+    s=str(Indent(text,indent=6,tabs=5))
+    print_ruler(s)
+    lines=s.splitlines(True)
+    assert lines[0]=='      hel  lo\n'
+    assert lines[1]=='      my   dear world'
+
+    source = {"one":1
+             ,"two":2
+             }
+    s=str(Indent(source,indent=6,tabs=5))
+    print_ruler(s)
+    lines=s.splitlines(True)
+    
+    source = ["one"
+             ,"two"
+             ]
+    s=str(Indent(source,indent=6,tabs=5))
+    print_ruler(s)
+    lines=s.splitlines(True)

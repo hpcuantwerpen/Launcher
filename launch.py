@@ -6,13 +6,14 @@ import wx
 import xx
 import wx.lib.newevent
 import sshtools
-import indent
+from  indent import Indent
 
 from wxtools import *
 
 from BashEditor import PbsEditor
 import clusters
 import pbs
+
 wx.ToolTip.Enable(True)
 
 ######################
@@ -26,14 +27,13 @@ FJR_NOT_FINISHED =2
 FJR_NO_CONNECTION=3
 FJR_ERROR        =4
 
-__VERSION__ = (0,1)
+__VERSION__ = (0,5)
 
 #####################################
 ### some wx convenience functions ###
 #####################################
 
 
-indented = indent.Indent()
 
 def is_valid_mail_address(address):
     s = address.lower()
@@ -96,6 +96,24 @@ def print_line(title="",line_length=80,n_white=1,line_char='-',indent=4):
         line = line_length*line_char
     print(line)
     
+_timestamps = []
+def print_item_header(title=""):
+    global _start
+    now = datetime.datetime.now()
+    _timestamps.append(now)
+    print()
+    print(now)
+    print("<<<",title)
+
+def print_item_footer(footer=""):
+    if footer:
+        print(">>>",footer,(datetime.datetime.now()-_timestamps.pop()).total_seconds(),'s')
+    else:
+        print(">>>",(datetime.datetime.now()-_timestamps.pop()).total_seconds(),'s')
+        
+#----------------------#
+# below only test code #
+#----------------------#
 ################################################################################
 ### Launcher classes                                                         ###
 ################################################################################
@@ -153,6 +171,7 @@ class Launcher(wx.Frame):
     ID_MENU_SSH_PREFERENCES = wx.NewId()
     ID_MENU_SSH_CONNECT     = wx.NewId()
     ID_MENU_LOGIN_NODE      = wx.NewId()
+    ID_MENU_CLUSTER_MODULE_ADDED = wx.NewId()
     
     def __init__(self, parent, title):
         """
@@ -245,44 +264,49 @@ class Launcher(wx.Frame):
         """
         log information about the event
         """
-        indent.print_item_header("Launcher.log_event():")
+        print_item_header("Launcher.log_event():")
         if isinstance(event,(str,unicode)):
-            print(indented(event,4))
+            print(Indent(event,4))
         else:
             t = str(type(event))
-            print(indented("Event.type "+t,4))
+            print(Indent("Event.type "+t,4))
             if "wx.lib.newevent._Event" in t:
                 print("    custom event")
-                print(indented(event.__dict__,4))
+                print(Indent(event.__dict__,4))
             else:
                 print("         .object.name : "+event.GetEventObject().GetName())
                 print("         .object.class: "+event.GetEventObject().GetClassName())
         if msg: 
             print(msg)
-        indent.print_item_footer()
+        print_item_footer()
         self.SetStatusText("")
         
     def dump(self):
         """
         write all control values and data values 
         """
-        indent.print_item_header("Dump of all control values:")
+        print_item_header("Dump of all control values:")
         for k,v in self.__dict__.iteritems():
             if k[0]=='w' and k[1].isupper(): # a control
                 try:
                     value = v.GetValue()
+                    if not value:
+                        if isinstance(v, wx.CheckBox):
+                            value='False'
+                        else:
+                            value = "''"
                     print()
                     print_line(title=k)
-                    pprint.pprint(value)
+                    print(Indent(value,indent=4))
                 except AttributeError:
                     pass
                 v.SetName(k)
             else:                           # a data member
                 print()
                 print_line(title=k)
-                pprint.pprint(v)
+                print(Indent(v,indent=4))
         print_line()
-        indent.print_item_footer()
+        print_item_footer()
             
     ### event handlerss ###        
     def wCluster_EVT_COMBOBOX(self,event):
@@ -472,13 +496,13 @@ class Launcher(wx.Frame):
 
     def on_EVT_CLOSE(self,event=None):
         self.log_event(event)
-        indent.print_item_header('Launcher closing')
+        print_item_header('Launcher closing')
         frame_size = self.GetSize()
         self.config.attributes['frame_size'] = frame_size
         print('    Saving config file.')
         self.config.save()
         self.Destroy()
-        indent.print_item_footer('end of log')
+        print_item_footer('end of log')
              
     ### the widgets ###
     def init_ui(self):        
@@ -775,9 +799,10 @@ class Launcher(wx.Frame):
         # Tools Menu
         menu_ssh = wx.Menu()
         menu_bar.Append(menu_ssh, "&SSH")
-        menu_ssh.Append(Launcher.ID_MENU_SSH_PREFERENCES, "Preferences\tCtrl+P")
-        menu_ssh.Append(Launcher.ID_MENU_SSH_CONNECT    , "Retry to connect\tCtrl+R")
-        menu_ssh.Append(Launcher.ID_MENU_LOGIN_NODE     , "Select login node\tCtrl+L")
+        menu_ssh.Append(Launcher.ID_MENU_SSH_PREFERENCES     ,"Preferences\tCtrl+P")
+        menu_ssh.Append(Launcher.ID_MENU_SSH_CONNECT         ,"Retry to connect\tCtrl+R")
+        menu_ssh.Append(Launcher.ID_MENU_LOGIN_NODE          ,"Select login node\tCtrl+L")
+        menu_ssh.Append(Launcher.ID_MENU_CLUSTER_MODULE_ADDED,"Check for new cluster modules\tCtrl+M")
 
     def on_EVT_MENU(self, event):
         """Handle menu clicks"""
@@ -789,6 +814,13 @@ class Launcher(wx.Frame):
             # the object is not stored because it is not used 
         if event_id==Launcher.ID_MENU_LOGIN_NODE:
             self.select_login_node()
+        if event_id==Launcher.ID_MENU_CLUSTER_MODULE_ADDED:
+            self.update_cluster_list()
+            msg = "These cluster modules are installed in folder\n"+clusters.clusters_folder+":\n"
+            for m in self.wCluster.GetItems():
+                msg += "\n  - "+m+".py"
+            wx.MessageBox(msg, 'Cluster modules',wx.OK | wx.ICON_INFORMATION)
+
         else:
             raise Exception("Unknown menu event id:"+str(event_id))
              
@@ -855,17 +887,17 @@ class Launcher(wx.Frame):
             old_log = self.log+str(random.random())[1:]
             shutil.copy(self.log,old_log)
 
-        indent.print_item_header('launch.py')
+        print_item_header('launch.py')
         print('    begin of log.')
-        indent.print_item_footer()
+        print_item_footer()
         
-        indent.print_item_header("Version info of used components")
+        print_item_header("Version info of used components")
         print("    Python version:")
-        print(indented(sys.version,8))
+        print(Indent(sys.version,8))
         print("    wxPython version:")
-        print(indented(wx.version(),8))
+        print(Indent(wx.version(),8))
         print("    paramiko version:")
-        print(indented(sshtools.paramiko.__version__,8))
+        print(Indent(sshtools.paramiko.__version__,8))
         print("    Launcher version:")
         try:
             s=subprocess.check_output(["git","describe","HEAD"])
@@ -873,12 +905,12 @@ class Launcher(wx.Frame):
                 s = s[:-1]
         except:
             s="v{}.{}".format(*__VERSION__)
-        print(indented(s,8))
+        print(Indent(s,8))
         print("    Platform:")
-        print(indented(sys.platform,8))
-        indent.print_item_footer()
+        print(Indent(sys.platform,8))
+        print_item_footer()
         
-        indent.print_item_header("cleaning log files")
+        print_item_header("cleaning log files")
         if old_log:
             print("    Renaming previous log file 'Launcher.log' to '{}'".format(old_log))
             
@@ -901,7 +933,7 @@ class Launcher(wx.Frame):
 #                                 print(' ',fname,ftime) 
                     break
             print("    Removed {} log files older than {} days.".format(removed,remove_logs_older_than))
-        indent.print_item_footer()
+        print_item_footer()
             
     def remote_location_has_changed(self):
         if self.wRemoteLocation.GetValue()=="$VSC_DATA":
@@ -1001,9 +1033,7 @@ class Launcher(wx.Frame):
         return self.wCluster.GetValue()
     
     def update_cluster_list(self):
-        '''
-        '''
-        clusters = reload(clusters)
+        reload(clusters)
         self.wCluster.SetItems(clusters.cluster_list)        
         try:
             i = clusters.cluster_list.index(self.cluster)
@@ -1021,10 +1051,10 @@ class Launcher(wx.Frame):
     def cluster_has_changed(self):
         self.cluster = self.get_cluster()
         self.login_node = clusters.login_nodes[self.cluster][0]
-        indent.print_item_header('Accessing cluster:')
+        print_item_header('Accessing cluster:')
         print('    cluster    = '+self.cluster)
         print('    login node = '+self.login_node)
-        indent.print_item_footer()
+        print_item_footer()
         self.set_node_set_items(clusters.node_set_names(self.cluster))
         self.wSelectModule.SetItems(self.get_module_avail())
         self.is_resources_modified = True
@@ -1161,17 +1191,17 @@ class Launcher(wx.Frame):
         return module_list
     
     def update_resources_from_script(self,event=None):
-        indent.print_item_header('update_resources_from_script()')
+        print_item_header('update_resources_from_script()')
         lines = self.wScript.GetText().splitlines(True)
         self.script.parse(lines)
         self.set_default_pbs_parameters()
         self.update_resources()
-        indent.print_item_footer()
+        print_item_footer()
         
     def update_script_from_resources(self):       
         if not self.is_resources_modified:
             return
-        indent.print_item_header('update_script_from_resources()')
+        print_item_header('update_script_from_resources()')
         #make sure all values are transferred to self.script.values
         if not hasattr(self, 'script'):
             self.script = pbs.Script()
@@ -1217,7 +1247,7 @@ class Launcher(wx.Frame):
         lines = self.script.compose()
         print("    Script updated.")
         self.format_script(lines)
-        indent.print_item_footer()
+        print_item_footer()
         
     def format_script(self,lines):
         self.wScript.ClearAll()
@@ -1447,12 +1477,12 @@ class Launcher(wx.Frame):
         ssh.close()
     
     def set_status_text(self,msg,colour=wx.BLACK):
-        indent.print_item_header('Status bar text:')
-        print( indented(msg,4))
+        print_item_header('Status bar text:')
+        print( Indent(msg,4))
         self.SetStatusText(msg)
         #todo allow for colored messages? not working on macosx
         #self.GetStatusBar().SetForeGroundColour(colour)
-        indent.print_item_footer()
+        print_item_footer()
         
     def submit_job(self):
         if not self.save_job():
@@ -1657,9 +1687,9 @@ class SelectLoginNodeDialog(wx.Dialog):
             return 
         else:
             self.GetParent().login_node = login_node
-            indent.print_item_header('Selecting login node')
+            print_item_header('Selecting login node')
             print('    selected: '+login_node)
-            indent.print_item_footer()
+            print_item_footer()
             
 class RedirectStdStreams(object):
     def __init__(self, stdout=None, stderr=None):
@@ -1678,7 +1708,7 @@ class RedirectStdStreams(object):
 
 def run_launcher():
     app = wx.App()
-    frame = Launcher(None,"launch-4")
+    frame = Launcher(None,"Launcher v{}.{}".format(*__VERSION__))
     log = frame.log
     app.SetTopWindow(frame)
     app.MainLoop()
