@@ -3,8 +3,8 @@ import sys,cStringIO,datetime,argparse,subprocess,traceback,time
 import re,os,random,shutil,pprint,errno,pickle,inspect
 
 import wx
-import xx
 import wx.lib.newevent
+import xx
 import sshtools
 from  indent import Indent
 
@@ -14,7 +14,7 @@ from BashEditor import PbsEditor
 import clusters
 import pbs
 import log
-import git
+
 wx.ToolTip.Enable(True)
 
 ######################
@@ -877,6 +877,8 @@ class Launcher(wx.Frame):
         with log.LogItem("Version info of used components"):
             print("    Python version:")
             print(Indent(sys.version,8))
+            print("    Python executable:")
+            print(Indent(sys.executable,8))
             print("    wxPython version:")
             print(Indent(wx.version(),8))
             print("    paramiko version:")
