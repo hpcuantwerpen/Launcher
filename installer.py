@@ -23,6 +23,7 @@ issues = 0
 istep  = 0
 unzipped_folder = None
 git_commit_id = None
+dependencies_ok = False
 
 class LogAction(object):
     def __init__(self,before='',after='done',verbose=True):
@@ -187,8 +188,12 @@ def verifyDependencies(args):
         if verbose:
             print '  + This python distribution is compliant with the Launcher requirements.'
     else:
-        print '  - WARNING:\n    This python distribution is NOT compliant with the Launcher requirements.'
-        
+        ext = '.bat' if sys.platform=='win32' else '.sh'
+        print '  - WARNING:'\
+              '    This python distribution is NOT compliant with the Launcher requirements.'\
+              '    You can continue the installation by providing the --ignore-deps command '\
+              '    line argument. The startup script "launcher'+ext+'" will use the current '\
+              '    non comliant Python distribution.'
     return ok
     
 def download(args,branch='master'):
@@ -258,7 +263,27 @@ def install(args):
        
     with LogAction('  + moving "{}" to "{}" ...'.format(unzipped_folder,launcher_src_folder),verbose=verbose):
         shutil.move(unzipped_folder,launcher_src_folder)
-        
+
+    ok = True
+    with LogAction('  + creating startup script'):
+        startup = 'launcher'+ ('.bat' if sys.platform=='win32' else '.sh')
+        fpath = os.path.join(launcher_home,startup)
+        f = open(fpath,'w+')
+        if not sys.platform=='win32':
+            f.write("#!/bin/bash")
+        installer_log = pickle.load(open('installer.log'))
+        if not installer_log['verifyDependencies']:
+            print '  - WARNING:'\
+                  '    The startup script "'+startup+'" uses a non compliant Python distribution.'\
+                  '    Launcher may not work properly.'
+            f.write('echo WARNING: this script uses a NON compliant Python distribution')
+            ok = False
+        f.write(sys.executable+' '+os.path.join(launcher_src_folder,'launch.py'))
+        f.close()
+        if not sys.platform=='win32':
+            from stat import S_IEXEC
+            os.chmod(fpath,S_IEXEC)
+    return ok
 
     
 def install_step(step,args,force_always=False):
@@ -290,8 +315,11 @@ def install_step(step,args,force_always=False):
         
         installer_log[step_name] = success
         pickle.dump(installer_log,open('installer.log','w+'))
+        return success
     else:
         print '  + step not repeated since already successful and --force==False.'
+        return True
+
     
 if __name__=="__main__":
     parser = argparse.ArgumentParser()
@@ -306,9 +334,12 @@ if __name__=="__main__":
                        )
     args = parser.parse_args()
     
-    install_step( preconditions     , args ,force_always=True)
-    install_step( verifyDependencies, args )
-    install_step( download          , args )
-    args.force = True
-    install_step( unzip             , args )
-    install_step( install           , args )
+    success = install_step( preconditions, args, force_always=True )
+    if success:
+        success = install_step( verifyDependencies, args )
+    if success:
+        success = install_step( download          , args )
+    if success:
+        success = install_step( unzip             , args )
+    if success:
+        success = install_step( install           , args )
