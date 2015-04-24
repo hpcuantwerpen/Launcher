@@ -268,8 +268,9 @@ def install(args):
 def create_startup_script(args):
     print 'Creating install script'
     verbose = not args.quiet
+    launcher_src_folder = os.path.join(launcher_home,'Launcher')
     ok = True
-    with LogAction('  + creating startup script'):
+    with LogAction('  + creating startup script ...',verbose=verbose):
         startup = 'launcher'+ ('.bat' if sys.platform=='win32' else '.sh')
         fpath = os.path.join(launcher_home,startup)
         f = open(fpath,'w+')
