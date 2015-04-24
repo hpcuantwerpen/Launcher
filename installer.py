@@ -19,7 +19,6 @@ LAUNCHER_PREVIOUS      = "Launcher.bak"
 #global variables:
 user_home     = None
 launcher_home = None
-issues = 0
 istep  = 0
 unzipped_folder = None
 git_commit_id = None
@@ -54,8 +53,6 @@ def module_not_available(module_name,minimal_version):
                 , minimal_version= tuple2version_string(minimal_version)
                 , python_exe     = sys.executable
                 )
-    global issues
-    issues += 1
     return s
 
 def module_version_insufficient(module_name,version,minimal_version):
@@ -142,8 +139,9 @@ def preconditions(args):
             print '  + Folder "'+launcher_home+'" exists.'
 
     # If the current directory is <$home>/Launcher/Launcher move up to parent directory
-    if os.getcwd() == os.path.join(launcher_home,'Launcher'):
-        os.chdir(launcher_home)
+    cwd = os.getcwd()
+    if cwd.endswith('/Launcher') and not cwd==launcher_home:
+        os.chdir('..')
         if verbose:
             print '  + changing current working directory to parent directory:'
             print '     ', os.getcwd()
@@ -152,7 +150,6 @@ def preconditions(args):
         # remove files left by previous run
         remove_files   = []
         remove_folders = []
-        move_backup    = []
         z = os.path.join('./',ZIP_FILE)
         if os.path.exists(z):
             remove_files.append(z)
@@ -174,7 +171,9 @@ def preconditions(args):
                 if verbose:
                     print f,'..',
                 os.remove(f)
-         
+
+    reinstall_previous_version(verbose)
+    
     return True
         
 def verifyDependencies(args):
@@ -188,47 +187,59 @@ def verifyDependencies(args):
         if verbose:
             print '  + This python distribution is compliant with the Launcher requirements.'
     else:
-        ext = '.bat' if sys.platform=='win32' else '.sh'
-        print '  - WARNING:'\
-              '    This python distribution is NOT compliant with the Launcher requirements.'\
-              '    You can continue the installation by providing the --ignore-deps command '\
-              '    line argument. The startup script "launcher'+ext+'" will use the current '\
-              '    non comliant Python distribution.'
+        if args.ignore_deps:
+            ok = True # force return value to continu if False
+            print '  - WARNING:'\
+                  '    This python distribution is NOT compliant with the Launcher requirements.'\
+                  '    Continuing since --ignore-deps found.'
+        else:
+            ext = '.bat' if sys.platform=='win32' else '.sh'
+            print '  - WARNING:'\
+                  '    This python distribution is NOT compliant with the Launcher requirements.'\
+                  '    You can continue the installation by providing the --ignore-deps command '\
+                  '    line argument. The startup script "launcher'+ext+'" will use the current '\
+                  '    non comliant Python distribution.'
     return ok
     
 def download(args,branch='master'):
     url="http://github.com/hpcuantwerpen/Launcher/zipball/{}/".format(branch)
     print 'Downloading from',url,'...'
     verbose = not args.quiet
-    attempts = 0
-    max_attempts = 3
-    while attempts < max_attempts:
-        attempts += 1        
-        try:
-            if verbose:
-                print '    attempt {} ...'.format(attempts), 
-            response = urllib2.urlopen(url,timeout=5)
-            content = response.read()
-            f = open(ZIP_FILE, 'w+' )
-            f.write( content )
-            f.close()
-            break
-        except urllib2.URLError as e:
-            if verbose:
-                print 'failed.'
-            print type(e)
-            print e
-        finally:
-            if verbose:
-                print 'succeeded :',ZIP_FILE
-    if not attempts<max_attempts:
-        print '  - Unable to download "{}", after {} attempts.'.format(url,attempts)
-        return False
+    if args.no_download:
+        print '  - Warning: --no-download found. Assuming "{}" is present in current directory.'.format(ZIP_FILE)
     else:
-        assert os.path.exists(ZIP_FILE), 'Zip file "{}" not found.'.format(ZIP_FILE)
-        if verbose:
-            print '  + Downloaded "Launcher.zip"'
-        return True
+        attempts = 0
+        max_attempts = 3
+        while attempts < max_attempts:
+            attempts += 1        
+            try:
+                if verbose:
+                    print '    attempt {} ...'.format(attempts), 
+                response = urllib2.urlopen(url,timeout=5)
+                content = response.read()
+                f = open(ZIP_FILE, 'w+' )
+                f.write( content )
+                f.close()
+                break
+            except urllib2.URLError as e:
+                if verbose:
+                    print 'failed.'
+                print type(e)
+                print e
+            finally:
+                if verbose:
+                    print 'succeeded :',ZIP_FILE
+        if not attempts<max_attempts:
+            print '  - Unable to download "{}", after {} attempts.'.format(url,attempts)
+            return False
+    assert os.path.exists(ZIP_FILE), 'Zip file "{}" not found.'.format(ZIP_FILE)
+    if verbose:
+        if args.no_download:
+            msg='  + Found "{}" in current directory.'
+        else:
+            msg='  + Downloaded "{}".'
+        print msg.format(ZIP_FILE)
+    return True
 
 def unzip(args):
     print 'Unzipping "{}" ...'.format(ZIP_FILE)
@@ -236,7 +247,7 @@ def unzip(args):
         zf = zipfile.ZipFile(ZIP_FILE,mode='r')
         zf.extractall()
     finally:
-        global unzipped_folder
+        global unzipped_folder,git_commit_id
         for folder,sub_folders,files in os.walk('.'):
             for sub_folder in sub_folders:
                 if sub_folder.startswith(UNZIPPED_FOLDER_PREFIX):
@@ -249,7 +260,7 @@ def unzip(args):
         else:
             if not args.quiet:
                 print '  + Unzipped folder : "{}"'.format(unzipped_folder)
-            open('git_commit_id_'+git_commit_id,'w+') #empty file
+            open('git_commit_id_'+git_commit_id,'w+') #empty file to store the git commit id 
             return True
    
 def install(args):
@@ -263,6 +274,10 @@ def install(args):
        
     with LogAction('  + moving "{}" to "{}" ...'.format(unzipped_folder,launcher_src_folder),verbose=verbose):
         shutil.move(unzipped_folder,launcher_src_folder)
+    
+    with LogAction('  + Copying "git_commit_id_{}" ...'.format(git_commit_id),verbose=verbose):
+        shutil.copy('git_commit_id_'+git_commit_id,launcher_src_folder)
+        
     return True
 
 def create_startup_script(args):
@@ -275,15 +290,15 @@ def create_startup_script(args):
         fpath = os.path.join(launcher_home,startup)
         f = open(fpath,'w+')
         if not sys.platform=='win32':
-            f.write("#!/bin/bash")
+            f.write("#!/bin/bash\n")
         installer_log = pickle.load(open('installer.log'))
         if not installer_log['verifyDependencies']:
             print '  - WARNING:'\
                   '    The startup script "'+startup+'" uses a non compliant Python distribution.'\
                   '    Launcher may not work properly.'
-            f.write('echo WARNING: this script uses a NON compliant Python distribution')
+            f.write('echo WARNING: this script uses a NON compliant Python distribution\n')
             ok = False
-        f.write(sys.executable+' '+os.path.join(launcher_src_folder,'launch.py'))
+        f.write(sys.executable+' '+os.path.join(launcher_src_folder,'launch.py')+'\n')
         f.close()
         if not sys.platform=='win32':
             import stat
@@ -337,8 +352,16 @@ if __name__=="__main__":
                        , help="Do not produce detailed overview of the installation progress."
                        , action="store_true"
                        )
+    parser.add_argument("--ignore-deps"
+                       , help="Proceed with installation if the Python distribution uses is not compliant."
+                       , action="store_true"
+                       )
+    parser.add_argument("--no-download"
+                       , help="Do not download - for testing purposes only."
+                       , action="store_true"
+                       )
     args = parser.parse_args()
-    
+    print args
     success = install_step( preconditions, args, force_always=True )
     if success:
         success = install_step( verifyDependencies, args )
@@ -350,4 +373,5 @@ if __name__=="__main__":
         success = install_step( install, args )
     if success:
         args.force = True
-        success = install_step( create_startup_script, args )        
+        success = install_step( create_startup_script, args )      
+    print '\nInstallation of Launcher finished! '  
