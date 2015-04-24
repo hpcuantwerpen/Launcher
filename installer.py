@@ -263,7 +263,11 @@ def install(args):
        
     with LogAction('  + moving "{}" to "{}" ...'.format(unzipped_folder,launcher_src_folder),verbose=verbose):
         shutil.move(unzipped_folder,launcher_src_folder)
+    return True
 
+def create_startup_script(args):
+    print 'Creating install script'
+    verbose = not args.quiet
     ok = True
     with LogAction('  + creating startup script'):
         startup = 'launcher'+ ('.bat' if sys.platform=='win32' else '.sh')
@@ -281,8 +285,8 @@ def install(args):
         f.write(sys.executable+' '+os.path.join(launcher_src_folder,'launch.py'))
         f.close()
         if not sys.platform=='win32':
-            from stat import S_IEXEC
-            os.chmod(fpath,S_IEXEC)
+            import stat
+            os.chmod(fpath,stat.S_IRWXU|stat.S_IRWXG)
     return ok
 
     
@@ -338,8 +342,11 @@ if __name__=="__main__":
     if success:
         success = install_step( verifyDependencies, args )
     if success:
-        success = install_step( download          , args )
+        success = install_step( download, args )
     if success:
-        success = install_step( unzip             , args )
+        success = install_step( unzip, args )
     if success:
-        success = install_step( install           , args )
+        success = install_step( install, args )
+    if success:
+        args.force = True
+        success = install_step( create_startup_script, args )        
