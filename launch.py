@@ -846,7 +846,7 @@ class Launcher(wx.Frame):
                         msg = 'Updated successfully.'
                     else:
                         msg = 'Update failed.\nCheck the Log file.'
-                    answer = wx.MessageBox(msg, 'Update.',wx.YES|wx.NO | wx.ICON_QUESTION)
+                    answer = wx.MessageBox(msg, 'Update.',wx.OK | wx.ICON_INFORMATION)
             else:
                 msg = 'You have the most recent version already.'            
                 answer = wx.MessageBox(msg, 'Check for updates',wx.OK | wx.ICON_INFORMATION)
