@@ -841,7 +841,7 @@ class Launcher(wx.Frame):
                 answer = wx.MessageBox(msg, 'Update Launcher?',wx.YES|wx.NO | wx.ICON_QUESTION)
                 if answer==wx.YES:
                     with log.LogItem('Updating'):
-                         success = installer.install_launcher()
+                        success = installer.install_launcher()
                     if success:
                         msg = 'Updated successfully.'
                     else:
