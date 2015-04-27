@@ -1635,7 +1635,7 @@ class Launcher(wx.Frame):
                 if m:
                     print("\nStoring valid user_id '{}'".format(user_id))
                     self.config.attributes['user_id'] = user_id
-                    self.wUserId.SetValue(user_id)                    
+                    self.wUserId.SetValue(user_id)
             else:
                 return None
         return user_id
