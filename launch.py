@@ -834,14 +834,19 @@ class Launcher(wx.Frame):
     def check_for_updates(self):
         import installer
         with log.LogItem('Checking for updates'):
-            installer.install_launcher(['--check-for-updates-only', '--force'])
+            success = installer.install_launcher(['--check-for-updates-only', '--force'])
         if installer.Global.install_step_ok['check for updates']:
             if installer.Global.update_available:
                 msg = 'A more recent version was found: {}\nDo you want to update?'.format(installer.Global.git_commit_id)
                 answer = wx.MessageBox(msg, 'Update Launcher?',wx.YES|wx.NO | wx.ICON_QUESTION)
                 if answer==wx.YES:
                     with log.LogItem('Updating'):
-                        installer.install_launcher()
+                         success = installer.install_launcher()
+                    if success:
+                        msg = 'Updated successfully.'
+                    else:
+                        msg = 'Update failed.\nCheck the Log file.'
+                    answer = wx.MessageBox(msg, 'Update.',wx.YES|wx.NO | wx.ICON_QUESTION)
             else:
                 msg = 'You have the most recent version already.'            
                 answer = wx.MessageBox(msg, 'Check for updates',wx.OK | wx.ICON_INFORMATION)

@@ -7,7 +7,7 @@ import datetime
 import argparse
 import importlib
 import traceback
-from argparse import Namespace
+import random
 
 #constants:
 MINIMAL_WX_VERSION       = (2,8,10)
@@ -354,8 +354,9 @@ def install(args):
     verbose = not args.quiet
     launcher_src_folder = os.path.join(Global.launcher_home,'Launcher')
     if os.path.exists(launcher_src_folder):
-        with LogAction('  + making backup of previous version of Launcher -> "{}" ...'.format(LAUNCHER_PREVIOUS),verbose=verbose):
-            launcher_src_backup = os.path.join(Global.launcher_home,LAUNCHER_PREVIOUS)
+        backup = LAUNCHER_PREVIOUS+str(random.random())[1:]
+        with LogAction('  + making backup of previous version of Launcher -> "{}" ...'.format(backup),verbose=verbose):
+            launcher_src_backup = os.path.join(Global.launcher_home,backup)
             shutil.move(launcher_src_folder,launcher_src_backup)
 #     print os.getcwd()
     try:
@@ -480,11 +481,13 @@ def install_launcher(argv=[]):
             if success:
                 removeGlobal() #will interfere with next update
                 print '\nInstallation of Launcher finished successfully. Enjoy!'
+
             else:
                 Global.istep=0
                 dumpGlobal()
                 print '\nInstallation of Launcher failed.'
-    
+                
+    return success
     
 if __name__=="__main__":
     install_launcher(sys.argv[1:])
