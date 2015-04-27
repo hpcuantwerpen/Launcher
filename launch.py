@@ -160,6 +160,8 @@ class Launcher(wx.Frame):
     ID_MENU_LOGIN_NODE      = wx.NewId()
     ID_MENU_CLUSTER_MODULE_ADDED = wx.NewId()
     
+    ID_MENU_CHECK_FOR_UPDATE = wx.NewId()
+    
     def __init__(self, parent, title):
         """
         Create all the controls in the Launcher window and bind the necessary methods
@@ -789,6 +791,10 @@ class Launcher(wx.Frame):
         menu_ssh.Append(Launcher.ID_MENU_LOGIN_NODE          ,"Select login node\tCtrl+L")
         menu_ssh.Append(Launcher.ID_MENU_CLUSTER_MODULE_ADDED,"Check for new cluster modules\tCtrl+M")
 
+        menu_launcher = wx.Menu()
+        menu_bar.Append(menu_launcher, "&Launcher")
+        menu_launcher.Append(Launcher.ID_MENU_CHECK_FOR_UPDATE,"Check for updates")
+
     def on_EVT_MENU(self, event):
         """Handle menu clicks"""
         event_id = event.GetId()
@@ -805,6 +811,8 @@ class Launcher(wx.Frame):
             for m in self.wCluster.GetItems():
                 msg += "\n  - "+m+".py"
             answer = wx.MessageBox(msg, 'Cluster modules',wx.OK | wx.ICON_INFORMATION)
+        if event_id==Launcher.ID_MENU_CHECK_FOR_UPDATE:
+            self.check_for_updates()
         else:
             raise Exception("Unknown menu event id:"+str(event_id))
              
@@ -823,7 +831,24 @@ class Launcher(wx.Frame):
             dlg.select()
         del dlg
         
-    
+    def check_for_updates(self):
+        import installer
+        with log.LogItem('Checking for updates'):
+            installer.install_launcher(['--check-for-updates-only', '--force'])
+        if installer.Global.install_step_ok['check for updates']:
+            if installer.Global.update_available:
+                msg = 'A more recent version was found: {}\nDo you want to update?'.format(installer.Global.git_commit_id)
+                answer = wx.MessageBox(msg, 'Update Launcher?',wx.YES|wx.NO | wx.ICON_QUESTION)
+                if answer==wx.YES:
+                    with log.LogItem('Updating'):
+                        installer.install_launcher()
+            else:
+                msg = 'You have the most recent version already.'            
+                answer = wx.MessageBox(msg, 'Check for updates',wx.OK | wx.ICON_INFORMATION)
+        else:
+            msg = 'Checking for updates failed.\nCheck the log file.'            
+            answer = wx.MessageBox(msg, 'Check for updates',wx.OK | wx.ICON_INFORMATION)
+                
     def InitData(self):        
         """
         Initializte the data elements of the controls of the Launcher window

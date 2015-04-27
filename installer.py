@@ -14,7 +14,7 @@ MINIMAL_WX_VERSION       = (2,8,10)
 MINIMAL_PARAMIKO_VERSION = (1,15,2)
 ZIP_FILE = 'Launcher.zip'
 UNZIPPED_FOLDER_PREFIX = "hpcuantwerpen-Launcher-"
-GIT_COMMIT_ID_PREFIX   = "Global.git_commit_id_"
+GIT_COMMIT_ID_PREFIX   = "git_commit_id_"
 LAUNCHER_PREVIOUS      = "Launcher.bak"
 GLOBAL_PICKLED         = "installer_status.pickled"
 
@@ -193,9 +193,9 @@ def preconditions(args):
             for sub_folder in sub_folders:
                 if sub_folder.startswith(UNZIPPED_FOLDER_PREFIX):
                     remove_folders.append(sub_folder)
-            for file in files:
-                if file.startswith(GIT_COMMIT_ID_PREFIX):
-                    remove_files.append(file)
+#             for file in files:
+#                 if file.startswith(GIT_COMMIT_ID_PREFIX):
+#                     remove_files.append(file)
             break
         if remove_folders:
             with LogAction('  + removing old folders :',verbose=verbose):
@@ -210,7 +210,8 @@ def preconditions(args):
                         print f,'..',
                     os.remove(f)
 
-    reinstall_previous_version(verbose)
+#     if not args.check_updates_only:
+#         reinstall_previous_version(verbose)
     
     return True
         
@@ -243,10 +244,19 @@ def verifyDependencies(args):
     
 def download(args,branch='master'):
     url="http://github.com/hpcuantwerpen/Launcher/zipball/{}/".format(branch)
-    print 'Downloading from',url,'...'
+    
+    if args.check_for_updates_only:
+        print 'Checking for updates ...'
+        args.no_download = False
+    else:
+        print 'Downloading from',url,'...'
+    
     verbose = not args.quiet
+    
     if args.no_download:
         print '  - Warning: --no-download found. Assuming "{}" is present in current directory.'.format(ZIP_FILE)
+        assert os.path.exists(ZIP_FILE), 'Zip file "{}" not found.'.format(ZIP_FILE)
+        print '  + Found "{}" in current directory.'.format(ZIP_FILE)
     else:
         attempts = 0
         max_attempts = 3
@@ -256,16 +266,32 @@ def download(args,branch='master'):
                 if verbose:
                     print '    attempt {} ...'.format(attempts), 
                 response = urllib2.urlopen(url,timeout=5)
-#                 print response.info()['Content-Disposition']
-#                 print type(response.info()['Content-Disposition'])
                 pattern = re.compile(r"attachment; filename=(.*)")
                 m = re.match(pattern, response.info()['Content-Disposition'])
                 Global.zip_folder = m.group(1)
-                content = response.read()
-                f = open(ZIP_FILE, 'w+' )
-                f.write( content )
-                f.close()
-                break
+                
+                if args.check_for_updates_only:
+                    
+                    Global.unzipped_folder = os.path.splitext(Global.zip_folder)[0]
+                    Global.git_commit_id   = Global.unzipped_folder[len(UNZIPPED_FOLDER_PREFIX):]
+                    launcher_src_folder = os.path.join(Global.launcher_home,'Launcher')
+                    Global.update_available=False
+                    previous_git_commit_id=None
+                    for folder,sub_folders,files in os.walk(launcher_src_folder):
+                        for f in files:
+                            if f.startswith(GIT_COMMIT_ID_PREFIX):
+                                previous_git_commit_id = f[len(GIT_COMMIT_ID_PREFIX):]
+                                Global.update_available = ( previous_git_commit_id!=Global.git_commit_id )
+                                break
+                        else:
+                            Global.update_available=True
+                        break
+                else:
+                    content = response.read()
+                    f = open(ZIP_FILE, 'w+' )
+                    f.write( content )
+                    f.close()
+                    break
             except urllib2.URLError as e:
                 if verbose:
                     print 'failed.'
@@ -273,18 +299,29 @@ def download(args,branch='master'):
                 print e
             finally:
                 if verbose:
-                    print 'succeeded :"{}" -> "{}"'.format(Global.zip_folder,ZIP_FILE)
-        if not attempts<max_attempts:
-            print '  - Unable to download "{}", after {} attempts.'.format(url,attempts)
-            return False
-    assert os.path.exists(ZIP_FILE), 'Zip file "{}" not found.'.format(ZIP_FILE)
-    if verbose:
-        if args.no_download:
-            msg='  + Found "{}" in current directory.'
+                    if args.check_for_updates_only:
+                        print 'succeeded :'
+                        if Global.update_available:
+                            if not previous_git_commit_id:
+                                print "  + No git commit id found in installation, assuming outdated version."
+                            print '  + Update available:',Global.git_commit_id
+                        else:
+                            print '  + You have the most recent version already.'
+                    else:
+                        print 'succeeded :"{}" -> "{}"'.format(Global.zip_folder,ZIP_FILE)
+                        print '  + Downloaded "{}".'.format(ZIP_FILE)
+
+                if not args.check_for_updates_only:
+                    assert os.path.exists(ZIP_FILE), 'Zip file "{}" not found.'.format(ZIP_FILE)
+                    print '  + Downloaded "{}".'.format(ZIP_FILE)
+
+                return True
+            
+        if args.check_for_updates_only:
+            print '  - Unable to connect to github, after {} attempts.'.format(attempts)
         else:
-            msg='  + Downloaded "{}".'
-        print msg.format(ZIP_FILE)
-    return True
+            print '  - Unable to download "{}", after {} attempts.'.format(url,attempts)
+        return False
 
 def unzip(args):
     print 'Unzipping "{}" ...'.format(ZIP_FILE)
@@ -361,14 +398,14 @@ def create_startup_script(args):
     return ok
 
     
-def install_step(step,args):
+def install_step(step,args,name=None):
     start = datetime.datetime.now()
     loadGlobal()
     
     Global.istep += 1
     print '\nSTEP', Global.istep    
     
-    step_name = step.__name__
+    step_name = step.__name__ if not name else name
     step_already_ok = Global.install_step_ok.get(step_name,False)
 
     if not step_already_ok:
@@ -387,11 +424,12 @@ def install_step(step,args):
         dumpGlobal()
         return success
     else:
+        print step_name
         print '  + step not repeated since already successful and --force==False.'
+        dumpGlobal()
         return True
-
     
-if __name__=="__main__":
+def install_launcher(argv=[]):
     parser = argparse.ArgumentParser()
     parser.add_argument("-f","--force"
                        , help="Force all steps to execute, even when reported to be successful"\
@@ -410,26 +448,44 @@ if __name__=="__main__":
                        , help="Do not download - for testing purposes only."
                        , action="store_true"
                        )
-    args = parser.parse_args()
+    parser.add_argument("--check-for-updates-only"
+                       , help="Check only if there is a newer version, but don't download, and don't install. "
+                       , action="store_true"
+                       )
+    args = parser.parse_args(argv)
     if not args.quiet:
-        print "Commandline arguments:",args
+        print "Launcher installer called with Commandline arguments:",str(args)[9:]
     
     success     = install_step( preconditions, args)
     if success:
         success = install_step( verifyDependencies, args )
     if success:
-        success = install_step( download, args )
-    if success:
-        success = install_step( unzip, args )
-    if success:
-        success = install_step( install, args )
-    if success:
-        args.force = True
-        success = install_step( create_startup_script, args )    
+        if args.check_for_updates_only:
+            success = install_step( download, args, name='check for updates')
+            if success:
+                print '\nChecking for Launcher updates finished successfully.'
+                Global.istep=0
+                dumpGlobal()
+            else:
+                print '\nChecking for Launcher updates failed.'
+        else:
+            success     = install_step( download, args )
+            if success:
+                success = install_step( unzip, args )
+            if success:
+                success = install_step( install, args )
+            if success:
+                args.force = True
+                success = install_step( create_startup_script, args )    
+            if success:
+                removeGlobal() #will interfere with next update
+                print '\nInstallation of Launcher finished successfully. Enjoy!'
+            else:
+                Global.istep=0
+                dumpGlobal()
+                print '\nInstallation of Launcher failed.'
     
-    if success:
-        removeGlobal() #will interfere with next update
-        print '\nInstallation of Launcher finished successfully. Enjoy!'
-    else:
-        print '\nInstallation of Launcher failed.'
+    
+if __name__=="__main__":
+    install_launcher(sys.argv[1:])
     
