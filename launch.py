@@ -839,8 +839,7 @@ class Launcher(wx.Frame):
             success = installer.install_launcher(['--check-for-updates-only', '--force'])
         if success:
             if installer.status.update_available:
-                msg = 'A more recent version was found: {}\nDo you want to update?'.format(installer.status.git_commit_id)
-                answer = wx.MessageBox(msg, 'Update Launcher?',wx.YES|wx.NO | wx.ICON_QUESTION)
+                answer = UpdateFoundDialog(update=installer.status.git_commit_id)
                 if answer==wx.YES:
                     with log.LogItem('Updating'):
                         success = installer.install_launcher()
@@ -857,6 +856,7 @@ class Launcher(wx.Frame):
             if not quiet:
                 msg = 'Checking for updates failed.\nCheck the log file.'            
                 answer = wx.MessageBox(msg, 'Check for updates',wx.OK | wx.ICON_INFORMATION)
+
                 
     def InitData(self):        
         """
@@ -1673,13 +1673,32 @@ class Launcher(wx.Frame):
             else:
                 return None
         return user_id
-    
+ 
+class UpdateFoundDialog(wx.Dialog):
+    def __init__(self, parent, title="Update Found", update=""):
+        super(UpdateFoundDialog,self).__init__(parent, title=title)  
+        automatic_update = parent.config.attributes['automatic_update']
+        self.wAutomaticUpdate = wx.CheckBox(self,label='Check for updates automatically?') 
+        self.wAutomaticUpdate.SetValue(automatic_update)   
+        buttons = self.CreateSeparatedButtonSizer(wx.CANCEL|wx.OK)
+        msg = 'A Launcher update was found : '
+        if update:
+            msg+='"'+update+'"'
+        msg+='\n  Do you want to install the update?'.format(update)
+        self.SetSizer( grid_layout( [ wx.StaticText(self) 
+                                    , [self.wAutomaticUpdate,1,wx.EXPAND]
+                                    , [wx.StaticText(self,label=msg),1,wx.EXPAND]
+                                    , wx.StaticText(self) 
+                                    , [buttons,1,wx.EXPAND]
+                                    ]
+                                  , ncols=1, growable_cols=[0] ) )
+       
 class SelectLoginNodeDialog(wx.Dialog):
     def __init__(self, parent, title="Select login node"):
         super(SelectLoginNodeDialog,self).__init__(parent, title=title)
     
         login_node = parent.login_node
-        self. choices = wx.ComboBox( self, wx.ID_ANY
+        self.choices = wx.ComboBox( self, wx.ID_ANY
                                    , choices=clusters.login_nodes[parent.cluster], value=login_node
                                    , style=wx.CB_DROPDOWN|wx.CB_READONLY|wx.CB_SIMPLE|wx.EXPAND
                                    )

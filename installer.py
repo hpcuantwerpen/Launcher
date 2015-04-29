@@ -50,7 +50,7 @@ def load_status(reset=False):
         except: #cannot unpickle, hence reset key-value pair to default
             init_status()
         return
-    else
+    else:
         init_status()
         
 def dump_status():
@@ -59,7 +59,7 @@ def dump_status():
     for k,v in status.__dict__.iteritems():
         if not (k.startswith('__') and k.endswith('__')):
             d[k]=v 
-    pickle.dump(d, open(GLOBAL_PICKLED,'w+b’))
+    pickle.dump(d, open(GLOBAL_PICKLED,"w+b"))
 
 def remove_status():
     """
