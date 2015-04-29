@@ -18,41 +18,54 @@ GIT_COMMIT_ID_PREFIX   = "git_commit_id_"
 LAUNCHER_PREVIOUS      = "Launcher.bak"
 GLOBAL_PICKLED         = "installer_status.pickled"
 
-class Global(object): 
-    """ using class as namespace
-        key-value pairs are defined in loadGlobal()
+class status(object): 
+    """ using class object as namespace
+        key-value pairs are defined in load_status()
     """
+def init_status():
+    """
+    (re)set the attributes to their default values.
+    """
+    status.user_home       = None
+    status.launcher_home   = None
+    status.istep           = 0
+    status.unzipped_folder = None
+    status.git_commit_id   = None
+    status.dependencies_ok = False
+    status.zip_folder      = None
+    status.install_step_ok = {}
 
-def loadGlobal(reset=False):
-    """ persistence for Global namespace"""
-    if reset:
-        #set default key value pairs
-        Global.user_home       = None
-        Global.launcher_home   = None
-        Global.istep           = 0
-        Global.unzipped_folder = None
-        Global.git_commit_id   = None
-        Global.dependencies_ok = False
-        Global.zip_folder      = None
-        Global.install_step_ok = {}
+def load_status(reset=False):
+    """
+    Persistence for status namespace:
+      - unpickle the status class object, unless
+      - reset == True, in which case the attributes are set to their default values.
+    """
+    if not reset:
+        try:
+            d={}
+            d=pickle.load(open(GLOBAL_PICKLED))
+            for k,v in d.iteritems():
+                setattr(status, k, v)
+        except: #cannot unpickle, hence reset key-value pair to default
+            init_status()
         return
-    try:
-        d={}
-        d=pickle.load(open(GLOBAL_PICKLED))
-        for k,v in d.iteritems():
-            setattr(Global, k, v)
-    except:
-        loadGlobal(reset=True)
+    else
+        init_status()
         
-def dumpGlobal():
-    """ persistence for Global namespace"""
+def dump_status():
+    """ persistence for status namespace - pickle the status class object."""
     d={}
-    for k,v in Global.__dict__.iteritems():
+    for k,v in status.__dict__.iteritems():
         if not (k.startswith('__') and k.endswith('__')):
             d[k]=v 
-    pickle.dump(d, open(GLOBAL_PICKLED,'w+'))
+    pickle.dump(d, open(GLOBAL_PICKLED,'w+b’))
 
-def removeGlobal():
+def remove_status():
+    """
+    Remove the persistent (pickled) status class object.
+    On the next load_status() call the status attributes will be set to their default values
+    """
     try:
         os.remove(GLOBAL_PICKLED)
     except Exception as e:
@@ -137,9 +150,9 @@ def check_module(module_name, minimal_version, verbose=False, module_name_verbos
     return ok
         
 def reinstall_previous_version(verbose):
-    launcher_src_previous = os.path.join(Global.launcher_home,LAUNCHER_PREVIOUS)
+    launcher_src_previous = os.path.join(status.launcher_home,LAUNCHER_PREVIOUS)
     if os.path.exists(launcher_src_previous):
-        launcher_src_folder = os.path.join(Global.launcher_home,'Launcher')
+        launcher_src_folder = os.path.join(status.launcher_home,'Launcher')
         if os.path.exists(launcher_src_folder):
             with LogAction('  + removing recently installed Launcher version ...',verbose=verbose):
                 shutil.rmtree(launcher_src_folder)
@@ -151,34 +164,34 @@ def preconditions(args):
     verbose=not args.quiet
     # existence of home directory
     env_home = "HOMEPATH" if sys.platform=="win32" else "HOME"
-    Global.user_home = os.environ[env_home]
-    assert (not Global.user_home is None),"Unable to detect home folder."
+    status.user_home = os.environ[env_home]
+    assert (not status.user_home is None),"Unable to detect home folder."
     if verbose:
-        print '  + home folder found :', Global.user_home
+        print '  + home folder found :', status.user_home
     # existence of Launcher directory
-    Global.launcher_home = os.path.join(Global.user_home,'Launcher')
-    if not os.path.exists(Global.launcher_home):
+    status.launcher_home = os.path.join(status.user_home,'Launcher')
+    if not os.path.exists(status.launcher_home):
         try:
-            os.makedirs(Global.launcher_home)
+            os.makedirs(status.launcher_home)
         except:
-            print '  - Unable to create folder "'+Global.launcher_home+'".'
+            print '  - Unable to create folder "'+status.launcher_home+'".'
             raise
         finally:
             if verbose:
-                print '  + Folder "'+Global.launcher_home+'" created.'
+                print '  + Folder "'+status.launcher_home+'" created.'
     else:
         if verbose:
-            print '  + Folder "'+Global.launcher_home+'" exists.'
+            print '  + Folder "'+status.launcher_home+'" exists.'
 
     # If the current directory is <$home>/Launcher/Launcher move up to parent directory
     cwd = os.getcwd()
-    if cwd.endswith('/Launcher') and not cwd==Global.launcher_home:
+    if cwd.endswith('/Launcher') and not cwd==status.launcher_home:
         os.chdir('..')
         if verbose:
             print '  + changing current working directory to parent directory:'
             print '     ', os.getcwd()
     if args.force:
-        removed = removeGlobal() #forget the state of the previous run
+        removed = remove_status() #forget the state of the previous run
         if verbose and removed:
             print '  + removed old "{}" (--force):'.format(GLOBAL_PICKLED)
     
@@ -239,7 +252,7 @@ def verifyDependencies(args):
                   '    line argument. The startup script "launcher'+ext+'" will use the current '\
                   '    non comliant Python distribution.'
 
-    Global.dependencies_ok = ok
+    status.dependencies_ok = ok
     return ok
     
 def download(args,branch='master'):
@@ -268,23 +281,23 @@ def download(args,branch='master'):
                 response = urllib2.urlopen(url,timeout=5)
                 pattern = re.compile(r"attachment; filename=(.*)")
                 m = re.match(pattern, response.info()['Content-Disposition'])
-                Global.zip_folder = m.group(1)
+                status.zip_folder = m.group(1)
                 
                 if args.check_for_updates_only:
                     
-                    Global.unzipped_folder = os.path.splitext(Global.zip_folder)[0]
-                    Global.git_commit_id   = Global.unzipped_folder[len(UNZIPPED_FOLDER_PREFIX):]
-                    launcher_src_folder = os.path.join(Global.launcher_home,'Launcher')
-                    Global.update_available=False
+                    status.unzipped_folder = os.path.splitext(status.zip_folder)[0]
+                    status.git_commit_id   = status.unzipped_folder[len(UNZIPPED_FOLDER_PREFIX):]
+                    launcher_src_folder = os.path.join(status.launcher_home,'Launcher')
+                    status.update_available=False
                     previous_git_commit_id=None
                     for folder,sub_folders,files in os.walk(launcher_src_folder):
                         for f in files:
                             if f.startswith(GIT_COMMIT_ID_PREFIX):
                                 previous_git_commit_id = f[len(GIT_COMMIT_ID_PREFIX):]
-                                Global.update_available = ( previous_git_commit_id!=Global.git_commit_id )
+                                status.update_available = ( previous_git_commit_id!=status.git_commit_id )
                                 break
                         else:
-                            Global.update_available=True
+                            status.update_available=True
                         break
                 else:
                     content = response.read()
@@ -301,14 +314,14 @@ def download(args,branch='master'):
                 if verbose:
                     if args.check_for_updates_only:
                         print 'succeeded :'
-                        if Global.update_available:
+                        if status.update_available:
                             if not previous_git_commit_id:
                                 print "  + No git commit id found in installation, assuming outdated version."
-                            print '  + Update available:',Global.git_commit_id
+                            print '  + Update available:',status.git_commit_id
                         else:
                             print '  + You have the most recent version already.'
                     else:
-                        print 'succeeded :"{}" -> "{}"'.format(Global.zip_folder,ZIP_FILE)
+                        print 'succeeded :"{}" -> "{}"'.format(status.zip_folder,ZIP_FILE)
                         print '  + Downloaded "{}".'.format(ZIP_FILE)
 
                 if not args.check_for_updates_only:
@@ -329,42 +342,42 @@ def unzip(args):
         zf = zipfile.ZipFile(ZIP_FILE,mode='r')
         zf.extractall()
     finally:
-        if Global.zip_folder is None:
+        if status.zip_folder is None:
             for folder,sub_folders,files in os.walk('.'):
                 for sub_folder in sub_folders:
                     if sub_folder.startswith(UNZIPPED_FOLDER_PREFIX):
-                        Global.unzipped_folder = sub_folder
+                        status.unzipped_folder = sub_folder
                 break
         else:
-            Global.unzipped_folder=os.path.splitext(Global.zip_folder)[0]
-            assert os.path.exists(Global.unzipped_folder)
+            status.unzipped_folder=os.path.splitext(status.zip_folder)[0]
+            assert os.path.exists(status.unzipped_folder)
             
-    if Global.unzipped_folder is None:
-        print '  - Unzipped folder not found. Expecting "{}<Global.git_commit_id>"'.format(UNZIPPED_FOLDER_PREFIX)
+    if status.unzipped_folder is None:
+        print '  - Unzipped folder not found. Expecting "{}<status.git_commit_id>"'.format(UNZIPPED_FOLDER_PREFIX)
         return False
     else:
         if not args.quiet:
-            print '  + Unzipped folder : "{}"'.format(Global.unzipped_folder)
-        Global.git_commit_id = Global.unzipped_folder[len(UNZIPPED_FOLDER_PREFIX):]
-        open('git_commit_id_'+Global.git_commit_id,'w+') #empty file to store the git commit id 
+            print '  + Unzipped folder : "{}"'.format(status.unzipped_folder)
+        status.git_commit_id = status.unzipped_folder[len(UNZIPPED_FOLDER_PREFIX):]
+        open('git_commit_id_'+status.git_commit_id,'w+') #empty file to store the git commit id 
         return True
    
 def install(args):
     print 'Installing Launcher ...'
     verbose = not args.quiet
-    launcher_src_folder = os.path.join(Global.launcher_home,'Launcher')
+    launcher_src_folder = os.path.join(status.launcher_home,'Launcher')
     if os.path.exists(launcher_src_folder):
         backup = LAUNCHER_PREVIOUS+str(random.random())[1:]
         with LogAction('  + making backup of previous version of Launcher -> "{}" ...'.format(backup),verbose=verbose):
-            launcher_src_backup = os.path.join(Global.launcher_home,backup)
+            launcher_src_backup = os.path.join(status.launcher_home,backup)
             shutil.move(launcher_src_folder,launcher_src_backup)
 #     print os.getcwd()
     try:
-        with LogAction('  + moving "{}" to "{}" ...'.format(Global.unzipped_folder,launcher_src_folder),verbose=verbose):
-            shutil.move(Global.unzipped_folder,launcher_src_folder)
+        with LogAction('  + moving "{}" to "{}" ...'.format(status.unzipped_folder,launcher_src_folder),verbose=verbose):
+            shutil.move(status.unzipped_folder,launcher_src_folder)
         
-        with LogAction('  + Copying "git_commit_id_{}" ...'.format(Global.git_commit_id),verbose=verbose):
-            shutil.copy('git_commit_id_'+Global.git_commit_id,launcher_src_folder)
+        with LogAction('  + Copying "git_commit_id_{}" ...'.format(status.git_commit_id),verbose=verbose):
+            shutil.copy('git_commit_id_'+status.git_commit_id,launcher_src_folder)
     except:
         traceback.print_exc(file=sys.stdout)
         print "Returning to previous version."
@@ -376,16 +389,16 @@ def install(args):
 def create_startup_script(args):
     print 'Creating install script'
     verbose = not args.quiet
-    launcher_src_folder = os.path.join(Global.launcher_home,'Launcher')
+    launcher_src_folder = os.path.join(status.launcher_home,'Launcher')
     ok = True
     with LogAction('  + creating startup script ...',verbose=verbose):
         startup = 'launcher'+ ('.bat' if sys.platform=='win32' else '.sh')
-        fpath = os.path.join(Global.launcher_home,startup)
+        fpath = os.path.join(status.launcher_home,startup)
         f = open(fpath,'w+')
         if not sys.platform=='win32':
             f.write("#!/bin/bash\n")
         
-        if not Global.dependencies_ok:
+        if not status.dependencies_ok:
             print '  - WARNING:'\
                   '    The startup script "'+startup+'" uses a non compliant Python distribution.'\
                   '    Launcher may not work properly.'
@@ -401,13 +414,13 @@ def create_startup_script(args):
     
 def install_step(step,args,name=None):
     start = datetime.datetime.now()
-    loadGlobal()
+    load_status()
     
-    Global.istep += 1
-    print '\nSTEP', Global.istep    
+    status.istep += 1
+    print '\nSTEP', status.istep    
     
     step_name = step.__name__ if not name else name
-    step_already_ok = Global.install_step_ok.get(step_name,False)
+    step_already_ok = status.install_step_ok.get(step_name,False)
 
     if not step_already_ok:
         try:
@@ -421,13 +434,13 @@ def install_step(step,args,name=None):
             + str((datetime.datetime.now()-start).total_seconds())+'s.'
         print msg
         
-        Global.install_step_ok[step_name] = success
-        dumpGlobal()
+        status.install_step_ok[step_name] = success
+        dump_status()
         return success
     else:
         print step_name
         print '  + step not repeated since already successful and --force==False.'
-        dumpGlobal()
+        dump_status()
         return True
     
 def install_launcher(argv=[]):
@@ -465,8 +478,8 @@ def install_launcher(argv=[]):
             success = install_step( download, args, name='check for updates')
             if success:
                 print '\nChecking for Launcher updates finished successfully.'
-                Global.istep=0
-                dumpGlobal()
+                status.istep=0
+                dump_status()
             else:
                 print '\nChecking for Launcher updates failed.'
         else:
@@ -479,12 +492,12 @@ def install_launcher(argv=[]):
                 args.force = True
                 success = install_step( create_startup_script, args )    
             if success:
-                removeGlobal() #will interfere with next update
+                remove_status() #avoid  interference during installation of next update
                 print '\nInstallation of Launcher finished successfully. Enjoy!'
 
             else:
-                Global.istep=0
-                dumpGlobal()
+                status.istep=0
+                dump_status()
                 print '\nInstallation of Launcher failed.'
                 
     return success

@@ -222,6 +222,8 @@ class Launcher(wx.Frame):
         #set control data
         self.InitData()
         self.dump('At end of Launcher Frame constructor')
+        if self.config.attributes.get('automatic_updates',False):
+            self.check_for_updates(quiet=True)
     
     def bind(self,object_name,event_name):
         """
@@ -831,13 +833,13 @@ class Launcher(wx.Frame):
             dlg.select()
         del dlg
         
-    def check_for_updates(self):
+    def check_for_updates(self,quiet=False):
         import installer
         with log.LogItem('Checking for updates'):
             success = installer.install_launcher(['--check-for-updates-only', '--force'])
-        if installer.Global.install_step_ok['check for updates']:
-            if installer.Global.update_available:
-                msg = 'A more recent version was found: {}\nDo you want to update?'.format(installer.Global.git_commit_id)
+        if success:
+            if installer.status.update_available:
+                msg = 'A more recent version was found: {}\nDo you want to update?'.format(installer.status.git_commit_id)
                 answer = wx.MessageBox(msg, 'Update Launcher?',wx.YES|wx.NO | wx.ICON_QUESTION)
                 if answer==wx.YES:
                     with log.LogItem('Updating'):
@@ -848,15 +850,17 @@ class Launcher(wx.Frame):
                         msg = 'Update failed.\nCheck the Log file.'
                     answer = wx.MessageBox(msg, 'Update.',wx.OK | wx.ICON_INFORMATION)
             else:
-                msg = 'You have the most recent version already.'            
-                answer = wx.MessageBox(msg, 'Check for updates',wx.OK | wx.ICON_INFORMATION)
+                if not quiet:
+                    msg = 'You have the most recent version already.'            
+                    answer = wx.MessageBox(msg, 'Check for updates',wx.OK | wx.ICON_INFORMATION)
         else:
-            msg = 'Checking for updates failed.\nCheck the log file.'            
-            answer = wx.MessageBox(msg, 'Check for updates',wx.OK | wx.ICON_INFORMATION)
+            if not quiet:
+                msg = 'Checking for updates failed.\nCheck the log file.'            
+                answer = wx.MessageBox(msg, 'Check for updates',wx.OK | wx.ICON_INFORMATION)
                 
     def InitData(self):        
         """
-        Initializte the data elements of the controls of the Launcher window
+        Initialize the data elements of the controls of the Launcher window
         """
         #select a cluster
         cluster = self.config.attributes['cluster']

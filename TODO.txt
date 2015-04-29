@@ -1,5 +1,4 @@
 TODO LIST
-- create public repository
 - automatic check for updates
 - test on linux ubuntu
 - test on windows
@@ -7,6 +6,7 @@ TODO LIST
 - add mpi functionality
 
 DONE
+- create public repository
 - test Launcher.node_set_has_changed
 - add option to dos2unix all files transferred (and the other way around)
 - add menu with some tools to 
