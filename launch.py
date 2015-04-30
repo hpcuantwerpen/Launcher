@@ -839,15 +839,18 @@ class Launcher(wx.Frame):
             success = installer.install_launcher(['--check-for-updates-only', '--force'])
         if success:
             if installer.status.update_available:
-                answer = UpdateFoundDialog(update=installer.status.git_commit_id)
+                dlg = UpdateFoundDialog(self,update=installer.status.git_commit_id)
+                answer = dlg.ShowModal()
                 if answer==wx.YES:
-                    with log.LogItem('Updating'):
-                        success = installer.install_launcher()
+                    success = installer.install_launcher()
                     if success:
                         msg = 'Updated successfully.'
                     else:
                         msg = 'Update failed.\nCheck the Log file.'
                     answer = wx.MessageBox(msg, 'Update.',wx.OK | wx.ICON_INFORMATION)
+                self.config.attributes['automatic_update'] = dlg.wAutomaticUpdate.IsChecked()
+                del dlg
+
             else:
                 if not quiet:
                     msg = 'You have the most recent version already.'            
@@ -1677,19 +1680,18 @@ class Launcher(wx.Frame):
 class UpdateFoundDialog(wx.Dialog):
     def __init__(self, parent, title="Update Found", update=""):
         super(UpdateFoundDialog,self).__init__(parent, title=title)  
-        automatic_update = parent.config.attributes['automatic_update']
+        automatic_update = parent.config.attributes.get('automatic_update',False)
         self.wAutomaticUpdate = wx.CheckBox(self,label='Check for updates automatically?') 
         self.wAutomaticUpdate.SetValue(automatic_update)   
-        buttons = self.CreateSeparatedButtonSizer(wx.CANCEL|wx.OK)
-        msg = 'A Launcher update was found : '
-        if update:
-            msg+='"'+update+'"'
-        msg+='\n  Do you want to install the update?'.format(update)
-        self.SetSizer( grid_layout( [ wx.StaticText(self) 
-                                    , [self.wAutomaticUpdate,1,wx.EXPAND]
-                                    , [wx.StaticText(self,label=msg),1,wx.EXPAND]
-                                    , wx.StaticText(self) 
-                                    , [buttons,1,wx.EXPAND]
+      
+        self.SetSizer( grid_layout( [  wx.StaticText(self) 
+                                    , [self.wAutomaticUpdate,1,wx.ALIGN_CENTER_HORIZONTAL]
+                                    ,  wx.StaticText(self) 
+                                    , [wx.StaticText(self,label='A Launcher update was found:'),1,wx.EXPAND]
+                                    , [wx.StaticText(self,label=update),1,wx.ALIGN_CENTER_HORIZONTAL]
+                                    , [wx.StaticText(self,label='Do you want to install the update?'),1,wx.ALIGN_CENTER_HORIZONTAL]
+                                    ,  wx.StaticText(self) 
+                                    , [self.CreateSeparatedButtonSizer(wx.NO|wx.YES),1,wx.EXPAND]
                                     ]
                                   , ncols=1, growable_cols=[0] ) )
        

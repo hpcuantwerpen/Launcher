@@ -319,7 +319,7 @@ def download(args,branch='master'):
                                 print "  + No git commit id found in installation, assuming outdated version."
                             print '  + Update available:',status.git_commit_id
                         else:
-                            print '  + You have the most recent version already.'
+                            print '  + You have the most recent version already:', status.git_commit_id
                     else:
                         print 'succeeded :"{}" -> "{}"'.format(status.zip_folder,ZIP_FILE)
                         print '  + Downloaded "{}".'.format(ZIP_FILE)
