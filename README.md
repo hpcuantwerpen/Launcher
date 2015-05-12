@@ -18,10 +18,14 @@ $ conda install -c https://conda.binstar.org/anaconda wxpython
 $ conda install -c https://conda.binstar.org/anaconda paramiko
 
 ###Installing Launcher - Linux/MacOSX
-Open a terminal and execute
+Open a terminal and execute:
+
 $ cd some_tmp_dir
+
 $ wget https://github.com/hpcuantwerpen/Launcher/raw/master/installer.py
+
 $ python installer.py
+
 You should now have a Launcher folder in your home folder. 
 
 ###Installing Launcher - Windows
