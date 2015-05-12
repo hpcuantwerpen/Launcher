@@ -13,4 +13,4 @@ Launcher requires
  - wxPython 2.8 or later
  - paramiko 1.15.2
 
-If your are not experienced in installing Python and Python modules on your OS we recommend that you install the free Anaconda Python distribution from Continuum Analytics. You can currently get it at https://store.continuum.io/cshop/anaconda. Install it as your default Python. Familiarize yourself with virtual Python environments (virtualenv)[http://docs.python-guide.org/en/latest/dev/virtualenvs/] if you need different Python versions on your system.
+If your are not experienced in installing Python and Python modules on your OS we recommend that you install the free Anaconda Python distribution from Continuum Analytics. You can currently get it at https://store.continuum.io/cshop/anaconda. Install it as your default Python. Familiarize yourself with virtual Python environments [virtualenv](http://docs.python-guide.org/en/latest/dev/virtualenvs/) if you need different Python versions on your system.
