@@ -301,7 +301,7 @@ def download(args,branch='master'):
                         break
                 else:
                     content = response.read()
-                    f = open(ZIP_FILE, 'w+' )
+                    f = open(ZIP_FILE, 'w+b' )
                     f.write( content )
                     f.close()
                     break
