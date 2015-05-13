@@ -64,3 +64,6 @@ The installer produces a report that you should check to assure that the install
 The temporary folder can be removed now.
 
 Happy Launching!
+
+###Installing updates
+Updates are installed from the Launcher menu "Launcher/Check for updates"
