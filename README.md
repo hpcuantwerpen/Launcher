@@ -4,7 +4,7 @@ Launcher is a GUI application for
  - submitting your jobs
  - synchronizing your job output with your local file system (for postprocessing,  analysis, or storage) 
 
-Launcher is tested on Windows/Linux(Ubuntu 14.04, 15.04)/MacOSX)
+Launcher is tested on Windows/Linux(Ubuntu 14.04, 15.04)/MacOSX, also inside virtual machines)
 
 If You experience any problems during installation or operation contact engelbert.tijskens@uantwerpen.be
 
