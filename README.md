@@ -66,4 +66,4 @@ The temporary folder can be removed now.
 Happy Launching!
 
 ###Installing updates
-Updates are installed from the Launcher menu "Launcher/Check for updates"
+Updates are installed from the Launcher menu "Launcher/Check for updates".
