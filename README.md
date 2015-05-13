@@ -17,7 +17,7 @@ Launcher requires
 
 Paramiko is easily installed with pip, but wxPython can be harder.
 
-If your are not experienced in installing Python and Python modules on your OS we recommend that you install the free *Anaconda Python distribution* from Continuum Analytics. If you are a windows user, we strongly recommend you to take this route. You can currently get it at https://store.continuum.io/cshop/anaconda. Install it as your default Python. If you need different Python versions on your system and you do not want Anaconda as your default Python, we suggest you to familiarise yourself with virtual Python environments ([virtualenv](http://docs.python-guide.org/en/latest/dev/virtualenvs/)). Next, fire up a terminal and install the components that Launcher needs with the Anaconda packages install tool:
+If your are not experienced in installing Python and Python modules on your OS we recommend that you install the free **Anaconda Python distribution** from Continuum Analytics. If you are a windows user, we strongly recommend you to take this route. You can currently get it at https://store.continuum.io/cshop/anaconda. Install it as your default Python. If you need different Python versions on your system and you do not want Anaconda as your default Python, we suggest you to familiarise yourself with virtual Python environments ([virtualenv](http://docs.python-guide.org/en/latest/dev/virtualenvs/)). Next, fire up a terminal and install the components that Launcher needs with the Anaconda packages install tool:
 $ conda install -c https://conda.binstar.org/anaconda wxpython
 $ conda install -c https://conda.binstar.org/anaconda paramiko
 
