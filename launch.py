@@ -140,7 +140,7 @@ class Config(object):
 #         if 'submitted' in self.attributes:
 #             del self.attributes['submitted']
         self.add_default_attributes(default_attributes)
-        
+                
     def add_default_attributes(self,default_attributes):
         for k,v in default_attributes.iteritems():
             if not k in self.attributes:
@@ -175,8 +175,6 @@ class Launcher(wx.Frame):
             
         self.open_log_file()        
         
-#        self.validate_user_id(self.config.attributes.get("user_id","your_user_id"))
-
         super(Launcher,self).__init__(parent,title=title,size=frame_size)
         
         self.init_ui()
@@ -203,7 +201,7 @@ class Launcher(wx.Frame):
         self.bind('wNotifyBegin'            , 'EVT_CHECKBOX')
         self.bind('wNotifyEnd'              , 'EVT_CHECKBOX')
         self.bind('wNotifyAddress'          , 'EVT_TEXT_ENTER')
-        self.bind('wJobName'                , 'EVT_TEXT')
+        self.bind('wJobName'                , 'EVT_TEXT_ENTER')
         self.bind('wRemoteSubfolder'        , 'EVT_TEXT')
         self.bind('wUserId'                 , 'EVT_TEXT_ENTER')
         self.bind('wSaveJob'                , 'EVT_BUTTON',)
@@ -224,6 +222,10 @@ class Launcher(wx.Frame):
         self.dump('At end of Launcher Frame constructor')
         if self.config.attributes.get('automatic_updates',False):
             self.check_for_updates(quiet=True)
+
+        ico = wx.Icon('Launcher-icon.ico', wx.BITMAP_TYPE_ICO)
+        self.SetIcon(ico)
+        # no effect?
     
     def bind(self,object_name,event_name):
         """
@@ -403,11 +405,11 @@ class Launcher(wx.Frame):
         self.notify_address_has_changed(event)
         self.is_resources_modified = True
         
-    def wJobName_EVT_TEXT(self,event):
-        self.log_event(event)
+    def wJobName_EVT_TEXT_ENTER(self,event):
+        self.log_event(event,msg='value="{}"'.format(self.wJobName.GetValue()))
         self.job_name_has_changed()
         self.is_resources_modified = True
-        
+
     def wRemoteSubfolder_EVT_TEXT(self,event):
         self.log_event(event)
         self.remote_subfolder_has_changed()
@@ -484,6 +486,7 @@ class Launcher(wx.Frame):
         self.remote_location_has_changed()
 
     def on_EVT_CLOSE(self,event=None):
+        self.save_job(ask=True)
         self.log_event(event)
         self.dump('Before closing Launcher Frame')
         with log.LogItem('Launcher closing'):
@@ -508,19 +511,19 @@ class Launcher(wx.Frame):
         self.wNotebookPageRetrieve  = add_notebook_page(self.wNotebook, "Retrieve")
    
         #self.wNotebookPageResources
-        sizer_1 = create_staticbox(self.wNotebookPageResources, "Requests resources from")
-        sizer_2a= create_staticbox(self.wNotebookPageResources, "Requests nodes and cores per node")
-        sizer_2b= create_staticbox(self.wNotebookPageResources, "Requests cores and memory per core")
+        sizer_1 = create_staticbox(self.wNotebookPageResources, "Request resources from:")
+        sizer_2a= create_staticbox(self.wNotebookPageResources, "Request nodes and cores per node:")
+        sizer_2b= create_staticbox(self.wNotebookPageResources, "Request cores and memory per core:")
         sizer_2 = wx.BoxSizer(wx.HORIZONTAL)
         sizer_2.Add(sizer_2a,1,wx.EXPAND,0)
         sizer_2.Add(sizer_2b,1,wx.EXPAND,0)
         #sizer_3 = create_staticbox(self.wNotebookPageResources, "Node policies", orient=wx.HORIZONTAL)
-        sizer_4 = create_staticbox(self.wNotebookPageResources, "Request compute time")
-        sizer_5 = create_staticbox(self.wNotebookPageResources, "Notify")
-        sizer_6 = create_staticbox(self.wNotebookPageResources, "Job name")
-        sizer_7 = create_staticbox(self.wNotebookPageResources, "Local file location")
-        sizer_8 = create_staticbox(self.wNotebookPageResources, "Remote file location",orient=wx.VERTICAL)
-        sizer_9 = create_staticbox(self.wNotebookPageResources, "Job management",orient=wx.HORIZONTAL)
+        sizer_4 = create_staticbox(self.wNotebookPageResources, "Request compute time:")
+        sizer_5 = create_staticbox(self.wNotebookPageResources, "Notify:")
+        sizer_6 = create_staticbox(self.wNotebookPageResources, "Job name:")
+        sizer_7 = create_staticbox(self.wNotebookPageResources, "Local file location:")
+        sizer_8 = create_staticbox(self.wNotebookPageResources, "Remote file location:",orient=wx.VERTICAL)
+        sizer_9 = create_staticbox(self.wNotebookPageResources, "Job management:",orient=wx.HORIZONTAL)
         self.wNotebookPageResources.SetSizer( grid_layout( [ [sizer_1,1,wx.EXPAND]
                                                            , [sizer_2,1,wx.EXPAND]
                                                            , [sizer_4,1,wx.EXPAND]
@@ -551,13 +554,13 @@ class Launcher(wx.Frame):
         self.wNCoresPerNodeRequested = xx.SpinCtrl  (self.wNotebookPageResources ) 
         txt2a4                       = wx.StaticText(self.wNotebookPageResources,label='Memory per node [GB]:') 
         self.wGbPerNodeGranted       = wx.TextCtrl  (self.wNotebookPageResources,style=wx.TE_READONLY|wx.TE_RIGHT) 
-        txt2a6                       = wx.StaticText(self.wNotebookPageResources,label='enforce #nodes') 
+        txt2a6                       = wx.StaticText(self.wNotebookPageResources,label='Enforce #nodes') 
         self.wEnforceNNodes          = wx.CheckBox  (self.wNotebookPageResources)
 
         txt2b0                       = wx.StaticText(self.wNotebookPageResources,label='Number of cores:')
         self.wNCoresRequested        = xx.SpinCtrl  (self.wNotebookPageResources )
         txt2b2                       = wx.StaticText(self.wNotebookPageResources,label='Memory per core [GB]:')
-        self.wGbPerCoreRequested     = xx.SpinCtrl  (self.wNotebookPageResources,converter=float ) 
+        self.wGbPerCoreRequested     = xx.SpinCtrl  (self.wNotebookPageResources,converter=float,digits=3) 
         txt2b4                       = wx.StaticText(self.wNotebookPageResources,label='Memory total [GB]:')
         self.wGbTotalGranted         = wx.TextCtrl  (self.wNotebookPageResources,style=wx.TE_READONLY|wx.TE_RIGHT)
         
@@ -649,7 +652,7 @@ class Launcher(wx.Frame):
             self.wNotifyAddress.SetForegroundColour(wx.TheColourDatabase.Find('GREY'))
         
         #sizer_6
-        self.wJobName = wx.TextCtrl(self.wNotebookPageResources,style=wx.EXPAND|wx.TE_PROCESS_ENTER|wx.TE_PROCESS_TAB)
+        self.wJobName = wx.TextCtrl(self.wNotebookPageResources,style=wx.EXPAND|wx.TE_PROCESS_ENTER)
         set_tool_tip_string(self.wJobName
                            ,tip="The job name is used as the name of the parent folder where your job script "\
                                 "(pbs.sh) is stored in the local and remote file location. Typically also input "\
@@ -819,12 +822,12 @@ class Launcher(wx.Frame):
             raise Exception("Unknown menu event id:"+str(event_id))
              
     def set_ssh_preferences(self):
-        print("set_ssh_preferences(self)")
-        dlg = sshtools.SSHPreferencesDialog(self)
-        answer = dlg.ShowModal()
-        if answer==wx.ID_OK:
-            dlg.update_preferences()
-        del dlg
+        with log.LogItem('Viewing/setting SSH preferences'):
+            dlg = sshtools.SSHPreferencesDialog(self)
+            answer = dlg.ShowModal()
+            if answer==wx.ID_OK:
+                dlg.update_preferences()
+            del dlg
         
     def select_login_node(self):
         dlg = SelectLoginNodeDialog(self)
@@ -865,6 +868,8 @@ class Launcher(wx.Frame):
         """
         Initialize the data elements of the controls of the Launcher window
         """
+        self.validate_user_id(self.config.attributes.get("user_id",""))
+        
         #select a cluster
         cluster = self.config.attributes['cluster']
         try:
@@ -876,8 +881,9 @@ class Launcher(wx.Frame):
         self.set_cluster(cluster) 
         # also sets all elements that depend on the cluster, such as nodesets, ...
 
+
         value=self.get_remote_file_location()
-        self.is_script_up_to_date = False
+        self.is_script_modified = True
         self.wRemoteFileLocation.SetValue(value)
         
         #check if there are any jobs submitted by the user which are ready for copying back   
@@ -977,24 +983,27 @@ class Launcher(wx.Frame):
             v = os.path.join(v,jobname)
         self.wRemoteFileLocation.SetValue(v)
     
-    def job_name_has_changed(self):
-        if self.wJobName.GetValue():
-            self.wLocalFileLocation.SetValue( os.path.join(self.local_parent_folder,self.wJobName.GetValue()) )
+    def job_name_has_changed(self,load=True):
+        value = self.wJobName.GetValue()
+        #self.wJobName.ChangeValue(self.wJobName.GetValue())
+        if value:
+            local_file_location = os.path.join(self.local_parent_folder,value) 
+            self.wLocalFileLocation.SetValue(local_file_location)
             self.wLocalFileLocation.SetForegroundColour(wx.BLUE)
             if not hasattr(self,'remote_location_subfolder'):
                 self.remote_location_subfolder = self.get_remote_file_location()
-            self.wRemoteFileLocation.SetValue( os.path.join(self.remote_location_subfolder,self.wJobName.GetValue()) )
-            f_script = os.path.join(self.wLocalFileLocation.GetValue(),'pbs.sh')
-            if os.path.exists(f_script):
-                msg = "Found script '{}'.\nDo you want to load it?".format(f_script)
-                msg+= "\n(If you answer No, it will be overwritten if you continue to work in this local file location.)"
-                answer = wx.MessageBox(msg, 'Script found',wx.YES|wx.NO | wx.ICON_QUESTION)
+            remote_file_location = os.path.join(self.remote_location_subfolder,value)
+            self.wRemoteFileLocation.SetValue(remote_file_location)
+            f_script = os.path.join(local_file_location,'pbs.sh')
+            if load and os.path.exists(f_script):
+                msg = "The job name folder \n    {}\nalready contains a job script\n    pbs.sh\nDo you want to load it?".format(local_file_location)
+                answer = wx.MessageBox(msg, 'Job script found',wx.YES|wx.NO | wx.ICON_QUESTION)
                 if answer==wx.NO:
                     self.set_status_text("The script was not loaded. It will be overwritten when pressing the 'Save' button.")
-                    self.is_script_up_to_date = False
+                    self.is_script_modified = True
                 elif answer==wx.YES:
                     self.load_job_script()
-                    self.set_status_text("Script '{}' is loaded.".format(f_script))
+                    self.set_status_text("Script in'{}' is loaded.".format(self.wLocalFileLocation.GetValue()))
         else:
             self.wLocalFileLocation.SetValue( self.local_parent_folder )
             self.wLocalFileLocation.SetForegroundColour(wx.BLACK)
@@ -1219,7 +1228,8 @@ class Launcher(wx.Frame):
         
     def update_script_from_resources(self):       
         if not self.is_resources_modified:
-            return
+            return False
+        
         with log.LogItem('update_script_from_resources()'):
             #make sure all values are transferred to self.script.values
             if not hasattr(self, 'script'):
@@ -1266,6 +1276,8 @@ class Launcher(wx.Frame):
             lines = self.script.compose()
             print("    Script updated.")
             self.format_script(lines)
+            self.is_script_modified = True
+            return True
         
     def format_script(self,lines):
         self.wScript.ClearAll()
@@ -1350,7 +1362,7 @@ class Launcher(wx.Frame):
         else:
             self.wNotifyAddress.SetForegroundColour(wx.BLACK)
             self.wNotifyAddress.SetValue(s)
-            self.is_script_up_to_date = False
+            self.is_script_modified = True
         if not event is None:
             event.Skip()
 
@@ -1382,6 +1394,11 @@ class Launcher(wx.Frame):
         lines = self.wScript.GetValue().splitlines(True)
         self.format_script(lines)
         self.script = pbs.Script(lines)
+        
+        #make sure that the job name corresponds to the job name folder
+        #(if the job folder was copied that is not always the case) 
+        self.script.values['job_name'] = os.path.basename(self.wLocalFileLocation.GetValue())
+        
         self.update_resources()
         
     def transfer(self,values,name,attr):
@@ -1390,31 +1407,65 @@ class Launcher(wx.Frame):
                 getattr(self,attr).SetValue( values[name] )
             else:
                 setattr(self,attr,values[name])
-        
-    def check_job_name_present(self):
+                
+    def save_job(self,ask=False):
+        """
+        ask > ask before overwrite.
+        """
         if not self.wJobName.GetValue():
-            random_job_name = 'job-'+str(random.random())[2:]
-            msg = "No Job name specified.\n:Press\n  - 'Cancel' to specify a Job name, then retry, or\n  - 'OK' to use '{}' (random).".format(random_job_name)
-            answer = wx.MessageBox(msg, 'Warning',wx.CANCEL|wx.OK | wx.ICON_WARNING)
-            if answer==wx.CANCEL:
-                self.SetStatusText('You can specify a job name now.')
+            msg="Enter a job name below or press 'Cancel' to not save your work."
+            dlg = wx.TextEntryDialog(self,msg,caption="Cannot save job script: missing job name")
+            res = dlg.ShowModal()
+            if res==wx.ID_OK:
+                job_name = dlg.GetValue()
+                del dlg
+                if job_name:
+                    self.wJobName.ChangeValue(job_name)
+                    self.job_name_has_changed(load=False)
+            else:
                 return False
-            elif answer==wx.OK:
-                self.wJobName.SetValue(random_job_name)
-                return True
-        return True
-        
-    def save_job(self):
-        if not self.check_job_name_present():
-            self.set_status_text("Job script not saved: job name missing.")
-            return False
         self.update_script_from_resources()
-        self.set_status_text("Saving job script to '{}' ...".format(self.wJobName.GetValue()))
-        my_makedirs(self.wLocalFileLocation.GetValue())
-        fname = os.path.join(self.wLocalFileLocation.GetValue(),'pbs.sh')
-        self.wScript.SaveFile(fname)
-        self.set_status_text("Job script saved to '{}'. Add input files to local location.".format(fname))
-        return True
+        if self.is_script_modified:
+            if ask:
+                msg="- Press OK to save any changes to the current job script\n"\
+                    "- Change the job name below and press OK to save the script under a different job name\n"\
+                    "- Press Cancel to discard any changes"
+                dlg = wx.TextEntryDialog(self,msg,caption="Unsaved changes in job script",defaultValue=self.wJobName.GetValue())
+                res = dlg.ShowModal()
+                if res==wx.ID_OK:
+                    job_name = dlg.GetValue()
+                    del dlg
+                    #ask confirmation on overwrite
+                    while True:
+                        if job_name!=self.wJobName.GetValue():
+                            self.wJobName.ChangeValue(job_name)
+                            self.job_name_has_changed(load=False)
+                            if os.path.exists(os.path.join(self.wLocalFileLocation.GetValue(),'pbs.sh')):
+                                msg="This folder already contains a job script, are your sure to overwrite it?\n"\
+                                    "- Press OK to overwrite this job script\n"\
+                                    "- Change the job name below and press OK to save the script under a different job name\n"\
+                                    "- Press Cancel to discard any changes"
+                                dlg = wx.TextEntryDialog(self,msg,caption="Save your job script",defaultValue=self.wJobName.GetValue())
+                                res = dlg.ShowModal()
+                                if res==wx.ID_OK:
+                                    job_name = dlg.GetValue()
+                                    del dlg
+                                else:
+                                    return False
+                        else:
+                            break
+                else:
+                    return False
+                
+            self.set_status_text("Saving (overwriting) job script to '{}' ...".format(self.wJobName.GetValue()))
+            my_makedirs(self.wLocalFileLocation.GetValue())
+            fname = os.path.join(self.wLocalFileLocation.GetValue(),'pbs.sh')
+            self.wScript.SaveFile(fname)
+            self.set_status_text("Job script saved to '{}'. Add input files to local location.".format(fname))
+            self.is_script_modified = False
+            return True
+        else:
+            return False
     
     def copy_to_remote_location(self,submit=False):
         self.set_status_text('Preparing to copy ... ')
@@ -1675,6 +1726,8 @@ class Launcher(wx.Frame):
                     self.wUserId.SetValue(user_id)
             else:
                 return None
+            
+        self.config.attributes['user_id'] = user_id
         return user_id
  
 class UpdateFoundDialog(wx.Dialog):

@@ -13,15 +13,15 @@ SSH_DEFAULTS = {"SSH_WORK_OFFLINE": False
                ,"SSH_VERBOSE"     : True
                ,"SSH_KEY"         : ""
                }
-SSH_VARIABLES = None
+SSH_PREFERENCES = None
 
-def reset_SSH_VARIABLES():
-    global SSH_VARIABLES
-    if SSH_VARIABLES:
-        print("sshtools.reset_SSH_VARIABLES()")
-    SSH_VARIABLES = copy.copy(SSH_DEFAULTS)   
+def reset_SSH_PREFERENCES():
+    global SSH_PREFERENCES
+    if SSH_PREFERENCES:
+        print("sshtools.reset_SSH_PREFERENCES()")
+    SSH_PREFERENCES = copy.copy(SSH_DEFAULTS)   
      
-reset_SSH_VARIABLES()
+reset_SSH_PREFERENCES()
 
 # SSH_WORK_OFFLINE = True
 # SSH_KEEP_CLIENT = False
@@ -49,17 +49,17 @@ class Client(object):
     last_try_success = False
     frame            = None
     
-    def __init__(self,user_id,login_node,force=False):
-        if SSH_VARIABLES["SSH_WORK_OFFLINE"]:
+    def __init__(self,user_id,login_node,force=False,verbose=True):
+        if SSH_PREFERENCES["SSH_WORK_OFFLINE"]:
             self  .paramiko_client = None
             Client.paramiko_client = None
             return
-        if (Client.user_id!=user_id) or (Client.login_node!=login_node) or (not SSH_VARIABLES["SSH_KEEP_CLIENT"]):
+        if (Client.user_id!=user_id) or (Client.login_node!=login_node) or (not SSH_PREFERENCES["SSH_KEEP_CLIENT"]):
             #Close old client
             if Client.paramiko_client:
                 Client.paramiko_client.close()
                 Client.paramiko_client = None
-        if Client.paramiko_client and SSH_VARIABLES["SSH_KEEP_CLIENT"]:
+        if Client.paramiko_client and SSH_PREFERENCES["SSH_KEEP_CLIENT"]:
             print("\nReusing Paramiko/SSH client (SSH_KEEP_CLIENT==True).")
             self.paramiko_client = Client.paramiko_client
         else:
@@ -67,12 +67,12 @@ class Client(object):
             Client.user_id = user_id
             
             Client.login_node = login_node            
-            self.paramiko_client = self._connect(user_id,login_node,force)
-            if SSH_VARIABLES["SSH_KEEP_CLIENT"]:
+            self.paramiko_client = self._connect(user_id,login_node,force,verbose)
+            if SSH_PREFERENCES["SSH_KEEP_CLIENT"]:
                 Client.paramiko_client = self.paramiko_client
        
     def close(self):
-        if not SSH_VARIABLES["SSH_KEEP_CLIENT"]:
+        if not SSH_PREFERENCES["SSH_KEEP_CLIENT"]:
             self.paramiko_client.close()
             Client.paramiko_client = None
     
@@ -85,7 +85,7 @@ class Client(object):
         out = stdout.readlines()
         err = stderr.readlines()
         del stdin
-        if SSH_VARIABLES["SSH_VERBOSE"] or err:
+        if SSH_PREFERENCES["SSH_VERBOSE"] or err:
             with log.LogItem("Executing Paramiko/SSH command:"):
                 print("  >",cmd )
                 print("  > stdout:" )
@@ -100,7 +100,7 @@ class Client(object):
     def connected(self):
         return (not self.paramiko_client is None)
 
-    def _connect(self,user_id,login_node,force):
+    def _connect(self,user_id,login_node,force,verbose=True):
         """
         Try to open an ssh connection
           - if the previous attempt was succesful
@@ -111,9 +111,9 @@ class Client(object):
         last_try_success = Client.last_try_success
         delta = datetime.datetime.now() - last_try
         
-        if force or last_try_success or ( not last_try_success and delta.total_seconds() > SSH_VARIABLES["SSH_WAIT"] ):
+        if force or last_try_success or ( not last_try_success and delta.total_seconds() > SSH_PREFERENCES["SSH_WAIT"] ):
             #retry to make ssh connection    
-            msg ="Creating and opening Paramiko/SSH client (SSH_KEEP_CLIENT=={},force_reconnect=={}).".format(SSH_VARIABLES["SSH_KEEP_CLIENT"],force)
+            msg ="Creating and opening Paramiko/SSH client (SSH_KEEP_CLIENT=={},force_reconnect=={}).".format(SSH_PREFERENCES["SSH_KEEP_CLIENT"],force)
             self.frame_set_status(msg)
             ssh = None
             pwd = None
@@ -127,23 +127,22 @@ class Client(object):
                             msg+="\n    invalid user id"
                         if not login_node:
                             msg+="\n    invalid login node"
-                            
-                        wx.MessageBox(msg, 'No Paramiko/SSH connection.',wx.OK | wx.ICON_INFORMATION)
+                        wx.MessageBox(msg, 'No Paramiko/SSH connection.', wx.OK | wx.ICON_INFORMATION )
                         Client.last_try = datetime.datetime.now()
                         break
 
                     if not ssh:
                         ssh = paramiko.SSHClient()
-                        if SSH_VARIABLES["SSH_KEY"]:
-                            ssh.load_host_keys(SSH_VARIABLES["SSH_KEY"])
+                        if SSH_PREFERENCES["SSH_KEY"]:
+                            ssh.load_host_keys(SSH_PREFERENCES["SSH_KEY"])
                         else:
                             ssh.load_system_host_keys()
                         
                     if pwd is None:
                         #ssh.connect(login_node, username=user_id)
-                        ssh.connect(login_node, username=user_id,timeout=SSH_VARIABLES["SSH_TIMEOUT"])
+                        ssh.connect(login_node, username=user_id,timeout=SSH_PREFERENCES["SSH_TIMEOUT"])
                     else:
-                        ssh.connect(login_node, username=user_id,timeout=SSH_VARIABLES["SSH_TIMEOUT"],password=pwd)
+                        ssh.connect(login_node, username=user_id,timeout=SSH_PREFERENCES["SSH_TIMEOUT"],password=pwd)
                 
                 except paramiko.ssh_exception.PasswordRequiredException as e:
                     print("Handled exception:",e)
@@ -175,11 +174,12 @@ class Client(object):
                     print("Unhandled exception (ignored):",type(e),e)
                     Client.last_try_success = False
                     ssh = None
-                    msg ="Unable to connect via Paramiko/SSH to "+str(user_id)+"@"+login_node
-                    msg+="\nPossible causes are:"
-                    msg+="\n  - no internet connection."
-                    msg+="\n  - you are not connected to your home institution (VPN connection needed?)."
-                    wx.MessageBox(msg, 'No Paramiko/SSH connection.',wx.OK | wx.ICON_INFORMATION)
+                    if verbose:
+                        msg ="Unable to connect via Paramiko/SSH to "+str(user_id)+"@"+login_node
+                        msg+="\nPossible causes are:"
+                        msg+="\n  - no internet connection."
+                        msg+="\n  - you are not connected to your home institution (VPN connection needed?)."
+                        wx.MessageBox(msg, 'No Paramiko/SSH connection.',wx.OK | wx.ICON_INFORMATION)
                     Client.last_try = datetime.datetime.now()
                     break
                     
@@ -207,22 +207,22 @@ class SSHPreferencesDialog(wx.Dialog):
 
         lst=[]
         tip="Check this box to avoid the timeout while trying to connect to the host."
-        lst.extend(wxtools.pair(self, label="SSH_WORK_OFFLINE", value=SSH_VARIABLES["SSH_WORK_OFFLINE"],tip=tip,style0=wx.ALIGN_RIGHT))
+        lst.extend(wxtools.pair(self, label="SSH_WORK_OFFLINE", value=SSH_PREFERENCES["SSH_WORK_OFFLINE"],tip=tip,style0=wx.ALIGN_RIGHT))
         lst[-2]=[lst[-2],0,wx.ALIGN_RIGHT]
         tip="Connect once to the host and keep the connection alive during the entire session."
-        lst.extend(wxtools.pair(self, label="SSH_KEEP_CLIENT", value=SSH_VARIABLES["SSH_KEEP_CLIENT"] ,tip=tip))
+        lst.extend(wxtools.pair(self, label="SSH_KEEP_CLIENT", value=SSH_PREFERENCES["SSH_KEEP_CLIENT"] ,tip=tip))
         lst[-2]=[lst[-2],0,wx.ALIGN_RIGHT]
         tip="Verbose logging of SSH actions"
-        lst.extend(wxtools.pair(self, label="SSH_VERBOSE", value=SSH_VARIABLES["SSH_VERBOSE"]     ,tip=tip))
+        lst.extend(wxtools.pair(self, label="SSH_VERBOSE", value=SSH_PREFERENCES["SSH_VERBOSE"]     ,tip=tip))
         lst[-2]=[lst[-2],0,wx.ALIGN_RIGHT]
         tip="Give up trying to connect to the host after this many seconds."
-        lst.extend(wxtools.pair(self, label="SSH_TIMEOUT", value=SSH_VARIABLES["SSH_TIMEOUT"], value_range=(0,120, 1), tip=tip))
+        lst.extend(wxtools.pair(self, label="SSH_TIMEOUT", value=SSH_PREFERENCES["SSH_TIMEOUT"], value_range=(0,120, 1), tip=tip))
         lst[-2]=[lst[-2],0,wx.ALIGN_RIGHT]
         tip="Do not retry to connect before this many seconds"
-        lst.extend(wxtools.pair(self, label="SSH_WAIT", value=SSH_VARIABLES["SSH_WAIT"], value_range=(0,360,10), tip=tip))
+        lst.extend(wxtools.pair(self, label="SSH_WAIT", value=SSH_PREFERENCES["SSH_WAIT"], value_range=(0,360,10), tip=tip))
         lst[-2]=[lst[-2],0,wx.ALIGN_RIGHT]
         tip="Path and filename of your ssh key for accessing the VSC clusters. If empty, Paramiko tries to find it automatically (not always successful)."
-        lst.extend(wxtools.pair(self, label="SSH_KEY", value=SSH_VARIABLES["SSH_KEY"], tip=tip))
+        lst.extend(wxtools.pair(self, label="SSH_KEY", value=SSH_PREFERENCES["SSH_KEY"], tip=tip))
         lst[-1]=[lst[-1],1,wx.EXPAND]
         lst[-2]=[lst[-2],0,wx.ALIGN_RIGHT]
         
@@ -245,16 +245,16 @@ class SSHPreferencesDialog(wx.Dialog):
             if isinstance(lbl,list):
                 lbl = lbl[0]
             lbl = lbl.GetLabel()
-            if lbl in SSH_VARIABLES:
+            if lbl in SSH_PREFERENCES:
                 ctrl = lst[i+1]
                 if isinstance(ctrl,list):
                     ctrl = ctrl[0]
                 self.dct[lbl] = ctrl
         
     def reset_preferences(self,event):
-        reset_SSH_VARIABLES()
+        reset_SSH_PREFERENCES()
         #update the dialog
-        for k,v in SSH_VARIABLES.iteritems():
+        for k,v in SSH_PREFERENCES.iteritems():
             self.dct[k].SetValue(v)
             
 #     def GetValue(self,item):
@@ -284,13 +284,18 @@ class SSHPreferencesDialog(wx.Dialog):
 #         return value 
     
     def update_preferences(self):
-        print("\nUpdating SSH preferences:")
-        changed = False
-        for k,v in self.dct.iteritems():
-            v_changed = self.update_preference(k)
-            if k==v_changed and "SSH_KEY":
-                del Client.paramiko_client
-                Client.paramiko_client = None
-            changed |= v_changed
-        if not changed:
-            print("  nothing changed.")
+        some_value_has_changed = False
+        for k,ctrl in self.dct.iteritems():
+            ctrl_value = ctrl.GetValue()
+            crnt_value = SSH_PREFERENCES[k]
+            value_has_changed = crnt_value!=ctrl_value
+            if value_has_changed:
+                print("changing SSH_PREFERENCES[{}] from {} to {}.".format(k,crnt_value,ctrl_value))
+                SSH_PREFERENCES[k] = ctrl_value
+                if k=="SSH_KEY":
+                    #destroy current connection if a new key is provided.
+                    del Client.paramiko_client
+                    Client.paramiko_client = None
+            some_value_has_changed |= value_has_changed
+        if not some_value_has_changed:
+            print("nothing changed.")

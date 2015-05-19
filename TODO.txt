@@ -1,11 +1,17 @@
 TODO LIST
-- automatic check for updates
-- test on linux ubuntu
-- test on windows
 - add a save button to the wScript tab
 - add mpi functionality
+- add icon
+- add app on mac wth icon
+  see https://mathiasbynens.be/notes/shell-script-mac-apps
+- add shortcut on desktop of windows with icon
+- installer must detect anaconda on mac and make shell script with pythonw
+- dialog to save before exit
 
 DONE
+- test on linux ubuntu
+- test on windows
+- automatic check for updates
 - create public repository
 - test Launcher.node_set_has_changed
 - add option to dos2unix all files transferred (and the other way around)

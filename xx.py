@@ -25,7 +25,7 @@ class SpinCtrl(wx.FlexGridSizer):
     """
     based on a wx.txtctrl and a wx.SpinButton (and the above validator)
     """
-    def __init__(self,parent,style=0,gap=0,converter=int,value=None,value_range=None,):
+    def __init__(self,parent,style=0,gap=0,converter=int,value=None,value_range=None, digits=None,verbose=False):
         super(SpinCtrl,self).__init__(1,2,gap,gap)
         self.name = "xx.SpinCtrl{} instance".format(int)
         self.frame = get_frame(parent)
@@ -38,6 +38,11 @@ class SpinCtrl(wx.FlexGridSizer):
         self.Add(self.txtctrl,1,wx.EXPAND)
         self.Add(self.spinner,0,0)
         
+        self.digits = None
+        if self.converter is float and not digits is None:
+            assert isinstance(digits,int),"Argument 'digits' must be an integer."
+            self.digits = digits
+
         if value_range is None:
             default_range = default_ranges[self.converter]
         else:
@@ -47,7 +52,9 @@ class SpinCtrl(wx.FlexGridSizer):
 
         if not value is None:
             self.SetValue(value)
-
+            
+        self.verbose = verbose
+            
         self.spinner.Bind(wx.EVT_SPIN_DOWN , self.spinner_EVT_SPIN_DOWN)
         self.spinner.Bind(wx.EVT_SPIN_UP   , self.spinner_EVT_SPIN_UP  )
         self.txtctrl.Bind(wx.EVT_KEY_DOWN  , self.txtctrl_EVT_KEY_DOWN)
@@ -57,7 +64,10 @@ class SpinCtrl(wx.FlexGridSizer):
         return self.txtctrl
     
     def SetValue(self,value):
-        v = str(self.converter(value))
+        if self.digits:
+            v =  str(round(self.converter(value),3))
+        else:
+            v = str(self.converter(value))
         self.txtctrl.SetValue(v)
         self.txtctrl.SetInsertionPoint(len(v))
 
@@ -84,7 +94,8 @@ class SpinCtrl(wx.FlexGridSizer):
         event.value = self.txtctrl.GetValue()
         event.source = self.GetName()
         wx.PostEvent(self.txtctrl, event)
-        print "\nxx.EVT_SPINCTRL posted, current value is",self.txtctrl.GetValue()
+        if self.verbose:
+            print "\nxx.EVT_SPINCTRL posted, current value is",self.txtctrl.GetValue()
         
     def Bind(self,EVT,handler):
         self.txtctrl.Bind(EVT,handler)
