@@ -22,7 +22,7 @@ If your are not experienced in installing Python and Python modules on your OS w
 $ conda install -c https://conda.binstar.org/anaconda wxpython
 $ conda install -c https://conda.binstar.org/anaconda paramiko
 ```
-###Installing Launcher - Linux/MacOSX
+###Installing Launcher - Linux
 To download and run the Launcher installer proceed as follows. Open a terminal and cd into some temporary directory:
 ```
 $ mkdir some_tmp_dir && cd some_tmp_dir
@@ -40,6 +40,9 @@ The installer produces a report that you should check to assure that the install
 The temporary folder can be removed now.
 
 Happy Launching!
+
+###Installing Launcher - MacOSX
+The Anaconda python distribution for Mac provides two Python executables: `python`, for working in a terminal, and `pythonw`, which can also handle graphical applications.
 
 ###Installing Launcher - Windows
 To download and run the Launcher installer proceed as follows. Open a Powershell window and cd into some temporary directory:
