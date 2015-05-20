@@ -223,8 +223,8 @@ class Launcher(wx.Frame):
         if self.config.attributes.get('automatic_updates',False):
             self.check_for_updates(quiet=True)
 
-        ico = wx.Icon('Launcher-icon.ico', wx.BITMAP_TYPE_ICO)
-        self.SetIcon(ico)
+        # ico = wx.Icon('Launcher-icon.ico', wx.BITMAP_TYPE_ICO)
+        # self.SetIcon(ico)
         # no effect?
     
     def bind(self,object_name,event_name):
@@ -1469,14 +1469,16 @@ class Launcher(wx.Frame):
         """
         ask > ask before overwrite.
         """
+        pbs_sh = os.path.join(self.wLocalFileLocation.GetValue(),'pbs.sh')
         #is there anything to save?
-        if not (self.is_resources_modified or self.is_script_modified):
+        if not (self.is_resources_modified or self.is_script_modified) \
+           and os.path.exists(pbs_sh):
             #no
-            self.set_status_text("Nothing to save.")
-            return False
+            self.set_status_text("Job script is already up to date.")
+            return True
 
         if ask:
-            if os.path.exists(os.path.join(self.wLocalFileLocation.GetValue(),'pbs.sh')):
+            if os.path.exists(pbs_sh):
                 #save will overwrite, ask for permission
                 if not self.ask_permission_to_overwrite():
                     #no permission given to overwrite
