@@ -303,41 +303,40 @@ class Launcher(wx.Frame):
     def wCluster_EVT_COMBOBOX(self,event):
         self.log_event(event)
         self.cluster_has_changed()
-
-        self.is_resources_modified = True
+        self.is_resources_modified+=1
     
     def wNodeSet_EVT_COMBOBOX(self,event):
         self.log_event(event)
         self.node_set_has_changed()
-        self.is_resources_modified = True
+        self.is_resources_modified+=1
 
     def wNNodesRequested_EVT_SPINCTRL(self,event):
         self.log_event(event)
         self.request_nodes_cores()
-        self.is_resources_modified = True
+        self.is_resources_modified+=1
         
     def wNCoresPerNodeRequested_EVT_SPINCTRL(self,event):
         self.log_event(event)
         self.request_nodes_cores()
-        self.is_resources_modified = True
+        self.is_resources_modified+=1
         
     def wNCoresRequested_EVT_SPINCTRL(self,event):
         self.log_event(event)
         self.request_cores_memory()
-        self.is_resources_modified = True
+        self.is_resources_modified+=1
         
     def wGbPerCoreRequested_EVT_SPINCTRL(self,event):
         self.log_event(event)
         self.request_cores_memory()
-        self.is_resources_modified = True
+        self.is_resources_modified+=1
 
     def wEnforceNNodes_EVT_CHECKBOX(self,event):
         self.log_event(event)
-        self.is_resources_modified = True
+        self.is_resources_modified+=1
 
     def wNAccessPolicy_EVT_CHECKBOX(self,event):
         self.log_event(event)
-        self.is_resources_modified = True
+        self.is_resources_modified+=1
  
     def wSelectModule_EVT_COMBOBOX(self,event):
         self.log_event(event)
@@ -379,7 +378,7 @@ class Launcher(wx.Frame):
     def wWalltime_EVT_SPINCTRL(self,event):
         self.log_event(event)
         self.walltime_has_changed()
-        self.is_resources_modified = True
+        self.is_resources_modified+=1
         
     def wWalltimeUnit_EVT_COMBOBOX(self,event):
         self.log_event(event)
@@ -388,27 +387,27 @@ class Launcher(wx.Frame):
     def wNotifyAbort_EVT_CHECKBOX(self,event):
         self.log_event(event)
         self.notify_address_has_changed(event)
-        self.is_resources_modified = True
+        self.is_resources_modified+=1
         
     def wNotifyBegin_EVT_CHECKBOX(self,event):
         self.log_event(event)
         self.notify_address_has_changed(event)
-        self.is_resources_modified = True
+        self.is_resources_modified+=1
         
     def wNotifyEnd_EVT_CHECKBOX(self,event):
         self.log_event(event)
         self.notify_address_has_changed(event)
-        self.is_resources_modified = True
+        self.is_resources_modified+=1
         
     def wNotifyAddress_EVT_TEXT_ENTER(self,event):
         self.log_event(event)
         self.notify_address_has_changed(event)
-        self.is_resources_modified = True
+        self.is_resources_modified+=1
         
     def wJobName_EVT_TEXT_ENTER(self,event):
         self.log_event(event,msg='value="{}"'.format(self.wJobName.GetValue()))
         self.job_name_has_changed()
-        self.is_resources_modified = True
+        #self.is_resources_modified+=1
 
     def wRemoteSubfolder_EVT_TEXT(self,event):
         self.log_event(event)
@@ -507,7 +506,7 @@ class Launcher(wx.Frame):
         self.main_sizer.Add(self.wNotebook, 1, wx.EXPAND, 0)
         
         self.wNotebookPageResources = add_notebook_page(self.wNotebook, 'Resources')
-        self.wNotebookPageScript    = add_notebook_page(self.wNotebook, "PBS script")
+        self.wNotebookPageScript    = add_notebook_page(self.wNotebook, "Job script")
         self.wNotebookPageRetrieve  = add_notebook_page(self.wNotebook, "Retrieve")
    
         #self.wNotebookPageResources
@@ -659,7 +658,14 @@ class Launcher(wx.Frame):
                                 "and output file are stored here.\n"\
                                 "If you do not provide a job name Launcher will propose a random name."
                            )
-        sizer_6.Add(self.wJobName,1,wx.EXPAND,0)
+        self.wReloadJob  = wx.Button(self.wNotebookPageResources,label="Reload")
+        set_tool_tip_string(self.wReloadJob
+                           ,tip="Reload existing job script (pbs.sh) from the local file location. "\
+                                "Recent changes are discarded."
+                           )
+        sizer_6.Add(grid_layout([[self.wJobName,1,wx.EXPAND]
+                                , self.wReloadJob
+                                ],growable_cols=[0]),1,wx.EXPAND,0 )        
         
         #sizer_7
         self.local_parent_folder = self.config.attributes['local_files']
@@ -769,12 +775,12 @@ class Launcher(wx.Frame):
         
         self.wRefresh = wx.Button(self.wNotebookPageRetrieve,label="Refresh job status")
         self.wDeleteJob = wx.Button(self.wNotebookPageRetrieve,label="Delete selected job")
-        self.wAddJob = wx.Button(self.wNotebookPageRetrieve,label="Add a job to retrieve")
+        #self.wAddJob = wx.Button(self.wNotebookPageRetrieve,label="Add a job to retrieve")
         sizer_3 = wx.BoxSizer(wx.HORIZONTAL)
         sizer_3.Add(self.wRefresh      ,1,wx.EXPAND,0)
         sizer_3.Add(self.wRetrieveJobs2,1,wx.EXPAND,0)
         sizer_3.Add(self.wDeleteJob    ,1,wx.EXPAND,0)
-        sizer_3.Add(self.wAddJob       ,1,wx.EXPAND,0)
+        #sizer_3.Add(self.wAddJob       ,1,wx.EXPAND,0)
         self.wNotebookPageRetrieve.SetSizer( grid_layout( [ [sizer_1,1,wx.EXPAND]
                                                           , [sizer_2,1,wx.EXPAND]
                                                           , [sizer_3,1,wx.EXPAND]
@@ -868,6 +874,9 @@ class Launcher(wx.Frame):
         """
         Initialize the data elements of the controls of the Launcher window
         """
+        self.is_resources_modified = 0
+        self.is_script_modified = False 
+
         self.validate_user_id(self.config.attributes.get("user_id",""))
         
         #select a cluster
@@ -883,7 +892,6 @@ class Launcher(wx.Frame):
 
 
         value=self.get_remote_file_location()
-        self.is_script_modified = True
         self.wRemoteFileLocation.SetValue(value)
         
         #check if there are any jobs submitted by the user which are ready for copying back   
@@ -1000,7 +1008,7 @@ class Launcher(wx.Frame):
                 answer = wx.MessageBox(msg, 'Job script found',wx.YES|wx.NO | wx.ICON_QUESTION)
                 if answer==wx.NO:
                     self.set_status_text("The script was not loaded. It will be overwritten when pressing the 'Save' button.")
-                    self.is_script_modified = True
+                    #self.is_script_modified = True
                 elif answer==wx.YES:
                     self.load_job_script()
                     self.set_status_text("Script in'{}' is loaded.".format(self.wLocalFileLocation.GetValue()))
@@ -1086,7 +1094,7 @@ class Launcher(wx.Frame):
         
         self.set_node_set_items(clusters.node_set_names(self.cluster))
         self.wSelectModule.SetItems(self.get_module_avail())
-        self.is_resources_modified = True
+        self.is_resources_modified+=1
          
     def set_node_set_items(self,node_sets):
         node_set_names = clusters.node_set_names(self.cluster)
@@ -1129,7 +1137,7 @@ class Launcher(wx.Frame):
         if self.current_node_set and hasattr(self,'script'):
             self.current_node_set.script_extras(self.script)
 
-        self.is_resources_modified = True
+        self.is_resources_modified+=1
             
     def request_nodes_cores(self):
         n_cores,gb_per_core = self.current_node_set.request_nodes_cores(self.wNNodesRequested.GetValue(),self.wNCoresPerNodeRequested.GetValue())
@@ -1277,14 +1285,13 @@ class Launcher(wx.Frame):
             print("    Script updated.")
             self.format_script(lines)
             self.is_script_modified = True
+            self.is_resources_modified = 0
             return True
         
     def format_script(self,lines):
         self.wScript.ClearAll()
         for line in lines:
             self.wScript.AddText(line)
-        #self.wScript.Colourise()
-        self.is_script_modified = False
         print("    Script formatted.")
 
     def update_resources(self):
@@ -1292,7 +1299,7 @@ class Launcher(wx.Frame):
             return
         if not hasattr(self.script,'values'):
             return
-        #print 'update_resources()'
+        print('updating resources ...')
         new_request = False
         new_request|= self.update_value(self.wNNodesRequested       ,'n_nodes')
         new_request|= self.update_value(self.wNCoresPerNodeRequested,'n_cores_per_node')
@@ -1347,7 +1354,7 @@ class Launcher(wx.Frame):
             self.walltime_seconds = self.wWalltime.GetValue()*unit_sec
         else:
             self.wWalltime.SetValue( self.walltime_seconds/unit_sec ) 
-            self.is_resources_modified = True
+            self.is_resources_modified+=1
 
     def notify_address_has_changed(self,event=None):
         #print "event handler 'notify_address_has_changed (event={})'".format(event)
@@ -1379,27 +1386,33 @@ class Launcher(wx.Frame):
             self.wRemoteFileLocation.SetValue( self.get_remote_file_location() )
     
     def load_job_script(self):
-        self.wScript.ClearAll()
-        self.is_resources_modified = False
-        s = self.wLocalFileLocation.GetValue()
-        if os.path.isdir(s):
-            s = os.path.join(s,'pbs.sh')
-        if os.path.isfile(s):
-            fname = s
-        else:
-            msg = "No 'pbs.sh' script found at location '{}'.".format(s)
-            wx.MessageBox(msg, 'Error',wx.OK | wx.ICON_ERROR)
-            return
-        self.wScript.LoadFile(fname)
-        lines = self.wScript.GetValue().splitlines(True)
-        self.format_script(lines)
-        self.script = pbs.Script(lines)
-        
-        #make sure that the job name corresponds to the job name folder
-        #(if the job folder was copied that is not always the case) 
-        self.script.values['job_name'] = os.path.basename(self.wLocalFileLocation.GetValue())
-        
-        self.update_resources()
+        with log.LogItem('loading job script from "{}"'.format(self.wLocalFileLocation.GetValue())):
+            self.wScript.ClearAll()
+            self.is_resources_modified = 0
+            s = self.wLocalFileLocation.GetValue()
+            if os.path.isdir(s):
+                s = os.path.join(s,'pbs.sh')
+            if os.path.isfile(s):
+                fname = s
+            else:
+                msg = "No 'pbs.sh' script found at location '{}'.".format(s)
+                wx.MessageBox(msg, 'Error',wx.OK | wx.ICON_ERROR)
+                return
+            self.wScript.LoadFile(fname)
+            
+            lines = self.wScript.GetValue().splitlines(True)
+            self.format_script(lines)
+            self.script = pbs.Script(lines)
+            
+            #make sure that the job name corresponds to the job name folder
+            #(if the job folder was copied that is not always the case) 
+            self.script.values['job_name'] = os.path.basename(self.wLocalFileLocation.GetValue())
+            
+            self.update_resources()
+            self.is_resources_modified+=1
+            
+            #make sure that the job name corresponds to the job name folder in the script too
+            self.update_script_from_resources()
         
     def transfer(self,values,name,attr):
         if name in values:
@@ -1408,64 +1421,100 @@ class Launcher(wx.Frame):
             else:
                 setattr(self,attr,values[name])
                 
+    def ask_permission_to_overwrite(self):
+        old_job_name = self.wJobName.GetValue()
+        msg="This folder already contains a job script, are your sure to overwrite it?\n"\
+            "- Press OK to overwrite this job script\n"\
+            "- Change the job name below and press OK to save the script under a different job name\n"\
+            "- Press Cancel to not save the job script to disk."
+        dlg = wx.TextEntryDialog(self,msg,caption="Save your job script",defaultValue=old_job_name)
+        res = dlg.ShowModal()
+        if res==wx.ID_OK:
+            new_job_name = dlg.GetValue()
+            del dlg
+            if new_job_name==old_job_name:
+                #update and save the job script (overwrite)
+                if self.is_resources_modified:
+                    self.update_script_from_resources()
+                else:
+                    self.update_resources_from_script()
+                return True #permission given to overwrite
+            else:
+                #a new job name was specified
+                self.wJobName.ChangeValue(new_job_name)
+                self.job_name_has_changed(load=False) 
+                if os.path.exists(os.path.join(self.wLocalFileLocation.GetValue(),'pbs.sh')):
+                    #we will still be overwriting, continue to ask if that is ok
+                    return self.ask_permission_to_overwrite()
+        else:
+            return False
+        
+    def supply_missing_job_name(self):
+        #missing job_name > cannot save
+        msg="Enter a job name below or press 'Cancel' to not save your work."
+        dlg = wx.TextEntryDialog(self,msg,caption="Cannot save job script: missing job name")
+        res = dlg.ShowModal()
+        if res==wx.ID_OK:
+            new_job_name = dlg.GetValue()
+            del dlg
+            if new_job_name:
+                self.wJobName.ChangeValue(new_job_name)
+                self.job_name_has_changed(load=False)
+                return True
+        else:
+            return False
+        
+        
     def save_job(self,ask=False):
         """
         ask > ask before overwrite.
         """
+        #is there anything to save?
+        if not (self.is_resources_modified or self.is_script_modified):
+            #no
+            self.set_status_text("Nothing to save.")
+            return False
+
+        if ask:
+            if os.path.exists(os.path.join(self.wLocalFileLocation.GetValue(),'pbs.sh')):
+                #save will overwrite, ask for permission
+                if not self.ask_permission_to_overwrite():
+                    #no permission given to overwrite
+                    return False
+
         if not self.wJobName.GetValue():
-            msg="Enter a job name below or press 'Cancel' to not save your work."
-            dlg = wx.TextEntryDialog(self,msg,caption="Cannot save job script: missing job name")
-            res = dlg.ShowModal()
-            if res==wx.ID_OK:
-                job_name = dlg.GetValue()
-                del dlg
-                if job_name:
-                    self.wJobName.ChangeValue(job_name)
-                    self.job_name_has_changed(load=False)
+            if not( self.is_resources_modified or self.is_script_modified ):
+                return False
+            if self.supply_missing_job_name():
+                if os.path.exists(os.path.join(self.wLocalFileLocation.GetValue(),'pbs.sh')):
+                    #save will overwrite, ask for permission
+                    if not self.ask_permission_to_overwrite():
+                        #no permission given to overwrite
+                        return False
             else:
                 return False
-        self.update_script_from_resources()
-        if self.is_script_modified:
-            if ask:
-                msg="- Press OK to save any changes to the current job script\n"\
-                    "- Change the job name below and press OK to save the script under a different job name\n"\
-                    "- Press Cancel to discard any changes"
-                dlg = wx.TextEntryDialog(self,msg,caption="Unsaved changes in job script",defaultValue=self.wJobName.GetValue())
-                res = dlg.ShowModal()
-                if res==wx.ID_OK:
-                    job_name = dlg.GetValue()
-                    del dlg
-                    #ask confirmation on overwrite
-                    while True:
-                        if job_name!=self.wJobName.GetValue():
-                            self.wJobName.ChangeValue(job_name)
-                            self.job_name_has_changed(load=False)
-                            if os.path.exists(os.path.join(self.wLocalFileLocation.GetValue(),'pbs.sh')):
-                                msg="This folder already contains a job script, are your sure to overwrite it?\n"\
-                                    "- Press OK to overwrite this job script\n"\
-                                    "- Change the job name below and press OK to save the script under a different job name\n"\
-                                    "- Press Cancel to discard any changes"
-                                dlg = wx.TextEntryDialog(self,msg,caption="Save your job script",defaultValue=self.wJobName.GetValue())
-                                res = dlg.ShowModal()
-                                if res==wx.ID_OK:
-                                    job_name = dlg.GetValue()
-                                    del dlg
-                                else:
-                                    return False
-                        else:
-                            break
-                else:
-                    return False
-                
-            self.set_status_text("Saving (overwriting) job script to '{}' ...".format(self.wJobName.GetValue()))
-            my_makedirs(self.wLocalFileLocation.GetValue())
-            fname = os.path.join(self.wLocalFileLocation.GetValue(),'pbs.sh')
-            self.wScript.SaveFile(fname)
-            self.set_status_text("Job script saved to '{}'. Add input files to local location.".format(fname))
+        
+        #actual save or overwrite
+        folder = self.wLocalFileLocation.GetValue()
+        pbs_sh = os.path.join(folder,'pbs.sh')
+        overwriting = os.path.exists(pbs_sh)
+        msg = "Saving (overwriting) job script to '{}' ..." if overwriting \
+         else "Saving job script to '{}' ..."
+        self.set_status_text(msg.format(pbs_sh))
+        
+        try:
+            my_makedirs(folder)
+            self.wScript.SaveFile(pbs_sh)
+        except Exception as e:
+            log_exception(e)
+        finally:
+            msg = "Job script saved (overwritten) to '{}'." if overwriting \
+             else "Job script saved to '{}'."
+            self.set_status_text(msg.format(pbs_sh))
+            
             self.is_script_modified = False
             return True
-        else:
-            return False
+        return False
     
     def copy_to_remote_location(self,submit=False):
         self.set_status_text('Preparing to copy ... ')

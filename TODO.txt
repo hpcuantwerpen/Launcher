@@ -7,6 +7,9 @@ TODO LIST
 - add shortcut on desktop of windows with icon
 - installer must detect anaconda on mac and make shell script with pythonw
 - dialog to save before exit
+- reload job script from disk, discarding changes
+- tab completion
+- delete remote files
 
 DONE
 - test on linux ubuntu
