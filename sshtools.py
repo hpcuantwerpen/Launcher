@@ -222,7 +222,7 @@ class SSHPreferencesDialog(wx.Dialog):
         lst.extend(wxtools.pair(self, label="SSH_WAIT", value=SSH_PREFERENCES["SSH_WAIT"], value_range=(0,360,10), tip=tip))
         lst[-2]=[lst[-2],0,wx.ALIGN_RIGHT]
         tip="Path and filename of your ssh key for accessing the VSC clusters. If empty, Paramiko tries to find it automatically (not always successful)."
-        lst.extend(wxtools.pair(self, label="SSH_KEY", value=SSH_PREFERENCES["SSH_KEY"], tip=tip))
+        lst.extend(wxtools.pair(self, label="SSH_KEY", value=str(SSH_PREFERENCES["SSH_KEY"]), tip=tip))
         lst[-1]=[lst[-1],1,wx.EXPAND]
         lst[-2]=[lst[-2],0,wx.ALIGN_RIGHT]
         
