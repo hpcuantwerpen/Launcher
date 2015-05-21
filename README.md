@@ -30,8 +30,8 @@ $ pip install paramiko
 This will install Paramiko for the default python (that is the python that is in your path). If you have more than one python version and/or Canopy Express is not your default Python, you must ad the path to the pip that comes with Canopy Express. Depending on your OS that would more or less look like
 ```
 Windows$ C:\Users\*user_name*\AppData\Local\Enthought\Canopy\User\Scripts\pip install paramiko
-Ubuntu $ /home/*user_name*/Enthought/Canopy_64bit/User/bin/pip install paramiko
-MacOSX $ /Users/*user_name*/Library/Enthought/Canopy_64bit/User/bin/pip install paramiko
+ Ubuntu$ /home/*user_name*/Enthought/Canopy_64bit/User/bin/pip install paramiko
+ MacOSX$ /Users/*user_name*/Library/Enthought/Canopy_64bit/User/bin/pip install paramiko
 ```
 
 ###Installing Launcher - Windows
@@ -76,11 +76,11 @@ $ wget https://github.com/hpcuantwerpen/Launcher/raw/master/installer.py
 ```
 Run the installer. It is recommended that you use the Python version that you want to use for running Launcher. The installer will check wether the running Python version satisfies the Launcher prerequisites. It will also build a Launcher startup script that references the python you use for the installer. If this python does not meet the prerequisites, that script may fail.
 ```
-Ubuntu $ python installer.py
+Ubuntu$ python installer.py
 ```
 or, if python is not in your path:
 ```
-Ubbuntu $ /home/*user_name*/Enthought/Canopy_64bit/User/bin/python installer.py
+Ubbuntu$ /home/*user_name*/Enthought/Canopy_64bit/User/bin/python installer.py
 ```
 The installer produces a report that you should check to assure that the installation was successful. If so, you should have a Launcher folder in your home folder, which serves as the default location for log files, and for storing the files of your jobs (PBS script, input files, output files). It also contains a shell script launcher.sh that you can use to start Launcher. 
 
