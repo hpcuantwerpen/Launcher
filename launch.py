@@ -28,13 +28,12 @@ FJR_NOT_FINISHED =2
 FJR_NO_CONNECTION=3
 FJR_ERROR        =4
 
-__VERSION__ = (0,5)
+__VERSION__ = [0,6]    
+
 
 #####################################
 ### some wx convenience functions ###
 #####################################
-
-
 
 def is_valid_mail_address(address):
     s = address.lower()
@@ -253,6 +252,11 @@ class Launcher(wx.Frame):
             if k[0]=='w' and k[1].isupper():
                 v.SetName(k)
             
+    def git_version(self):
+        f = open(os.path.join(self.config.launcher_home,'Launcher/git_commit_id.txt'))
+        git_commit_id = f.readlines()[0].strip()
+        return git_commit_id
+    
     def log_event(self,event,msg=None):
         """
         log information about the event
@@ -935,12 +939,9 @@ class Launcher(wx.Frame):
             print("    paramiko version:")
             print(Indent(sshtools.paramiko.__version__,8))
             print("    Launcher version:")
-            try:
-                s=subprocess.check_output(["git","describe","HEAD"])
-                if s[-1]=='\n':
-                    s = s[:-1]
-            except:
-                s="v{}.{}".format(*__VERSION__)
+            global __VERSION__
+            __VERSION__.append(self.git_version()) 
+            s="v{}.{}.{}".format(*__VERSION__)
             print(Indent(s,8))
             print("    Platform:")
             print(Indent(sys.platform,8))
