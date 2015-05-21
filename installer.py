@@ -72,6 +72,27 @@ def remove_status():
         #print type(e),e
         pass
 
+def read_git_commit_id():
+    try:
+        launcher_src_folder = os.path.join(status.launcher_home,'Launcher')
+        lines = open(os.path.join(launcher_src_folder,'git_commit_id.txt')).readlines()
+        git_commit_id = lines[0]
+    except:
+        git_commit_id = None
+    return git_commit_id
+        
+def write_git_commit_id():
+    launcher_src_folder = os.path.join(status.launcher_home,'Launcher')
+    git_commit_id = status.git_commit_id
+    fname = os.path.join(launcher_src_folder,'git_commit_id.txt')
+    print '  + writing "{}" << {}'.format(fname,git_commit_id)
+    try:
+        f = open(fname,'w')
+        f.write(str(git_commit_id))
+        f.close()
+    except:
+        print 'oops'
+        
 class LogAction(object):
     def __init__(self,before='',after='done',verbose=True):
         self.verbose=verbose
@@ -254,7 +275,7 @@ def verifyDependencies(args):
 
     status.dependencies_ok = ok
     return ok
-    
+
 def download(args,branch='master'):
     url="http://github.com/hpcuantwerpen/Launcher/zipball/{}/".format(branch)
     
@@ -282,38 +303,29 @@ def download(args,branch='master'):
                 pattern = re.compile(r"attachment; filename=(.*)")
                 m = re.match(pattern, response.info()['Content-Disposition'])
                 status.zip_folder = m.group(1)
-                
+
+                status.unzipped_folder = os.path.splitext(status.zip_folder)[0]
+                status.git_commit_id   = status.unzipped_folder[len(UNZIPPED_FOLDER_PREFIX):]
+                previous_git_commit_id = read_git_commit_id()
+                status.update_available = True if not previous_git_commit_id \
+                                                else ( previous_git_commit_id!=status.git_commit_id )
                 if args.check_for_updates_only:
-                    
-                    status.unzipped_folder = os.path.splitext(status.zip_folder)[0]
-                    status.git_commit_id   = status.unzipped_folder[len(UNZIPPED_FOLDER_PREFIX):]
-                    launcher_src_folder = os.path.join(status.launcher_home,'Launcher')
-                    status.update_available=False
-                    previous_git_commit_id=None
-                    for folder,sub_folders,files in os.walk(launcher_src_folder):
-                        for f in files:
-                            if f.startswith(GIT_COMMIT_ID_PREFIX):
-                                previous_git_commit_id = f[len(GIT_COMMIT_ID_PREFIX):]
-                                status.update_available = ( previous_git_commit_id!=status.git_commit_id )
-                                break
-                        else:
-                            status.update_available=True
-                        break
+                    pass     
                 else:
-                    content = response.read()
-                    f = open(ZIP_FILE, 'w+b' )
-                    f.write( content )
-                    f.close()
-                    break
+                    if status.update_available or args.force:
+                        content = response.read()
+                        f = open(ZIP_FILE, 'w+b' )
+                        f.write( content )
+                        f.close()
             except urllib2.URLError as e:
                 if verbose:
                     print 'failed.'
                 print type(e)
                 print e
-            finally:
+            else:
                 if verbose:
                     if args.check_for_updates_only:
-                        print 'succeeded :'
+                        print 'succeeded'
                         if status.update_available:
                             if not previous_git_commit_id:
                                 print "  + No git commit id found in installation, assuming outdated version."
@@ -321,10 +333,17 @@ def download(args,branch='master'):
                         else:
                             print '  + You have the most recent version already:', status.git_commit_id
                     else:
-                        print 'succeeded :"{}" -> "{}"'.format(status.zip_folder,ZIP_FILE)
-                        print '  + Downloaded "{}".'.format(ZIP_FILE)
-
-                if not args.check_for_updates_only:
+                        if not (status.update_available or args.force):
+                            print 'succeeded'
+                            print '  + You have already the most recent version.'
+                        elif not status.update_available and args.force:
+                            print 'succeeded :"{}" -> "{}"'.format(status.zip_folder,ZIP_FILE)
+                            print '  + You have already the most recent version,'\
+                                  '    but it is reinstalled because of --force commandline argument.'
+                        else:
+                            print 'succeeded'
+                            print '  + updating to most recent version.'
+                if not args.check_for_updates_only and (status.update_available or args.force):
                     assert os.path.exists(ZIP_FILE), 'Zip file "{}" not found.'.format(ZIP_FILE)
                     print '  + Downloaded "{}".'.format(ZIP_FILE)
 
@@ -359,7 +378,6 @@ def unzip(args):
         if not args.quiet:
             print '  + Unzipped folder : "{}"'.format(status.unzipped_folder)
         status.git_commit_id = status.unzipped_folder[len(UNZIPPED_FOLDER_PREFIX):]
-        open('git_commit_id_'+status.git_commit_id,'w+') #empty file to store the git commit id 
         return True
    
 def install(args):
@@ -375,9 +393,10 @@ def install(args):
     try:
         with LogAction('  + moving "{}" to "{}" ...'.format(status.unzipped_folder,launcher_src_folder),verbose=verbose):
             shutil.move(status.unzipped_folder,launcher_src_folder)
+        write_git_commit_id() 
         
-        with LogAction('  + Copying "git_commit_id_{}" ...'.format(status.git_commit_id),verbose=verbose):
-            shutil.copy('git_commit_id_'+status.git_commit_id,launcher_src_folder)
+#         with LogAction('  + Copying "git_commit_id_{}" ...'.format(status.git_commit_id),verbose=verbose):
+#             shutil.copy('git_commit_id_'+status.git_commit_id,launcher_src_folder)
     except:
         traceback.print_exc(file=sys.stdout)
         print "Returning to previous version."
@@ -468,7 +487,13 @@ def install_launcher(argv=[]):
                        )
     args = parser.parse_args(argv)
     if not args.quiet:
-        print "Launcher installer called with Commandline arguments:",str(args)[9:]
+        print "Launcher installer called with Commandline arguments:"
+        s = str(args)[10:-1]
+        s = s.replace(', ', '\n')
+        lines = s.split('\n')
+        for l in lines:
+            n_blanks = 25 - l.find('=')
+            print n_blanks*' ',l        
     
     success     = install_step( preconditions, args)
     if success:
@@ -485,7 +510,11 @@ def install_launcher(argv=[]):
         else:
             success     = install_step( download, args )
             if success:
-                success = install_step( unzip, args )
+                if (status.update_available or args.force):
+                    success = install_step( unzip, args )
+                else:
+                    print '\nInstallation of Launcher finished early because you already have the most recent version.'
+                    return success
             if success:
                 success = install_step( install, args )
             if success:
