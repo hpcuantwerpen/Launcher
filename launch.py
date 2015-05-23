@@ -165,6 +165,7 @@ class Launcher(wx.Frame):
         """
         Create all the controls in the Launcher window and bind the necessary methods
         """
+        self.is_initializing = True
         self.config = Config()
         #set the window size
         frame_size = self.config.attributes.get("frame_size",(500,500))
@@ -175,6 +176,10 @@ class Launcher(wx.Frame):
         self.open_log_file()        
         
         super(Launcher,self).__init__(parent,title=title,size=frame_size)
+
+        my_ssh_preferences = self.config.attributes.get("SSH_PREFERENCES",None)
+        if my_ssh_preferences:
+            sshtools.SSH_PREFERENCES = my_ssh_preferences
         
         self.init_ui()
         self.set_names()
@@ -225,6 +230,7 @@ class Launcher(wx.Frame):
         # ico = wx.Icon('Launcher-icon.ico', wx.BITMAP_TYPE_ICO)
         # self.SetIcon(ico)
         # no effect?
+        del self.is_initializing
     
     def bind(self,object_name,event_name):
         """
@@ -307,40 +313,40 @@ class Launcher(wx.Frame):
     def wCluster_EVT_COMBOBOX(self,event):
         self.log_event(event)
         self.cluster_has_changed()
-        self.is_resources_modified+=1
+        self.is_resources_modified = self.increment(self.is_resources_modified)
     
     def wNodeSet_EVT_COMBOBOX(self,event):
         self.log_event(event)
         self.node_set_has_changed()
-        self.is_resources_modified+=1
+        self.is_resources_modified = self.increment(self.is_resources_modified)
 
     def wNNodesRequested_EVT_SPINCTRL(self,event):
         self.log_event(event)
         self.request_nodes_cores()
-        self.is_resources_modified+=1
+        self.is_resources_modified = self.increment(self.is_resources_modified)
         
     def wNCoresPerNodeRequested_EVT_SPINCTRL(self,event):
         self.log_event(event)
         self.request_nodes_cores()
-        self.is_resources_modified+=1
+        self.is_resources_modified = self.increment(self.is_resources_modified)
         
     def wNCoresRequested_EVT_SPINCTRL(self,event):
         self.log_event(event)
         self.request_cores_memory()
-        self.is_resources_modified+=1
+        self.is_resources_modified = self.increment(self.is_resources_modified)
         
     def wGbPerCoreRequested_EVT_SPINCTRL(self,event):
         self.log_event(event)
         self.request_cores_memory()
-        self.is_resources_modified+=1
+        self.is_resources_modified = self.increment(self.is_resources_modified)
 
     def wEnforceNNodes_EVT_CHECKBOX(self,event):
         self.log_event(event)
-        self.is_resources_modified+=1
+        self.is_resources_modified = self.increment(self.is_resources_modified)
 
     def wNAccessPolicy_EVT_CHECKBOX(self,event):
         self.log_event(event)
-        self.is_resources_modified+=1
+        self.is_resources_modified = self.increment(self.is_resources_modified)
  
     def wSelectModule_EVT_COMBOBOX(self,event):
         self.log_event(event)
@@ -382,7 +388,7 @@ class Launcher(wx.Frame):
     def wWalltime_EVT_SPINCTRL(self,event):
         self.log_event(event)
         self.walltime_has_changed()
-        self.is_resources_modified+=1
+        self.is_resources_modified = self.increment(self.is_resources_modified)
         
     def wWalltimeUnit_EVT_COMBOBOX(self,event):
         self.log_event(event)
@@ -391,27 +397,27 @@ class Launcher(wx.Frame):
     def wNotifyAbort_EVT_CHECKBOX(self,event):
         self.log_event(event)
         self.notify_address_has_changed(event)
-        self.is_resources_modified+=1
+        self.is_resources_modified = self.increment(self.is_resources_modified)
         
     def wNotifyBegin_EVT_CHECKBOX(self,event):
         self.log_event(event)
         self.notify_address_has_changed(event)
-        self.is_resources_modified+=1
+        self.is_resources_modified = self.increment(self.is_resources_modified)
         
     def wNotifyEnd_EVT_CHECKBOX(self,event):
         self.log_event(event)
         self.notify_address_has_changed(event)
-        self.is_resources_modified+=1
+        self.is_resources_modified = self.increment(self.is_resources_modified)
         
     def wNotifyAddress_EVT_TEXT_ENTER(self,event):
         self.log_event(event)
         self.notify_address_has_changed(event)
-        self.is_resources_modified+=1
+        self.is_resources_modified = self.increment(self.is_resources_modified)
         
     def wJobName_EVT_TEXT_ENTER(self,event):
         self.log_event(event,msg='value="{}"'.format(self.wJobName.GetValue()))
         self.job_name_has_changed()
-        #self.is_resources_modified+=1
+        #self.is_resources_modified = self.increment(self.is_resources_modified)
 
     def wRemoteSubfolder_EVT_TEXT(self,event):
         self.log_event(event)
@@ -833,11 +839,23 @@ class Launcher(wx.Frame):
              
     def set_ssh_preferences(self):
         with log.LogItem('Viewing/setting SSH preferences'):
-            dlg = sshtools.SSHPreferencesDialog(self)
-            answer = dlg.ShowModal()
-            if answer==wx.ID_OK:
-                dlg.update_preferences()
-            del dlg
+            ok = False
+            while not ok:
+                dlg = sshtools.SshPreferencesDialog(self)
+                answer = dlg.ShowModal()
+                if answer==wx.ID_OK:
+                    try:
+                        keep_ssh_preferences = dlg.update_preferences()
+                    except:
+                        pass
+                    else:
+                        ok = True
+                        if keep_ssh_preferences:
+                            with log.LogItem("Storing SSH preferences in config file:"):
+                                self.config.attributes['SSH_PREFERENCES'] = sshtools.SSH_PREFERENCES
+                else:
+                    ok = True
+                del dlg
         
     def select_login_node(self):
         dlg = SelectLoginNodeDialog(self)
@@ -1095,7 +1113,7 @@ class Launcher(wx.Frame):
         
         self.set_node_set_items(clusters.node_set_names(self.cluster))
         self.wSelectModule.SetItems(self.get_module_avail())
-        self.is_resources_modified+=1
+        self.is_resources_modified = self.increment(self.is_resources_modified)
          
     def set_node_set_items(self,node_sets):
         node_set_names = clusters.node_set_names(self.cluster)
@@ -1138,7 +1156,7 @@ class Launcher(wx.Frame):
         if self.current_node_set and hasattr(self,'script'):
             self.current_node_set.script_extras(self.script)
 
-        self.is_resources_modified+=1
+        self.is_resources_modified = self.increment(self.is_resources_modified)
             
     def request_nodes_cores(self):
         n_cores,gb_per_core = self.current_node_set.request_nodes_cores(self.wNNodesRequested.GetValue(),self.wNCoresPerNodeRequested.GetValue())
@@ -1355,7 +1373,7 @@ class Launcher(wx.Frame):
             self.walltime_seconds = self.wWalltime.GetValue()*unit_sec
         else:
             self.wWalltime.SetValue( self.walltime_seconds/unit_sec ) 
-            self.is_resources_modified+=1
+            self.is_resources_modified = self.increment(self.is_resources_modified)
 
     def notify_address_has_changed(self,event=None):
         #print "event handler 'notify_address_has_changed (event={})'".format(event)
@@ -1410,10 +1428,17 @@ class Launcher(wx.Frame):
             self.script.values['job_name'] = os.path.basename(self.wLocalFileLocation.GetValue())
             
             self.update_resources()
-            self.is_resources_modified+=1
+            self.is_resources_modified = self.increment(self.is_resources_modified)
             
             #make sure that the job name corresponds to the job name folder in the script too
             self.update_script_from_resources()
+            
+    def increment(self,value):
+        if hasattr(self, 'is_initializing'):
+            #do not count changes during initialization
+            return value
+        else:
+            return value+1
         
     def transfer(self,values,name,attr):
         if name in values:
@@ -1472,11 +1497,13 @@ class Launcher(wx.Frame):
         """
         pbs_sh = os.path.join(self.wLocalFileLocation.GetValue(),'pbs.sh')
         #is there anything to save?
-        if not (self.is_resources_modified or self.is_script_modified) \
-           and os.path.exists(pbs_sh):
-            #no
-            self.set_status_text("Job script is already up to date.")
-            return True
+        if not (self.is_resources_modified or self.is_script_modified):
+            if not self.wJobName.GetValue():
+                self.set_status_text("There is nothing to save.")
+                return True
+            if os.path.exists(pbs_sh):
+                self.set_status_text("Job script is already up to date.")
+                return True
 
         if ask:
             if os.path.exists(pbs_sh):
@@ -1822,6 +1849,7 @@ class SelectLoginNodeDialog(wx.Dialog):
                                     , [buttons,1,wx.EXPAND]
                                     ]
                                   , ncols=1, growable_cols=[0] ) )
+
     def select(self):
         login_node = clusters.login_nodes[self.GetParent().cluster][self.choices.GetSelection()]
         if self.GetParent().login_node == login_node:

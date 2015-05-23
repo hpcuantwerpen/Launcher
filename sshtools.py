@@ -1,18 +1,27 @@
 from __future__ import print_function
 import paramiko,wx
-import datetime,re,pprint,copy
+import datetime,re,pprint,copy,os
 import wxtools
 from indent import Indent
 import log
 
 
-SSH_DEFAULTS = {"SSH_WORK_OFFLINE": False
-               ,"SSH_KEEP_CLIENT" : False
-               ,"SSH_TIMEOUT"     : 15
-               ,"SSH_WAIT"        : 30
-               ,"SSH_VERBOSE"     : True
-               ,"SSH_KEY"         : ""
-               }
+SSH_DEFAULTS    = {"SSH_WORK_OFFLINE": False
+                  ,"SSH_KEEP_CLIENT" : False
+                  ,"SSH_TIMEOUT"     : 15
+                  ,"SSH_WAIT"        : 30
+                  ,"SSH_VERBOSE"     : True
+                  ,"SSH_KEY"         : ""
+                  ,"SSH_KEEP_PREFS"  : True
+                  }
+SSH_DESCRIPTORS = {"SSH_WORK_OFFLINE": "Work offline"
+                  ,"SSH_KEEP_CLIENT" : "Keep SSH client alive"
+                  ,"SSH_TIMEOUT"     : "Timeout [s] for connecting"
+                  ,"SSH_WAIT"        : "Wait [s] before retry"
+                  ,"SSH_VERBOSE"     : "Verbose"
+                  ,"SSH_KEY"         : "Private key:"
+                  ,"SSH_KEEP_PREFS"  : "Store preferences"
+                  }
 SSH_PREFERENCES = None
 
 def reset_SSH_PREFERENCES():
@@ -133,6 +142,7 @@ class Client(object):
 
                     if not ssh:
                         ssh = paramiko.SSHClient()
+                        ssh.set_missing_host_key_policy(paramiko.AutoAddPolicy)
                         if SSH_PREFERENCES["SSH_KEY"]:
                             ssh.load_host_keys(SSH_PREFERENCES["SSH_KEY"])
                         else:
@@ -199,103 +209,123 @@ class Client(object):
     def frame_set_status(self,msg,colour=wx.BLACK):
         if Client.frame:
             Client.frame.set_status_text(msg,colour)
-
-            
-class SSHPreferencesDialog(wx.Dialog):
+   
+class InexistingKey(Exception):
+    pass
+         
+class SshPreferencesDialog(wx.Dialog):
     def __init__(self, parent, title="SSH preferences"):
-        super(SSHPreferencesDialog,self).__init__(parent, title=title)
+        super(SshPreferencesDialog,self).__init__(parent, title=title, style=wx.DEFAULT_DIALOG_STYLE | wx.RESIZE_BORDER)
 
-        lst=[]
-        tip="Check this box to avoid the timeout while trying to connect to the host."
-        lst.extend(wxtools.pair(self, label="SSH_WORK_OFFLINE", value=SSH_PREFERENCES["SSH_WORK_OFFLINE"],tip=tip,style0=wx.ALIGN_RIGHT))
+        sizer = wx.BoxSizer(orient=wx.VERTICAL)
+        
+        lst=[] # all the widgets in the grid_layout
+        self.key2ctrl={} # map preference key to ctrl
+        
+        swap=True
+        ikey=-2 if swap else -1
+
+        key="SSH_WORK_OFFLINE"
+        tip="Do not attempt to connect to the host."
+        lst.extend(wxtools.pair(self, label=SSH_DESCRIPTORS[key], value=SSH_PREFERENCES[key],tip=tip,swap=swap))
         lst[-2]=[lst[-2],0,wx.ALIGN_RIGHT]
+        self.key2ctrl[key] = lst[ikey][0] if isinstance(lst[ikey], list) else lst[ikey]
+
+        key="SSH_KEEP_CLIENT"
         tip="Connect once to the host and keep the connection alive during the entire session."
-        lst.extend(wxtools.pair(self, label="SSH_KEEP_CLIENT", value=SSH_PREFERENCES["SSH_KEEP_CLIENT"] ,tip=tip))
+        lst.extend(wxtools.pair(self, label=SSH_DESCRIPTORS[key], value=SSH_PREFERENCES[key] ,tip=tip,swap=swap))
         lst[-2]=[lst[-2],0,wx.ALIGN_RIGHT]
+        self.key2ctrl[key] = lst[ikey][0] if isinstance(lst[ikey], list) else lst[ikey]
+        
+        key="SSH_VERBOSE"
         tip="Verbose logging of SSH actions"
-        lst.extend(wxtools.pair(self, label="SSH_VERBOSE", value=SSH_PREFERENCES["SSH_VERBOSE"]     ,tip=tip))
+        lst.extend(wxtools.pair(self, label=SSH_DESCRIPTORS[key], value=SSH_PREFERENCES[key],tip=tip,swap=swap))
         lst[-2]=[lst[-2],0,wx.ALIGN_RIGHT]
+        self.key2ctrl[key] = lst[ikey][0] if isinstance(lst[ikey], list) else lst[ikey]
+        
+        key="SSH_TIMEOUT"
         tip="Give up trying to connect to the host after this many seconds."
-        lst.extend(wxtools.pair(self, label="SSH_TIMEOUT", value=SSH_PREFERENCES["SSH_TIMEOUT"], value_range=(0,120, 1), tip=tip))
-        lst[-2]=[lst[-2],0,wx.ALIGN_RIGHT]
+        lst.extend(wxtools.pair(self, label=SSH_DESCRIPTORS[key], value=SSH_PREFERENCES[key], value_range=(0,120, 1), tip=tip,swap=swap))
+        self.key2ctrl[key] = lst[ikey][0] if isinstance(lst[ikey], list) else lst[ikey]
+
+        key="SSH_WAIT"
         tip="Do not retry to connect before this many seconds"
-        lst.extend(wxtools.pair(self, label="SSH_WAIT", value=SSH_PREFERENCES["SSH_WAIT"], value_range=(0,360,10), tip=tip))
-        lst[-2]=[lst[-2],0,wx.ALIGN_RIGHT]
+        lst.extend(wxtools.pair(self, label=SSH_DESCRIPTORS[key], value=SSH_PREFERENCES[key], value_range=(0,360,10), tip=tip,swap=swap))
+        self.key2ctrl[key] = lst[ikey][0] if isinstance(lst[ikey], list) else lst[ikey]
+        
+        swap=False
+        ikey=-2 if swap else -1
+
+        key="SSH_KEY"
         tip="Path and filename of your ssh key for accessing the VSC clusters. If empty, Paramiko tries to find it automatically (not always successful)."
-        lst.extend(wxtools.pair(self, label="SSH_KEY", value=str(SSH_PREFERENCES["SSH_KEY"]), tip=tip))
+        lst.extend(wxtools.pair(self, label=SSH_DESCRIPTORS[key], value=str(SSH_PREFERENCES[key]), tip=tip))
+        #                                                    the str() converts unicode to str, which is what the TextCtrl expects
         lst[-1]=[lst[-1],1,wx.EXPAND]
         lst[-2]=[lst[-2],0,wx.ALIGN_RIGHT]
+        self.key2ctrl[key] = lst[ikey][0] if isinstance(lst[ikey], list) else lst[ikey]
         
-        lst.append( wx.StaticText(self) )
-        lst.append( wx.StaticText(self) )
+        if SSH_PREFERENCES[key] and not os.path.exists(SSH_PREFERENCES[key]):
+            lst.append(wx.StaticText(self))
+            error = wx.StaticText(self, label="Private key refers to inexisting file.")
+            error.SetForegroundColour(wx.RED)
+            lst.append([error,1,wx.EXPAND])
+            
+        swap=True
+        ikey=-2 if swap else -1
+
+        key="SSH_KEEP_PREFS"
+        tip="Store the settings in the config file, as to make them effective also in your next Launcher setting."
+        lst.extend(wxtools.pair(self, label=SSH_DESCRIPTORS[key], value=SSH_PREFERENCES[key], tip=tip,swap=swap))
+        lst[-1]=[lst[-1],1,wx.EXPAND]
+        lst[-2]=[lst[-2],0,wx.ALIGN_RIGHT]
+        self.key2ctrl[key] = lst[ikey][0] if isinstance(lst[ikey], list) else lst[ikey]
+
+        sizer.Add( wxtools.grid_layout( lst, ncols=2, growable_cols=[1] ),flag=wx.EXPAND )
         
-        lst.append( wx.StaticText(self) )
-        lst.append([wx.Button(self,ID_BUTTON_SSH_RESET,label="Reset to Defaults"),1,wx.EXPAND])
-        lst[-1][0].Bind(wx.EVT_BUTTON,self.reset_preferences)
-        lst.append([wx.Button(self, wx.ID_CANCEL),1,wx.EXPAND])
-        lst.append([wx.Button(self, wx.ID_OK    ),1,wx.EXPAND])
+        sizer.Add( wx.StaticText(self) )
+        
+        tip="Restore default settings"
+        self.wResetButton = wx.Button(self,ID_BUTTON_SSH_RESET,label=tip)
+
+        sizer.Add( self.wResetButton,flag=wx.EXPAND )
+        
+        sizer.Add( wx.StaticText(self) )
+
+        sizer.Add( self.CreateSeparatedButtonSizer(wx.CANCEL|wx.OK),flag=wx.EXPAND )
+        self.SetSizer(sizer)
+
+#         lst.append( wx.StaticText(self) )
+#         lst.append( wx.StaticText(self) )
+#         
+#         lst.append( wx.StaticText(self) )
+#         lst.append()
+        self.wResetButton.Bind(wx.EVT_BUTTON,self.reset_preferences)
 #         lst[-3][0].SetBackgroundStyle(wx.BG_STYLE_COLOUR)
 #         lst[-3][0].SetBackgroundColour(wx.Colour(0,0,255))
-        sizer =  wxtools.grid_layout(lst, ncols=2, growable_cols=[0,1])
-        self.SetSizer(sizer)
-        self.dct = {}
-        n = len(lst)
-        for i in range(0,n,2):
-            lbl = lst[i]
-            if isinstance(lbl,list):
-                lbl = lbl[0]
-            lbl = lbl.GetLabel()
-            if lbl in SSH_PREFERENCES:
-                ctrl = lst[i+1]
-                if isinstance(ctrl,list):
-                    ctrl = ctrl[0]
-                self.dct[lbl] = ctrl
-        
+                        
     def reset_preferences(self,event):
         reset_SSH_PREFERENCES()
         #update the dialog
         for k,v in SSH_PREFERENCES.iteritems():
             self.dct[k].SetValue(v)
-            
-#     def GetValue(self,item):
-#         value = None
-#         n = len(self.lst)
-#         if item is None:
-#             value = [w.GetValue() for w in self.lst[1:2:n]]
-#             for i in range(0,n,2):
-#                 lbl = self.lst[i]
-#                 if isinstance(lbl,list):
-#                     lbl = lbl[0]
-#                 if lbl.GetLabel()==item:
-#                     ctrl = self.lst[i+1]
-#                     if isinstance(ctrl,list):
-#                         ctrl = ctrl[0]
-#                     value = ctrl.GetValue()
-#         else:
-#             for i in range(0,n,2):
-#                 lbl = self.lst[i]
-#                 if isinstance(lbl,list):
-#                     lbl = lbl[0]
-#                 if lbl.GetLabel()==item:
-#                     ctrl = self.lst[i+1]
-#                     if isinstance(ctrl,list):
-#                         ctrl = ctrl[0]
-#                     value = ctrl.GetValue()
-#         return value 
-    
+                
     def update_preferences(self):
         some_value_has_changed = False
-        for k,ctrl in self.dct.iteritems():
+        for key,ctrl in self.key2ctrl.iteritems():
             ctrl_value = ctrl.GetValue()
-            crnt_value = SSH_PREFERENCES[k]
+            crnt_value = SSH_PREFERENCES[key]
             value_has_changed = crnt_value!=ctrl_value
             if value_has_changed:
-                print("changing SSH_PREFERENCES[{}] from {} to {}.".format(k,crnt_value,ctrl_value))
-                SSH_PREFERENCES[k] = ctrl_value
-                if k=="SSH_KEY":
+                print("changing SSH_PREFERENCES[{}] from {} to {}.".format(key,crnt_value,ctrl_value))
+                SSH_PREFERENCES[key] = ctrl_value
+                if key=="SSH_KEY":
+                    if not os.path.exists(ctrl_value):
+                        raise InexistingKey
                     #destroy current connection if a new key is provided.
                     del Client.paramiko_client
                     Client.paramiko_client = None
             some_value_has_changed |= value_has_changed
         if not some_value_has_changed:
             print("nothing changed.")
+            
+        return SSH_PREFERENCES["SSH_KEEP_PREFS"]

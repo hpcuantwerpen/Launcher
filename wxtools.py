@@ -50,7 +50,7 @@ def grid_layout(items,ncols=0,gap=0,growable_rows=[],growable_cols=[]):
             szr.Add(item,0,0)
     return szr
 
-def pair(parent,label, value=None, value_range=None,tip=None,style0=0,style1=0):
+def pair(parent,label, value=None, value_range=None,tip=None,style0=0,style1=0,swap=False):
     text = wx.StaticText(parent,label=label,style=style0)
     if isinstance(value,bool):
         widget = wx.CheckBox(parent,style=style1)
@@ -71,7 +71,8 @@ def pair(parent,label, value=None, value_range=None,tip=None,style0=0,style1=0):
     if not tip is None:
         text  .SetToolTipString(tip)
         widget.SetToolTipString(tip)
-    return [text,widget]
+    widget.sibling = text
+    return [widget,text] if swap else [text,widget]
 
 def set_tool_tip_string(controls,tip=""):
     if not isinstance(controls,(list,tuple)):
