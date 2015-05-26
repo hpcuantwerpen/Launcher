@@ -10,6 +10,7 @@ TODO LIST
 - reload job script from disk, discarding changes
 - tab completion
 - delete remote files
+- on windows do not show the log
 
 DONE
 - test on linux ubuntu

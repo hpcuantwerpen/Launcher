@@ -816,6 +816,12 @@ class Launcher(wx.Frame):
         menu_bar.Append(menu_launcher, "&Launcher")
         menu_launcher.Append(Launcher.ID_MENU_CHECK_FOR_UPDATE,"Check for updates")
 
+        unit_test_id = wx.NewId()
+        self.Bind(wx.EVT_MENU, self.test, id=unit_test_id)
+        accelerator_table = wx.AcceleratorTable([(wx.ACCEL_CTRL,  ord('T'), unit_test_id )])
+        self.SetAcceleratorTable(accelerator_table)
+
+
     def on_EVT_MENU(self, event):
         """Handle menu clicks"""
         event_id = event.GetId()
@@ -1874,8 +1880,12 @@ class RedirectStdStreams(object):
         sys.stdout = self.old_stdout
         sys.stderr = self.old_stderr
 
-def run_launcher():
-    app = wx.App()
+def run_launcher(redirect=None):
+    if redirect is None:
+        app = wx.App()
+    else:
+        app = wx.App(redirect) # get rid of the stdout/stderr window .
+        
     frame = Launcher(None,"Launcher v{}.{}".format(*__VERSION__))
     log = frame.log
     app.SetTopWindow(frame)
@@ -1893,7 +1903,10 @@ if __name__ == "__main__":
     if not args.printlog:
         s_out_err = cStringIO.StringIO()
         with RedirectStdStreams(stdout=s_out_err,stderr=s_out_err):
-            log = run_launcher()
+            if sys.platform=='win32':
+                log = run_launcher(False)
+            else:
+                log = run_launcher()
             open(log,"w+").write(s_out_err.getvalue())
     else:
         run_launcher()
