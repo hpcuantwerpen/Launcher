@@ -96,10 +96,6 @@ def print_line(title="",line_length=80,n_white=1,line_char='-',indent=4):
         line = line_length*line_char
     print(line)
     
-        
-#----------------------#
-# below only test code #
-#----------------------#
 ################################################################################
 ### Launcher classes                                                         ###
 ################################################################################
@@ -107,7 +103,14 @@ class Config(object):
     """
     Launcher configuration
     """
-    def __init__(self):
+    def __init__(self,must_load=True,must_save=True):
+        """
+        Some initialization options for (unit)testing. The default value correspond
+        to production runs (not testing) 
+        must_load  = False: do not load the config file
+        must_save  = False: do not save the config file
+        is_testing = True : do not call ShowModal() on dialogs
+        """
         env_home = "HOMEPATH" if sys.platform=="win32" else "HOME"
         user_home = os.environ[env_home]
         if not user_home or not os.path.exists(user_home):
@@ -117,10 +120,14 @@ class Config(object):
         if not os.path.exists(launcher_home):
             os.mkdir(launcher_home)
         self.launcher_home = launcher_home
+        self.must_save = must_save
         
         cfg_file = os.path.join(launcher_home,'Launcher.config')
         try:
-            self.attributes = pickle.load(open(cfg_file))
+            if must_load:
+                self.attributes = pickle.load(open(cfg_file))
+            else:
+                self.attributes = {}
         except Exception as e:
             log_exception(e)
             self.attributes = {}
@@ -146,7 +153,8 @@ class Config(object):
                 self.attributes[k] = v
 
     def save(self):
-        pickle.dump(self.attributes,open(self.cfg_file,'w+'))
+        if self.must_save:
+            pickle.dump(self.attributes,open(self.cfg_file,'w+'))
 
     
 class Launcher(wx.Frame):
@@ -161,12 +169,19 @@ class Launcher(wx.Frame):
     
     ID_MENU_CHECK_FOR_UPDATE = wx.NewId()
     
-    def __init__(self, parent, title):
+    def __init__(self, parent, title, load_config=True, save_config=True,is_testing=False):
         """
         Create all the controls in the Launcher window and bind the necessary methods
+
+        Some initialization options for (unit)testing. The default value correspond
+        to production runs (not testing) 
+        load_config = False: do not load the config file
+        save_config = False: do not save the config file
+        is_testing  = True : executing (unit)tests
         """
         self.is_initializing = True
-        self.config = Config()
+        self.is_testing = is_testing
+        self.config = Config(must_load=load_config,must_save=save_config)
         #set the window size
         frame_size = self.config.attributes.get("frame_size",(500,500))
    
@@ -687,7 +702,7 @@ class Launcher(wx.Frame):
         sizer_7.Add(self.wLocalFileLocation,1,wx.EXPAND,0)
 
         #sizer_8
-        self.wUserId   = wx.TextCtrl(self.wNotebookPageResources,value=self.config.attributes['user_id'],style=wx.TE_PROCESS_ENTER)
+        self.wUserId = wx.TextCtrl(self.wNotebookPageResources,value=self.config.attributes['user_id'],style=wx.TE_PROCESS_ENTER)
         self.wRemoteLocation = wx.ComboBox(self.wNotebookPageResources,choices=['$VSC_SCRATCH','$VSC_DATA'])
         self.wRemoteSubfolder= wx.TextCtrl(self.wNotebookPageResources,value=self.config.attributes['remote_subfolder'])
         lst1 = [ wx.StaticText(self.wNotebookPageResources,label="user id:")
@@ -816,12 +831,6 @@ class Launcher(wx.Frame):
         menu_bar.Append(menu_launcher, "&Launcher")
         menu_launcher.Append(Launcher.ID_MENU_CHECK_FOR_UPDATE,"Check for updates")
 
-        unit_test_id = wx.NewId()
-        self.Bind(wx.EVT_MENU, self.test, id=unit_test_id)
-        accelerator_table = wx.AcceleratorTable([(wx.ACCEL_CTRL,  ord('T'), unit_test_id )])
-        self.SetAcceleratorTable(accelerator_table)
-
-
     def on_EVT_MENU(self, event):
         """Handle menu clicks"""
         event_id = event.GetId()
@@ -842,16 +851,18 @@ class Launcher(wx.Frame):
             self.check_for_updates()
         else:
             raise Exception("Unknown menu event id:"+str(event_id))
+    
+    
              
     def set_ssh_preferences(self):
         with log.LogItem('Viewing/setting SSH preferences'):
             ok = False
             while not ok:
-                dlg = sshtools.SshPreferencesDialog(self)
-                answer = dlg.ShowModal()
+                self.dlg = sshtools.SshPreferencesDialog(self)
+                answer = self.dlg.ShowModal()
                 if answer==wx.ID_OK:
                     try:
-                        keep_ssh_preferences = dlg.update_preferences()
+                        keep_ssh_preferences = self.dlg.update_preferences()
                     except:
                         pass
                     else:
@@ -861,14 +872,14 @@ class Launcher(wx.Frame):
                                 self.config.attributes['SSH_PREFERENCES'] = sshtools.SSH_PREFERENCES
                 else:
                     ok = True
-                del dlg
+                del self.dlg
         
     def select_login_node(self):
-        dlg = SelectLoginNodeDialog(self)
-        answer = dlg.ShowModal()
+        self.dlg = SelectLoginNodeDialog(self)
+        answer = self.dlg.ShowModal()
         if answer==wx.ID_OK:
-            dlg.select()
-        del dlg
+            self.dlg.select()
+        del self.dlg
         
     def check_for_updates(self,quiet=False):
         import installer
@@ -876,8 +887,8 @@ class Launcher(wx.Frame):
             success = installer.install_launcher(['--check-for-updates-only', '--force'])
         if success:
             if installer.status.update_available:
-                dlg = UpdateFoundDialog(self,update=installer.status.git_commit_id)
-                answer = dlg.ShowModal()
+                self.dlg = UpdateFoundDialog(self,update=installer.status.git_commit_id)
+                answer = self.dlg.ShowModal()
                 if answer==wx.YES:
                     success = installer.install_launcher()
                     if success:
@@ -885,8 +896,8 @@ class Launcher(wx.Frame):
                     else:
                         msg = 'Update failed.\nCheck the Log file.'
                     answer = wx.MessageBox(msg, 'Update.',wx.OK | wx.ICON_INFORMATION)
-                self.config.attributes['automatic_update'] = dlg.wAutomaticUpdate.IsChecked()
-                del dlg
+                self.config.attributes['automatic_update'] = self.dlg.wAutomaticUpdate.IsChecked()
+                del self.dlg
 
             else:
                 if not quiet:
@@ -905,7 +916,8 @@ class Launcher(wx.Frame):
         self.is_resources_modified = 0
         self.is_script_modified = False 
 
-        self.validate_user_id(self.config.attributes.get("user_id",""))
+        if not self.is_testing:
+            self.validate_user_id(self.config.attributes.get("user_id",""))
         
         #select a cluster
         cluster = self.config.attributes['cluster']
@@ -917,7 +929,6 @@ class Launcher(wx.Frame):
         self.wCluster.SetItems(clusters.cluster_list)        
         self.set_cluster(cluster) 
         # also sets all elements that depend on the cluster, such as nodesets, ...
-
 
         value=self.get_remote_file_location()
         self.wRemoteFileLocation.SetValue(value)
@@ -1189,6 +1200,9 @@ class Launcher(wx.Frame):
         self.wGbPerCoreRequested    .GetTextCtrl().SetForegroundColour(wx.BLUE)
         
     def get_remote_file_location(self):
+        if hasattr(self,'is_initializing') and self.is_testing:
+            return self.wRemoteLocation.GetValue()
+
         ssh = sshtools.Client(self.get_user_id(),self.login_node)
         if ssh.connected():
             #retrieve the values of the environment variables $VSC_DATA and $VSC_SCRATCH 
@@ -1217,6 +1231,8 @@ class Launcher(wx.Frame):
         return location
         
     def get_module_avail(self):
+        if hasattr(self,'is_initializing') and self.is_testing:
+            return ["-- none --"]
         ssh = sshtools.Client(self.get_user_id(),self.login_node)
         if ssh.connected():
             stdout, stderr = ssh.execute('module avail')
@@ -1459,11 +1475,11 @@ class Launcher(wx.Frame):
             "- Press OK to overwrite this job script\n"\
             "- Change the job name below and press OK to save the script under a different job name\n"\
             "- Press Cancel to not save the job script to disk."
-        dlg = wx.TextEntryDialog(self,msg,caption="Save your job script",defaultValue=old_job_name)
-        res = dlg.ShowModal()
+        self.dlg = wx.TextEntryDialog(self,msg,caption="Save your job script",defaultValue=old_job_name)
+        res = self.dlg.ShowModal()
         if res==wx.ID_OK:
-            new_job_name = dlg.GetValue()
-            del dlg
+            new_job_name = self.dlg.GetValue()
+            del self.dlg
             if new_job_name==old_job_name:
                 #update and save the job script (overwrite)
                 if self.is_resources_modified:
@@ -1484,11 +1500,11 @@ class Launcher(wx.Frame):
     def supply_missing_job_name(self):
         #missing job_name > cannot save
         msg="Enter a job name below or press 'Cancel' to not save your work."
-        dlg = wx.TextEntryDialog(self,msg,caption="Cannot save job script: missing job name")
-        res = dlg.ShowModal()
+        self.dlg = wx.TextEntryDialog(self,msg,caption="Cannot save job script: missing job name")
+        res = self.dlg.ShowModal()
         if res==wx.ID_OK:
-            new_job_name = dlg.GetValue()
-            del dlg
+            new_job_name = self.dlg.GetValue()
+            del self.dlg
             if new_job_name:
                 self.wJobName.ChangeValue(new_job_name)
                 self.job_name_has_changed(load=False)
@@ -1799,11 +1815,11 @@ class Launcher(wx.Frame):
         msg ="Enter a valid VSC user_id (e.g. vscDDDDD)\nor press Cancel: "
         m = Launcher.regexp_userid.match(user_id)
         while not m:
-            dlg = wx.TextEntryDialog(self,msg,caption="Invalid user_id",defaultValue=user_id)
-            res = dlg.ShowModal()
-            if res==wx.ID_OK:
-                user_id = dlg.GetValue()
-                del dlg
+            self.dlg = wx.TextEntryDialog(self,msg,caption="Invalid user_id",defaultValue=user_id)
+            answer = self.dlg.ShowModal()
+            if answer==wx.ID_OK:
+                user_id = self.dlg.GetValue()
+                del self.dlg
                 m = Launcher.regexp_userid.match(user_id)
                 if m:
                     print("\nStoring valid user_id '{}'".format(user_id))
