@@ -5,13 +5,12 @@ TODO LIST
 - add app on mac wth icon
   see https://mathiasbynens.be/notes/shell-script-mac-apps
 - add shortcut on desktop of windows with icon
-- installer must detect anaconda on mac and make shell script with pythonw
-- dialog to save before exit
 - reload job script from disk, discarding changes
 - tab completion
 - delete remote files
 
 DONE
+- dialog to save before exit
 - test on linux ubuntu
 - test on windows
 - automatic check for updates
