@@ -32,6 +32,7 @@ class LauncherM(object): # this is the Modeller
     
     def __init__(self,load_config=False,save_config=False):
         self.config = Config(must_load=load_config,must_save=save_config)
+        self.is_resources_modified = False
         
     def initialize_value_objects(self):
         prev_cluster = self.config.attributes['cluster']
