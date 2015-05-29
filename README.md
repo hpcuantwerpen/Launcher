@@ -8,6 +8,9 @@ Launcher is tested on Windows/Linux(Ubuntu 14.04, 15.04)/MacOSX, also inside vir
 
 If You experience any problems during installation or operation contact engelbert.tijskens@uantwerpen.be
 
+##Starting Launcher
+Look in your home folder for a folder named "Launcher". It contains a startup script "Launcher.bat" or "Launcher.sh" depending on your OS.
+
 ##Installation
 ###Preparing your environment
 Launcher requires
