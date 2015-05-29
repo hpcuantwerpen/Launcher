@@ -2,6 +2,33 @@ import wx
 import xx
 import math
 
+def set_names(object):
+    """
+    loop over object's attributes and if the attribute name matches the pattern
+    for a wx object (starts with 'w' followed by a capital, e.g. wNotebook), it
+    sets the attribute's name. These names are used for logging events 
+    """
+    for k,v in object.__dict__.iteritems():
+        if k[0]=='w' and k[1].isupper():
+            v.SetName(k)
+
+def bind(object,object_name,event_name):
+    """
+    Basically a wrapper of wx.Object.Bind
+    helper function that binds an event handler (a Launcher method) to a
+    object.
+    - the object is object.<object_name> 
+    - the event is <event_name>
+    - the event handler is object.<object_name>_<event_name>
+    """
+    type_str = str( type(eval("object."+object_name)) )
+    if type_str.startswith("<class 'xx."):
+        s = "object.{}.GetTextCtrl().Bind(xx.{},object.{}_{})".format(object_name,event_name,object_name,event_name)
+    else:
+        s = "object.{}.Bind(wx.{},object.{}_{})".format(object_name,event_name,object_name,event_name)
+    eval(s)
+        
+
 def add_notebook_page(wNotebook,title):
     """
     Add a notebook page to a wx.Notebook

@@ -15,6 +15,8 @@ import clusters
 import pbs
 import log
 
+import LauncherVC
+
 wx.ToolTip.Enable(True)
 
 ######################
@@ -28,18 +30,9 @@ FJR_NOT_FINISHED =2
 FJR_NO_CONNECTION=3
 FJR_ERROR        =4
 
-__VERSION__ = [0,6]    
-
-
 #####################################
 ### some wx convenience functions ###
 #####################################
-
-def is_valid_mail_address(address):
-    s = address.lower()
-    pattern=re.compile(r'\b[a-z0-9._%+-]+@[a-z0-9.-]+\.[a-z]{2,4}\b')
-    match = pattern.match(s)
-    return s if match else False
 
 class ContainsString(object):
     """
@@ -81,11 +74,6 @@ def make_tree_output_relative(arg):
         clean.append(a[2:-1])        
     return clean
 
-def log_exception(exception):
-    print("\n### Exception raised: #############################################################")
-    traceback.print_exc(file=sys.stdout)
-    print( exception )
-    print(  "###################################################################################")
 
 def print_line(title="",line_length=80,n_white=1,line_char='-',indent=4):
     if title:
@@ -99,69 +87,14 @@ def print_line(title="",line_length=80,n_white=1,line_char='-',indent=4):
 ################################################################################
 ### Launcher classes                                                         ###
 ################################################################################
-class Config(object):
-    """
-    Launcher configuration
-    """
-    def __init__(self,must_load=True,must_save=True):
-        """
-        Some initialization options for (unit)testing. The default value correspond
-        to production runs (not testing) 
-        must_load  = False: do not load the config file
-        must_save  = False: do not save the config file
-        is_testing = True : do not call ShowModal() on dialogs
-        """
-        env_home = "HOMEPATH" if sys.platform=="win32" else "HOME"
-        user_home = os.environ[env_home]
-        if not user_home or not os.path.exists(user_home):
-            msg = "Error: environmaent variable '${}' not found.".format(env_home)
-            raise EnvironmentError(msg)
-        launcher_home = os.path.join(user_home,'Launcher')
-        if not os.path.exists(launcher_home):
-            os.mkdir(launcher_home)
-        self.launcher_home = launcher_home
-        self.must_save = must_save
-        
-        cfg_file = os.path.join(launcher_home,'Launcher.config')
-        try:
-            if must_load:
-                self.attributes = pickle.load(open(cfg_file))
-            else:
-                self.attributes = {}
-        except Exception as e:
-            log_exception(e)
-            self.attributes = {}
-        self.cfg_file = cfg_file
+_regexp_userid = re.compile(r'vsc\d{5}')
 
-        default_attributes = { 'cluster' : 'some_cluster'
-                             , 'mail_to' : 'your mail address goes here'
-                             , 'walltime_unit' : 'hours'
-                             , 'walltime_value' : 1
-                             , 'local_files' : os.path.join(launcher_home,'jobs')
-                             , 'user_id' : 'your_user_id'
-                             , 'remote_subfolder' : '.'
-                             , 'module_lists':{}
-                             , 'submitted_jobs':{}
-                             }
-#         if 'submitted' in self.attributes:
-#             del self.attributes['submitted']
-        self.add_default_attributes(default_attributes)
-                
-    def add_default_attributes(self,default_attributes):
-        for k,v in default_attributes.iteritems():
-            if not k in self.attributes:
-                self.attributes[k] = v
 
-    def save(self):
-        if self.must_save:
-            pickle.dump(self.attributes,open(self.cfg_file,'w+'))
-
-    
+   
 class Launcher(wx.Frame):
     """
     the Launcher gui
     """
-    regexp_userid = re.compile(r'vsc\d{5}')
     ID_MENU_SSH_PREFERENCES = wx.NewId()
     ID_MENU_SSH_CONNECT     = wx.NewId()
     ID_MENU_LOGIN_NODE      = wx.NewId()
@@ -263,20 +196,7 @@ class Launcher(wx.Frame):
             s = "self.{}.Bind(wx.{},self.{}_{})".format(object_name,event_name,object_name,event_name)
         eval(s)
         
-    def set_names(self):
-        """
-        loop over self's attributes and if the attribute name matches the pattern
-        for a wx object (starts with 'w' followed by a capital, e.g. wNotebook)
-        sets the attribute's name. These names are used for logging events 
-        """
-        for k,v in self.__dict__.iteritems():
-            if k[0]=='w' and k[1].isupper():
-                v.SetName(k)
             
-    def git_version(self):
-        f = open(os.path.join(self.config.launcher_home,'Launcher/git_commit_id.txt'))
-        git_commit_id = f.readlines()[0].strip()
-        return git_commit_id
     
     def log_event(self,event,msg=None):
         """
@@ -310,8 +230,10 @@ class Launcher(wx.Frame):
                         if not value:
                             if isinstance(v, wx.CheckBox):
                                 value='False'
+                            if isinstance(v, wx.ComboBox):
+                                value=str(v.GetItems())
                             else:
-                                value = "''"
+                                value = "'?'"
                         print()
                         print_line(title=k)
                         print(Indent(value,indent=4))
@@ -1902,10 +1824,16 @@ def run_launcher(redirect=None):
     else:
         app = wx.App(redirect) # get rid of the stdout/stderr window .
         
-    frame = Launcher(None,"Launcher v{}.{}".format(*__VERSION__))
-    log = frame.log
+    frame = LauncherVC.LauncherVC(None,"Launcher v{}.{}".format(*LauncherVC.LauncherM.__VERSION__))
     app.SetTopWindow(frame)
     app.MainLoop()
+
+    log = os.path.join(frame.model.config.launcher_home,'Launcher.log')
+    old_log = None
+    if os.path.exists(frame.log):
+        old_log = log+str(random.random())[1:]
+        shutil.copy(log,old_log)
+
     return log # to save the log file
 
 if __name__ == "__main__":
@@ -1920,9 +1848,10 @@ if __name__ == "__main__":
         s_out_err = cStringIO.StringIO()
         with RedirectStdStreams(stdout=s_out_err,stderr=s_out_err):
             if sys.platform=='win32':
-                log = run_launcher(False)
+                run_launcher(False)
             else:
-                log = run_launcher()
+                run_launcher()
+            
             open(log,"w+").write(s_out_err.getvalue())
     else:
         run_launcher()

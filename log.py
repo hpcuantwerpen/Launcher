@@ -1,5 +1,6 @@
 from __future__ import print_function
-import datetime
+
+import datetime,traceback,sys
 
 class LogItem(object):
     def __init__(self,header='',footer=''):
@@ -13,6 +14,12 @@ class LogItem(object):
     def __exit__(self, type, value, traceback):
         footer =">>> "+self.footer+' '+str((datetime.datetime.now()-self.start).total_seconds())+' s'
         print(footer)
+
+def log_exception(exception):
+    print("\n### Exception raised: #############################################################")
+    traceback.print_exc(file=sys.stdout)
+    print( exception )
+    print(  "###################################################################################")
         
 ### test code ###
 if __name__=='__main__':

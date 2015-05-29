@@ -24,14 +24,16 @@ class TestLauncher(unittest.TestCase):
 
     def test_user_id(self):
         def clickOK():
+            print self.frame.dlg.GetValue()
             clickEvent = wx.CommandEvent(wx.wxEVT_COMMAND_BUTTON_CLICKED, wx.ID_OK)
-            self.dlg.ProcessEvent(clickEvent)
+            self.frame.ProcessEvent(clickEvent)
         def clickCancel():
+            print self.frame.dlg.GetValue()
             clickEvent = wx.CommandEvent(wx.wxEVT_COMMAND_BUTTON_CLICKED, wx.ID_CANCEL)
-            self.frame.dlg.ProcessEvent(clickEvent)
+            self.frame.ProcessEvent(clickEvent)
 
         wx.CallAfter(clickCancel)
-        self.frame.wUserId.SetValue('dafj')
+        self.frame.wUserId.SetValue('_vsc20170')
         self.frame.user_id_has_changed()
 #         self.ShowDialog()
 # 
