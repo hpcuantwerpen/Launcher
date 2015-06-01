@@ -1,18 +1,23 @@
 import os, inspect, importlib
 
-def node_set_names(cluster):
-    """ make a list with ComputeNodeSet names for cluster <cluster>
+################################################################################
+def decorated_node_set_names(cluster):
+    """ make a list with decorated ComputeNodeSet names for cluster <cluster>
     """
     return [ node_set.name+' ({}Gb/node, {} cores/node)'.format(node_set.gb_per_node,node_set.n_cores_per_node)
              for node_set in node_sets[cluster]
            ] 
-    
+################################################################################
+def undecorate(decorated_node_set_name):
+    return decorated_node_set_name.split('(')[0].strip()
+
 # get the path to the folder in which this file lives ( see also:
 #   http://stackoverflow.com/questions/50499/in-python-how-do-i-get-the-path-and-name-of-the-file-that-is-currently-executin/50905#50905
 #   http://stackoverflow.com/questions/247770/retrieving-python-module-path
 # )
 clusters_folder = os.path.dirname(os.path.abspath(inspect.getfile(inspect.currentframe())))
 
+################################################################################
 def import_clusters():
     """
     create 
@@ -49,4 +54,5 @@ def import_clusters():
                 before_qsub[cluster] = tmp 
     return cluster_list,node_sets,login_nodes,before_qsub
                 
-cluster_list,node_sets,login_nodes,before_qsub = import_clusters()
+################################################################################
+cluster_names,node_sets,login_nodes,before_qsub = import_clusters()

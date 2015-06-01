@@ -440,7 +440,9 @@ class Launcher(wx.Frame):
             self.config.attributes['frame_size'] = frame_size
             print('    Saving config file.')
             self.config.save()
+            print('    Cleaning up.')
             self.Destroy()
+        
      
     ### the widgets ###
     def init_ui(self):        

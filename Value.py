@@ -1,33 +1,38 @@
 import copy
 
+class Transaction(object):
+    started = False
+    def start_transaction():
+
 class Value(object):
     def __init__(self,v=None):
-        self.value    = copy.copy(v)
-        self.old_value= copy.copy(v)
-#     todo: unsafe use is permitted: old_value is not changed when 
-#         Value_object.value = new_value
-#     is used instead of
-#         Value_object.set(new_value)
-#     this is a nice idea but it does not work because the assigment in the ctor is overloaded to, hence self.value does not exist 
-#     def __setattr__(self, name, value):
-#         """ overwrite member assignment of Value objects
-#         http://stackoverflow.com/questions/11024646/is-it-possible-to-overload-python-assignment
-#         """
-#         if name == "value":
-#             self.set(value)
-#         else:
-#             self.__dict__[name] = value
-    
+        self._val = copy.copy(v)
+        self._old = copy.copy(v)
 
     def set(self, v):
-        self.old_value = self.value
-        self.value = v
+        """
+        set current value to v
+        """
+        self._old = self._val
+        self._val = v
         
     def get(self):
-        return self.value
+        """
+        get the current value
+        """
+        return self._val
+
+    def old(self):
+        """
+        get the previous value
+        """
+        return self._old
 
     def has_changed(self):
-        return self.value!=self.old_value
+        """
+        test if the value has changed.
+        """
+        return self._val!=self._old
 
 ###  test code
 import unittest
@@ -35,7 +40,7 @@ class TestValue(unittest.TestCase):
     def test1(self):
         v = Value()
         self.assertEqual(v.get(), None)
-        self.assertEqual(v.old_value, None)
+        self.assertEqual(v.old(), None)
         self.assertFalse(v.has_changed())    
     def test2(self):
         Old = [1,'one',[1,2],[1,2]]
@@ -44,12 +49,12 @@ class TestValue(unittest.TestCase):
             o=Old[i]
             n=New[i]
             v = Value(o)
-            self.assertEqual(v.get()    , o)
-            self.assertEqual(v.old_value, o)
+            self.assertEqual(v.get(), o)
+            self.assertEqual(v.old(), o)
             self.assertFalse(v.has_changed())
             v.set(n)
-            self.assertEqual(v.get(),     n)
-            self.assertEqual(v.old_value, o)
+            self.assertEqual(v.get(), n)
+            self.assertEqual(v.old(), o)
             self.assertTrue(v.has_changed())
     
 if __name__=='__main__':
