@@ -259,8 +259,11 @@ class Launcher(wx.Frame):
                 v.SetName(k)
             
     def git_version(self):
-        f = open(os.path.join(self.config.launcher_home,'Launcher/git_commit_id.txt'))
-        git_commit_id = f.readlines()[0].strip()
+        try:
+            f = open(os.path.join(self.config.launcher_home,'Launcher/git_commit_id.txt'))
+            git_commit_id = f.readlines()[0].strip()
+        except:
+            git_commit_id = ''          
         return git_commit_id
     
     def log_event(self,event,msg=None):

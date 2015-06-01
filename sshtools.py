@@ -142,7 +142,7 @@ class Client(object):
 
                     if not ssh:
                         ssh = paramiko.SSHClient()
-                        ssh.set_missing_host_key_policy(paramiko.AutoAddPolicy)
+                        ssh.set_missing_host_key_policy(paramiko.AutoAddPolicy())
                         if SSH_PREFERENCES["SSH_KEY"]:
                             ssh.load_host_keys(SSH_PREFERENCES["SSH_KEY"])
                         else:
