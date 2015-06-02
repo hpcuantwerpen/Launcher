@@ -527,7 +527,9 @@ def install_launcher(argv=[]):
                 status.istep=0
                 dump_status()
                 print '\nInstallation of Launcher failed.'
-                
+    
+    if success: 
+        os.remove(GLOBAL_PICKLED)
     return success
     
 if __name__=="__main__":
