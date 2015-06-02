@@ -4,7 +4,6 @@ import datetime,re,pprint,copy,os,StringIO,traceback
 import wxtools
 from indent import Indent
 import log
-import pwd
 
 
 SSH_DEFAULTS    = {"SSH_WORK_OFFLINE": False
