@@ -2,10 +2,11 @@ from __future__ import print_function
 
 import os,re
 import log
-from Config import Config
+import cfg
 import clusters
 import transactions
-import sshtools 
+import sshtools
+import constants
 
 ################################################################################
 class LauncherM(transactions.TransactionManager): 
@@ -13,29 +14,31 @@ class LauncherM(transactions.TransactionManager):
     """
     The Launcher Model part in the MVC approach. This contains only the logic, not the GUI part.
     """
-    def __init__(self,load_config=False,save_config=False,**kwargs):
-        self.is_initializing = True
+    is_testing=False
+    def __init__(self,reset=False,**kwargs):
+        self.is_resources_modified = -1
         #load the config file and copy all settings to member variables
-        self.config = Config(must_load=load_config,must_save=save_config)
-        for k,v in self.config.attributes.iteritems():
-            if not k[0]=='_': 
-                setattr(self, k, v)
+        path = os.path.join(constants.launcher_home(),'Launcher.cfg')
+        self.config = cfg.Config(path=path)
+        if reset:
+            self.config.reset()
+        self.config.inject_all(self)
+
         #overwrite member variables with kwargs, mainly for testing
-        for k,v in kwargs:
-            setattr(self, k, v)
-
-        self.is_resources_modified = 0
-
-        if not self.cluster in clusters.cluster_names:
-            self.cluster = clusters.cluster_names[0]
-        self.set_cluster( self.cluster )
+#         for k,v in kwargs:
+#             setattr(self, k, v)
+        
+        self.config.create(self.config,'cluster',default=clusters.cluster_names[0],inject_in=self)
+        if not self.get_cluster() in clusters.cluster_names:
+            self.config['cluster'].reset()
+        self.on_change_cluster()
                     
-        del self.is_initializing
+        self.is_resources_modified = 0 #start counting changes
         
     def __del__(self): #destructor
         self.config.save()
         
-    def set_cluster(self,new_cluster):        
+    def on_change_cluster(self,new_cluster):        
         self.cluster = new_cluster
         self.login_node = clusters.login_nodes[self.cluster][0]
         self.node_set_names = clusters.decorated_node_set_names(self.cluster)
@@ -74,7 +77,7 @@ class LauncherM(transactions.TransactionManager):
         self.config.attributes['selected_node_set_name'] = self.selected_node_set_name
 
     def increment(self,value):
-        if hasattr(self, 'is_initializing'):
+        if value<0:
             #do not count changes during initialization
             return value
         else:
