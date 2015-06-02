@@ -1213,6 +1213,8 @@ class Launcher(wx.Frame):
         self.remote_location = location
         if not self.wRemoteSubfolder.GetValue() in ['.','./']:
             location = os.path.join(location,self.wRemoteSubfolder.GetValue()) 
+            if sys.platform=='win32':
+                location = location.replace('\\','/')
         return location
         
     def get_module_avail(self):
