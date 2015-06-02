@@ -873,17 +873,20 @@ class Launcher(wx.Frame):
             success = installer.install_launcher(['--check-for-updates-only', '--force'])
         if success:
             if installer.status.update_available:
-                dlg = UpdateFoundDialog(self,update=installer.status.git_commit_id)
-                answer = dlg.ShowModal()
-                if answer==wx.YES:
+#                 dlg = UpdateFoundDialog(self,update=installer.status.git_commit_id)
+#                 answer = dlg.ShowModal()
+                msg = "An update was found: "+installer.status.git_commit_id
+                
+                answer = wx.MessageBox(msg, 'Install update?',wx.OK | wx.CANCEL | wx.ICON_INFORMATION)
+                if answer==wx.OK:
                     success = installer.install_launcher()
                     if success:
-                        msg = 'Updated successfully.'
+                        msg = 'Updated successfully.\n You MUST RESTART Launcher to use the latest version.'
                     else:
                         msg = 'Update failed.\nCheck the Log file.'
                     answer = wx.MessageBox(msg, 'Update.',wx.OK | wx.ICON_INFORMATION)
-                self.config.attributes['automatic_update'] = dlg.wAutomaticUpdate.IsChecked()
-                del dlg
+#                 self.config.attributes['automatic_update'] = dlg.wAutomaticUpdate.IsChecked()
+#                 del dlg
 
             else:
                 if not quiet:
