@@ -56,6 +56,7 @@ class Client(object):
     last_try         = datetime.datetime(2014,12,31)
     last_try_success = False
     frame            = None
+    pwd              = None
     
     def __init__(self,user_id,login_node,force=False,verbose=True):
         if SSH_PREFERENCES["SSH_WORK_OFFLINE"]:
@@ -124,7 +125,6 @@ class Client(object):
             msg ="Creating and opening Paramiko/SSH client (SSH_KEEP_CLIENT=={},force_reconnect=={}).".format(SSH_PREFERENCES["SSH_KEEP_CLIENT"],force)
             self.frame_set_status(msg)
             ssh = None
-            pwd = None
             
             if not user_id or not login_node:
                 Client.last_try_success = False
@@ -144,21 +144,21 @@ class Client(object):
                             ssh.load_system_host_keys()
                             ssh.connect(login_node, username=user_id,timeout=SSH_PREFERENCES["SSH_TIMEOUT"])
                         else:
-                            if not pwd:
+                            if not Client.pwd:
                                 ssh.connect( login_node, username=user_id
                                            , key_filename=SSH_PREFERENCES['SSH_KEY']
                                            , timeout=SSH_PREFERENCES["SSH_TIMEOUT"]
                                            )
                             else:
                                 ssh.connect( login_node, username=user_id
-                                           , key_filename=SSH_PREFERENCES['SSH_KEY'], password=pwd
+                                           , key_filename=SSH_PREFERENCES['SSH_KEY'], password=Client.pwd
                                            , timeout=SSH_PREFERENCES["SSH_TIMEOUT"]
                                            )
                                     
                     except paramiko.ssh_exception.PasswordRequiredException as e:
                         msg = "A pass phrase is needed to unlock your key. \nEnter pass phrase or press 'Cancel':"
-                        pwd = self.need_pw(msg)
-                        if not pwd:
+                        Client.pwd = self.need_pw(msg)
+                        if not Client.pwd:
                             del ssh
                             ssh = None
                             Client.last_try = datetime.datetime.now()
@@ -171,9 +171,8 @@ class Client(object):
                               "know you key is pass phrase protected, enter a pass "\
                               "phrase, or press 'Cancel' otherwise."
                         msg+= "\n\nException details:\n"+self.exception_to_str(e)
-
-                        pwd = self.need_pw(msg)
-                        if not pwd:
+                        Client.pwd = self.need_pw(msg)
+                        if not Client.pwd:
                             del ssh
                             ssh = None
                             Client.last_try = datetime.datetime.now()
@@ -181,8 +180,8 @@ class Client(object):
         
                     except paramiko.ssh_exception.AuthenticationException as e:
                         msg = "Wrong pass phrase ...\nRe-enter pass phrase or press 'Cancel':"
-                        pwd = self.need_pw(msg)
-                        if not pwd:
+                        Client.pwd = self.need_pw(msg)
+                        if not Client.pwd:
                             del ssh
                             ssh = None
                             Client.last_try = datetime.datetime.now()
