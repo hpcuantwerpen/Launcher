@@ -876,7 +876,6 @@ class Launcher(wx.Frame):
 #                 dlg = UpdateFoundDialog(self,update=installer.status.git_commit_id)
 #                 answer = dlg.ShowModal()
                 msg = "An update was found: "+installer.status.git_commit_id
-                
                 answer = wx.MessageBox(msg, 'Install update?',wx.OK | wx.CANCEL | wx.ICON_INFORMATION)
                 if answer==wx.OK:
                     success = installer.install_launcher()
