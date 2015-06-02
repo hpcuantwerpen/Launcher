@@ -1,6 +1,6 @@
 from __future__ import print_function
 import paramiko,wx
-import datetime,re,pprint,copy,os
+import datetime,re,pprint,copy,os,StringIO,traceback
 import wxtools
 from indent import Indent
 import log
@@ -36,7 +36,6 @@ reset_SSH_PREFERENCES()
 # SSH_KEEP_CLIENT = False
 # SSH_TIMEOUT = 15
 #   Number of seconds that paramiko.SSHClient.connect attempts to
-
 #   to connect.
 # SSH_WAIT = 30
 #   the minimum number of sceconds between two successive attempts 
@@ -143,14 +142,15 @@ class Client(object):
                     if not ssh:
                         ssh = paramiko.SSHClient()
                         ssh.set_missing_host_key_policy(paramiko.AutoAddPolicy())
-                        if SSH_PREFERENCES["SSH_KEY"]:
-                            ssh.load_host_keys(SSH_PREFERENCES["SSH_KEY"])
-                        else:
+                        if not SSH_PREFERENCES["SSH_KEY"]:
                             ssh.load_system_host_keys()
                         
                     if pwd is None:
                         #ssh.connect(login_node, username=user_id)
-                        ssh.connect(login_node, username=user_id,timeout=SSH_PREFERENCES["SSH_TIMEOUT"])
+                        if SSH_PREFERENCES['SSH_KEY']:
+                            ssh.connect(login_node, username=user_id,timeout=SSH_PREFERENCES["SSH_TIMEOUT"],key_filename=SSH_PREFERENCES['SSH_KEY'],password=pwd)
+                        else:
+                            ssh.connect(login_node, username=user_id,timeout=SSH_PREFERENCES["SSH_TIMEOUT"])
                     else:
                         ssh.connect(login_node, username=user_id,timeout=SSH_PREFERENCES["SSH_TIMEOUT"],password=pwd)
                 
@@ -181,15 +181,14 @@ class Client(object):
                         break
                                         
                 except Exception as e:
-                    print("Unhandled exception (ignored):",type(e),e)
+                    s=StringIO.StringIO()
                     Client.last_try_success = False
                     ssh = None
-                    if verbose:
-                        msg ="Unable to connect via Paramiko/SSH to "+str(user_id)+"@"+login_node
-                        msg+="\nPossible causes are:"
-                        msg+="\n  - no internet connection."
-                        msg+="\n  - you are not connected to your home institution (VPN connection needed?)."
-                        wx.MessageBox(msg, 'No Paramiko/SSH connection.',wx.OK | wx.ICON_INFORMATION)
+                    traceback.print_exc(file=s)
+                    msg ="Unable to connect via Paramiko/SSH to "+str(user_id)+"@"+login_node
+                    msg+="\nThis error was intercepted:"
+                    msg+=s.getvalue()
+                    wx.MessageBox(msg, 'No Paramiko/SSH connection.',wx.OK | wx.ICON_INFORMATION)
                     Client.last_try = datetime.datetime.now()
                     break
                     
