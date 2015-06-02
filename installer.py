@@ -1,8 +1,7 @@
 import urllib2
 #    http://stackoverflow.com/questions/24346872/python-equivalent-of-a-given-wget-command
 import os,shutil,sys,re
-import zipfile
-import pickle
+import zipfile, pickle
 import datetime
 import argparse
 import importlib
