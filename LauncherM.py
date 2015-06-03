@@ -15,6 +15,7 @@ class LauncherM(transactions.TransactionManager):
     The Launcher Model part in the MVC approach. This contains only the logic, not the GUI part.
     """
     is_testing=False
+    
     def __init__(self,reset=False,**kwargs):
         self.is_resources_modified = -1
         #load the config file and copy all settings to member variables
@@ -24,57 +25,78 @@ class LauncherM(transactions.TransactionManager):
             self.config.reset()
         self.config.inject_all(self)
 
-        #overwrite member variables with kwargs, mainly for testing
-#         for k,v in kwargs:
-#             setattr(self, k, v)
+        self.config.create('username', default='', inject_in=self)
         
-        self.config.create(self.config,'cluster',default=clusters.cluster_names[0],inject_in=self)
+        default = clusters.cluster_names[0]
+        self.config.create('cluster', default=default, inject_in=self)
+ 
+        default = clusters.login_nodes[self.get_cluster()][0]
+        self.config.create('login_node', default=default, inject_in=self)
+        
+        default = clusters.decorated_node_set_names(self.get_cluster())[0]
+        self.config.create('selected_node_set_name', default=default, inject_in=self)
+
         if not self.get_cluster() in clusters.cluster_names:
             self.config['cluster'].reset()
         self.on_change_cluster()
-                    
+        
+        if LauncherM.is_testing:
+            print('config values')
+            for k,v in self.config.values.iteritems():
+                print(k+' : '+str(v.value))
+              
         self.is_resources_modified = 0 #start counting changes
         
     def __del__(self): #destructor
         self.config.save()
         
-    def on_change_cluster(self,new_cluster):        
-        self.cluster = new_cluster
-        self.login_node = clusters.login_nodes[self.cluster][0]
-        self.node_set_names = clusters.decorated_node_set_names(self.cluster)
-
-        if not hasattr(self, 'selected_node_set_name'):
-            self.selected_node_set_name = self.node_set_names[0]
-        if not self.selected_node_set_name in self.node_set_names:
-            self.set_node_set(self.node_set_names[0])
+    def on_change_cluster(self,new_cluster=None):
+        if not new_cluster is None:
+            assert new_cluster in clusters.cluster_names, "Unknown cluster: '{}' ".format(new_cluster)
+            self.set_cluster(new_cluster)
+            cluster = new_cluster
         else:
-            self.set_node_set(self.selected_node_set_name)
+            cluster = self.get_cluster()
         
+
+        self.node_set_names = clusters.decorated_node_set_names(cluster)
+        if not self.get_selected_node_set_name() in self.node_set_names:
+            self.config['selected_node_set_name'].reset()
+        self.on_change_selected_node_set_name()
+                   
         self.modules = self.get_modules()
         
         self.is_resources_modified = self.increment(self.is_resources_modified)
         
         with log.LogItem('[M] Accessing cluster:'):
-            print('    cluster    = '+self.cluster)
-            print('    login node = '+self.login_node)
-            print('    node set   = '+self.current_node_set.name)
+            print('    cluster    = '+cluster)
+            print('    login node = '+self.get_login_node())
+            print('    node set   = '+self.get_selected_node_set_name())
             print('    modules    = ')
         
 
-    def set_node_set(self,new_node_set):        
+    def on_change_selected_node_set_name(self,new_selected_node_set_name=None):        
+        if not new_selected_node_set_name is None:
+            assert new_selected_node_set_name in self.node_set_names, \
+                "Node set '{}' does not belong to selected cluster '{}'.".format(new_selected_node_set_name,self.get_cluster())
+            self.set_selected_node_set_name(new_selected_node_set_name)
+            selected = new_selected_node_set_name
+        else:
+            selected = self.get_selected_node_set_name()
+            
         #remove extras required by previous node set
-        if getattr(self, 'current_node_set',None) and hasattr(self,'script'):
-            self.current_node_set.script_extras(self.script,remove=True)
+        if getattr(self, 'selected_node_set',None) and hasattr(self,'script'):
+            self.selected_node_set.script_extras(self.script,remove=True)
         
         #set current node set
-        self.current_node_set = clusters.node_sets[self.cluster][self.node_set_names.index(new_node_set)]
+        print(self.node_set_names)
+        self.selected_node_set = clusters.node_sets[self.get_cluster()][self.node_set_names.index(selected)]
 
         #add extras required by new node set
-        if self.current_node_set and hasattr(self,'script'):
-            self.current_node_set.script_extras(self.script)
+        if self.selected_node_set and hasattr(self,'script'):
+            self.selected_node_set.script_extras(self.script)
 
         self.is_resources_modified = self.increment(self.is_resources_modified)
-        self.config.attributes['selected_node_set_name'] = self.selected_node_set_name
 
     def increment(self,value):
         if value<0:
@@ -92,7 +114,7 @@ class LauncherM(transactions.TransactionManager):
         self.request_nodes_and_cores_per_node()
 
     def request_nodes_and_cores_per_node(self):
-        n_cores,gb_per_core = self.current_node_set.request_nodes_cores(self.wNNodesRequested.GetValue(),self.wNCoresPerNodeRequested.GetValue())
+        n_cores,gb_per_core = self.selected_node_set.request_nodes_cores(self.wNNodesRequested.GetValue(),self.wNCoresPerNodeRequested.GetValue())
         self.n_cores_requested  = n_cores
         self.gb_per_core_requested = gb_per_core
         self.gb_total_granted = gb_per_core*n_cores
@@ -140,7 +162,7 @@ class LauncherM(transactions.TransactionManager):
             my_makedirs(folder)
             self.wScript.SaveFile(pbs_sh)
         except Exception as e:
-            log_exception(e)
+            log.log_exception(e)
             return False
         else:
             self.status_text = "Job script saved {} to '{}'.".format('(overwritten)' if file_exists else '', pbs_sh)
@@ -151,7 +173,7 @@ class LauncherM(transactions.TransactionManager):
     def get_modules(self):
 #         if hasattr(self,'is_initializing') and self.is_testing:
 #             return ["-- none --"]
-        ssh = sshtools.Client(self.get_user_id(),self.login_node)
+        ssh = sshtools.Client(self.get_username(),self.get_login_node())
         if ssh.connected():
             stdout, stderr = ssh.execute('module avail')
             lines = stderr # yes, module avail writes to stderr
@@ -218,11 +240,12 @@ import unittest
 class TestLauncherM(unittest.TestCase):
     def testCtor(self):
         launcher_m = LauncherM()
-        self.assertEqual(launcher_m.cluster, 'Hopper')
+        self.assertEqual(launcher_m.get_cluster(), 'Hopper')
         self.assertEqual(len(launcher_m.node_set_names), 2)
-        self.assertTrue(launcher_m.current_node_set.name.startswith('Hopper-thin-nodes'), 2)
-        self.assertEqual(launcher_m.login_node, 'login.hpc.uantwerpen.be')
+        self.assertTrue(launcher_m.selected_node_set.name.startswith('Hopper-thin-nodes'), 2)
+        self.assertEqual(launcher_m.get_login_node(), 'login.hpc.uantwerpen.be')
 
 if __name__=='__main__':
+    LauncherM.is_testing = True
     unittest.main()
     

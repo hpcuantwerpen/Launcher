@@ -5,7 +5,8 @@ class CfgMissingPath(Exception):
 
 class Config(object):
     def __init__(self,path=None,clear=False):
-        """ Config Ctor. If path is None an empty Config object is created, otherwise, 
+        """ 
+        Config Ctor. If path is None an empty Config object is created, otherwise, 
         path is expected to point to an existing config file, that will be loaded.
         An exception is raised if the file does not exist.            
         """
@@ -20,7 +21,7 @@ class Config(object):
     def _path(self,path):
         if path is None:
             if self.path is None:
-                raise ConfigMissingPath
+                raise CfgMissingPath
             p = self.path
         else:
             p = path
