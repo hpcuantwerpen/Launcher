@@ -875,15 +875,22 @@ class Launcher(wx.Frame):
             if installer.status.update_available:
 #                 dlg = UpdateFoundDialog(self,update=installer.status.git_commit_id)
 #                 answer = dlg.ShowModal()
-                msg = "An update was found: "+installer.status.git_commit_id
-                answer = wx.MessageBox(msg, 'Install update?',wx.OK | wx.CANCEL | wx.ICON_INFORMATION)
-                if answer==wx.OK:
-                    success = installer.install_launcher()
-                    if success:
-                        msg = 'Updated successfully.\n You MUST RESTART Launcher to use the latest version.'
-                    else:
-                        msg = 'Update failed.\nCheck the Log file.'
-                    answer = wx.MessageBox(msg, 'Update.',wx.OK | wx.ICON_INFORMATION)
+                msg = "An update was found: {}\n".format(installer.status.git_commit_id)
+                msg+= "To install\n"\
+                      "1. open a terminal\n"\
+                      "2. execute: cd <your_home_directory>/Launcher\n"\
+                      "3. execute: python installer.py"
+                if sys.platform=="win32":
+                    msg=msg.replace('/', '\\')
+                answer = wx.MessageBox(msg, 'Update Found',wx.OK | wx.ICON_INFORMATION)
+#                 answer = wx.MessageBox(msg, 'Install update?',wx.OK | wx.CANCEL | wx.ICON_INFORMATION)
+#                 if answer==wx.OK:
+#                     success = installer.install_launcher()
+#                     if success:
+#                         msg = 'Updated successfully.\n You MUST RESTART Launcher to use the latest version.'
+#                     else:
+#                         msg = 'Update failed.\nCheck the Log file.'
+#                     answer = wx.MessageBox(msg, 'Update.',wx.OK | wx.ICON_INFORMATION)
 #                 self.config.attributes['automatic_update'] = dlg.wAutomaticUpdate.IsChecked()
 #                 del dlg
 
