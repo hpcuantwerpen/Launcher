@@ -879,7 +879,7 @@ class Launcher(wx.Frame):
                 msg+= "To install\n"\
                       "1. open a terminal\n"\
                       "2. execute: cd <your_home_directory>/Launcher\n"\
-                      "3. execute: python installer.py"
+                      "3. execute: python Launcher/installer.py"
                 if sys.platform=="win32":
                     msg=msg.replace('/', '\\')
                 answer = wx.MessageBox(msg, 'Update Found',wx.OK | wx.ICON_INFORMATION)

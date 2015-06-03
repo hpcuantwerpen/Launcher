@@ -525,7 +525,7 @@ def install_launcher(argv=[]):
 
             else:
                 status.istep=0
-                dump_status()p
+                dump_status()
                 print '\nInstallation of Launcher failed.'
     
     if success: 
