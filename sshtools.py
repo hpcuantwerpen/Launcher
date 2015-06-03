@@ -24,8 +24,6 @@ SSH_DESCRIPTORS = {"SSH_WORK_OFFLINE": "Work offline"
                   }
 ################################################################################
 ### Model part of MVC 
-################################################################################
-
 def reset_ssh_preferences():
     if Client.ssh_preferences:
         print("sshtools.reset_Client.ssh_preferences()")
@@ -46,11 +44,24 @@ reset_ssh_preferences()
 # SSH_KEY=""
 
 ID_BUTTON_SSH_RESET = wx.NewId()
+################################################################################
+_regexp_username = re.compile(r'vsc\d{5}')
 
-class InvalidUserIdException(Exception):
-    def __init__(self,*args,**kwargs):
-	    super(InvalidUserIdException).__init__(*args,**kwargs)
+def is_valid_username(username):
+    if not isinstance(username,(str,unicode)):
+        return False
+    m = _regexp_username.match(username)
+    if m:
+        return True
+    else:
+        return False
 
+################################################################################
+class InvalidUsername(Exception):
+    pass
+################################################################################
+class MissingLoginNode(Exception):
+    pass
 ################################################################################
 class Client(object):
 ################################################################################
@@ -63,7 +74,7 @@ class Client(object):
     last_try_success = False
     frame            = None
     
-    def __init__(self,username,login_node,pwd=None,force=False,verbose=True):
+    def __init__(self,username=None,login_node=None,pwd=None,force=False,verbose=True):
         if Client.ssh_preferences["SSH_WORK_OFFLINE"]:
             self  .paramiko_client = None
             Client.paramiko_client = None
@@ -77,10 +88,19 @@ class Client(object):
             print("\nReusing Paramiko/SSH client (SSH_KEEP_CLIENT==True).")
             self.paramiko_client = Client.paramiko_client
         else:
-            #creata new client
-            Client.username = username
-            Client.login_node = login_node            
-            self.paramiko_client = self._connect(username,login_node,force=force,verbose=verbose)
+            #create a new client
+            if username:
+                if not is_valid_username(username):
+                    raise InvalidUsername
+                Client.username = username
+            if login_node:
+                Client.login_node = login_node
+            if not Client.login_node:
+                raise MissingLoginNode
+            if pwd:
+                Client.pwd = pwd
+                   
+            self.paramiko_client = self._connect(force=force,verbose=verbose)
             if Client.ssh_preferences["SSH_KEEP_CLIENT"]:
                 Client.paramiko_client = self.paramiko_client
        
@@ -113,7 +133,7 @@ class Client(object):
     def connected(self):
         return (not self.paramiko_client is None)
 
-    def _connect(self,username,login_node,pwd,force=False,verbose=True):
+    def _connect(self,force=False,verbose=True):
         """
         Try to open an ssh connection
           - if the previous attempt was succesful
@@ -124,92 +144,101 @@ class Client(object):
         last_try_success = Client.last_try_success
         delta = datetime.datetime.now() - last_try
         
-        if force or last_try_success or ( not last_try_success and delta.total_seconds() > Client.ssh_preferences["SSH_WAIT"] ):
-            #retry to make ssh connection    
-            msg ="Creating and opening Paramiko/SSH client (SSH_KEEP_CLIENT=={},force_reconnect=={}).".format(Client.ssh_preferences["SSH_KEEP_CLIENT"],force)
+        if not (force or last_try_success or ( not last_try_success and delta.total_seconds() > Client.ssh_preferences["SSH_WAIT"] ) ):
+            msg ="SSH_WAIT prevented reattempt to connect. Next attempt only possible after {}s.".format(Client.ssh_preferences["SSH_WAIT"])
             self.frame_set_status(msg)
-            ssh = None
-            pwd = None
-            while True:
+            return None
+        
+        #retry to make ssh connection    
+        msg ="Creating and opening Paramiko/SSH client (SSH_KEEP_CLIENT=={},force_reconnect=={}).".format(Client.ssh_preferences["SSH_KEEP_CLIENT"],force)
+        self.frame_set_status(msg)
+        
                 try:
-                    if not username or not login_node:
-                        Client.last_try_success = False
+                    ssh = paramiko.SSHClient()
+                    ssh.set_missing_host_key_policy(paramiko.AutoAddPolicy())
+                    if not Client.ssh_preferences["SSH_KEY"]:
+                        ssh.load_system_host_keys()
+                        ssh.connect(login_node, username=user_id,timeout=Client.ssh_preferences["SSH_TIMEOUT"])
+                    else:
+                        if not Client.pwd:
+                            ssh.connect( login_node, username=user_id
+                                       , key_filename=Client.ssh_preferences['SSH_KEY']
+                                       , timeout=Client.ssh_preferences["SSH_TIMEOUT"]
+                                       )
+                        else:
+                            ssh.connect( login_node, username=user_id
+                                       , key_filename=Client.ssh_preferences['SSH_KEY'], password=Client.pwd
+                                       , timeout=Client.ssh_preferences["SSH_TIMEOUT"]
+                                       )
+                                
+                except paramiko.ssh_exception.PasswordRequiredException as e:
+                    msg = "A pass phrase is needed to unlock your key. \nEnter pass phrase or press 'Cancel':"
+                    Client.pwd = self.need_pw(msg)
+                    if not Client.pwd:
+                        del ssh
                         ssh = None
-                        msg ="Unable to connect via Paramiko/SSH to "+str(username)+"@"+str(login_node)
-                        if not username:
-                            msg+="\n    invalid user id"
-                        if not login_node:
-                            msg+="\n    invalid login node"
-                        wx.MessageBox(msg, 'No Paramiko/SSH connection.', wx.OK | wx.ICON_INFORMATION )
                         Client.last_try = datetime.datetime.now()
                         break
-
-                    if not ssh:
-                        ssh = paramiko.SSHClient()
-                        ssh.set_missing_host_key_policy(paramiko.AutoAddPolicy)
-                        if Client.ssh_preferences["SSH_KEY"]:
-                            ssh.load_host_keys(Client.ssh_preferences["SSH_KEY"])
-                        else:
-                            ssh.load_system_host_keys()
-                        
-                    if pwd is None:
-                        #ssh.connect(login_node, username=username)
-                        ssh.connect(login_node, username=username,timeout=Client.ssh_preferences["SSH_TIMEOUT"])
-                    else:
-                        ssh.connect(login_node, username=username,timeout=Client.ssh_preferences["SSH_TIMEOUT"],password=pwd)
-                
-                except paramiko.ssh_exception.PasswordRequiredException as e:
-                    print("Handled exception:",e)
-                    dlg = wx.PasswordEntryDialog(None,"Enter pass phrase to unlock your key:")
-                    res = dlg.ShowModal()
-                    pwd = dlg.GetValue()
-                    dlg.Destroy()
-                    if res!=wx.ID_OK:
+    
+                except paramiko.ssh_exception.SSHException as e:
+                    msg = "A pass phrase might be needed to unlock your key. "\
+                          "In some cases paramiko does not recognise ssh keys "\
+                          "protected with a pass phrase as valid keys. If you "\
+                          "know you key is pass phrase protected, enter a pass "\
+                          "phrase, or press 'Cancel' otherwise."
+                    msg+= "\n\nException details:\n"+self.exception_to_str(e)
+                    Client.pwd = self.need_pw(msg)
+                    if not Client.pwd:
                         del ssh
                         ssh = None
                         Client.last_try = datetime.datetime.now()
                         break
     
                 except paramiko.ssh_exception.AuthenticationException as e:
-                    #todo: test this
-                    print("Handled exception:",e)
-                    dlg = wx.PasswordEntryDialog(self,"Wrong password, retry ...\nEnter pass phrase to unlock your key:")
-                    res = dlg.ShowModal()
-                    pwd = dlg.GetValue()
-                    dlg.Destroy()
-                    if res!=wx.ID_OK:
-                        pwd = None
+                    msg = "Wrong pass phrase ...\nRe-enter pass phrase or press 'Cancel':"
+                    Client.pwd = self.need_pw(msg)
+                    if not Client.pwd:
                         del ssh
                         ssh = None
                         Client.last_try = datetime.datetime.now()
                         break
                                         
                 except Exception as e:
-                    print("Unhandled exception (ignored):",type(e),e)
-                    Client.last_try_success = False
+                    msg = "Unable to connect via Paramiko/SSH to "+str(user_id)+"@"+login_node
+                    msg+= "\nUnhandled Exception:"
+                    msg+= "\n\nException details:\n"+self.exception_to_str(e)
                     ssh = None
-                    if verbose:
-                        msg ="Unable to connect via Paramiko/SSH to "+str(username)+"@"+login_node
-                        msg+="\nPossible causes are:"
-                        msg+="\n  - no internet connection."
-                        msg+="\n  - you are not connected to your home institution (VPN connection needed?)."
-                        wx.MessageBox(msg, 'No Paramiko/SSH connection.',wx.OK | wx.ICON_INFORMATION)
+                    wx.MessageBox(msg, 'No Paramiko/SSH connection.',wx.OK | wx.ICON_INFORMATION)
                     Client.last_try = datetime.datetime.now()
                     break
                     
                 else:
                     Client.last_try_success = True
                     break
-    
-            msg = "Paramiko/SSH connection established: {}@{}".format(str(Client.username),Client.login_node) if ssh else \
+            
+            #end while not ssh
+            
+            msg = "Paramiko/SSH connection established: {}@{}".format(str(Client.user_id),Client.login_node) if ssh else \
                   "Paramiko/SSH connection NOT established."
             self.frame_set_status(msg)
-        else:
-            # don't retry to make ssh connection
-            ssh = None
 
         return ssh
     
+    def exception_to_str(self,e):
+        s = StringIO.StringIO()
+        traceback.print_exc(limit=1,file=s)
+        s = s.getvalue()
+        return s
+    
+    def need_pw(self,msg):
+        dlg = wx.PasswordEntryDialog(None,msg)
+        res = dlg.ShowModal()
+        pw = dlg.GetValue()
+        dlg.Destroy()
+        if res!=wx.ID_OK:
+            pw = None
+        return pw
+
     def frame_set_status(self,msg,colour=wx.BLACK):
         if Client.frame:
             Client.frame.set_status_text(msg,colour)
