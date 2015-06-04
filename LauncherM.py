@@ -244,8 +244,8 @@ class TestLauncherM(unittest.TestCase):
         self.assertEqual(len(launcher_m.node_set_names), 2)
         self.assertTrue(launcher_m.selected_node_set.name.startswith('Hopper-thin-nodes'), 2)
         self.assertEqual(launcher_m.get_login_node(), 'login.hpc.uantwerpen.be')
-
 if __name__=='__main__':
+
     LauncherM.is_testing = True
     unittest.main()
     

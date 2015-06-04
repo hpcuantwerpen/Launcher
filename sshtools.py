@@ -1,19 +1,14 @@
 from __future__ import print_function
+
 import paramiko,wx
-import datetime,re,pprint,copy,os
+
+import datetime,re,copy,os
+
 import wxtools
-from indent import Indent
 import log
+from indent   import Indent
+from settings import Settings
 
-
-SSH_DEFAULTS    = {"SSH_WORK_OFFLINE": False
-                  ,"SSH_KEEP_CLIENT" : False
-                  ,"SSH_TIMEOUT"     : 15
-                  ,"SSH_WAIT"        : 30
-                  ,"SSH_VERBOSE"     : True
-                  ,"SSH_KEY"         : ""
-                  ,"SSH_KEEP_PREFS"  : True
-                  }
 SSH_DESCRIPTORS = {"SSH_WORK_OFFLINE": "Work offline"
                   ,"SSH_KEEP_CLIENT" : "Keep SSH client alive"
                   ,"SSH_TIMEOUT"     : "Timeout [s] for connecting"
@@ -22,26 +17,11 @@ SSH_DESCRIPTORS = {"SSH_WORK_OFFLINE": "Work offline"
                   ,"SSH_KEY"         : "Private key:"
                   ,"SSH_KEEP_PREFS"  : "Store preferences"
                   }
+
 ################################################################################
-### Model part of MVC 
-def reset_ssh_preferences():
-    if Client.ssh_preferences:
-        print("sshtools.reset_Client.ssh_preferences()")
-    Client.ssh_preferences = copy.copy(SSH_DEFAULTS)   
-     
-reset_ssh_preferences()
+### Model part of MVC                                                        ###
+################################################################################
 
-# SSH_WORK_OFFLINE = True
-# SSH_KEEP_CLIENT = False
-# SSH_TIMEOUT = 15
-#   Number of seconds that paramiko.SSHClient.connect attempts to
-
-#   to connect.
-# SSH_WAIT = 30
-#   the minimum number of sceconds between two successive attempts 
-#   to make an ssh connection if the first attempt was unsuccesful.
-# SSH_VERBOSE = True
-# SSH_KEY=""
 
 ID_BUTTON_SSH_RESET = wx.NewId()
 ################################################################################
@@ -57,41 +37,48 @@ def is_valid_username(username):
         return False
 
 ################################################################################
+class InexistingKey(Exception):
+    pass
 class InvalidUsername(Exception):
     pass
-################################################################################
 class MissingLoginNode(Exception):
     pass
+class PassphraseNeeded(Exception):
+    pass
 ################################################################################
-class Client(object):
+class Client(Settings):
 ################################################################################
-    ssh_preferences  = None
-    username         = None
-    pwd              = None
-    login_node       = None
-    paramiko_client  = None
-    last_try         = datetime.datetime(2014,12,31)
-    last_try_success = False
-    frame            = None
+
+    @classmethod
+    def full_reset(cls,defaults=None):
+        #reset the ssh_preferences
+        cls.reset(defaults=defaults)
+        cls.username         = None
+        cls.pwd              = None
+        cls.login_node       = None
+        cls.paramiko_client  = None
+        cls.last_try         = datetime.datetime(2014,12,31)
+        cls.last_try_success = False
+        cls.frame            = None
     
-    def __init__(self,username=None,login_node=None,pwd=None,force=False,verbose=True):
-        if Client.ssh_preferences["SSH_WORK_OFFLINE"]:
+    def __init__(self,username=None,login_node=None,pwd=None,force=False,verbose=True,key=None):
+        if Client.ssh_work_offline:
             self  .paramiko_client = None
             Client.paramiko_client = None
             return
-        if (Client.username!=username) or (Client.login_node!=login_node) or (not Client.ssh_preferences["SSH_KEEP_CLIENT"]):
+        if (Client.username!=username) or (Client.login_node!=login_node) or (not Client.ssh_keep_client):
             #We need a new Client object, close the old one first
             if Client.paramiko_client:
                 Client.paramiko_client.close()
                 Client.paramiko_client = None
-        if Client.paramiko_client and Client.ssh_preferences["SSH_KEEP_CLIENT"]:
-            print("\nReusing Paramiko/SSH client (SSH_KEEP_CLIENT==True).")
+        if Client.paramiko_client and Client.ssh_keep_client:
+            print("\nReusing Paramiko/SSH client (ssh_keep_client==True).")
             self.paramiko_client = Client.paramiko_client
         else:
             #create a new client
-            if username:
-                if not is_valid_username(username):
-                    raise InvalidUsername
+            if not is_valid_username(username):
+                raise InvalidUsername
+            else:
                 Client.username = username
             if login_node:
                 Client.login_node = login_node
@@ -99,13 +86,19 @@ class Client(object):
                 raise MissingLoginNode
             if pwd:
                 Client.pwd = pwd
-                   
+            if not key is None:
+                key = str(key)
+                if not os.path.exists(key):
+                    raise InexistingKey
+                else:
+                    Client.ssh_key = key
             self.paramiko_client = self._connect(force=force,verbose=verbose)
-            if Client.ssh_preferences["SSH_KEEP_CLIENT"]:
+                
+            if Client.ssh_keep_client:
                 Client.paramiko_client = self.paramiko_client
        
     def close(self):
-        if not Client.ssh_preferences["SSH_KEEP_CLIENT"]:
+        if not Client.ssh_keep_client:
             self.paramiko_client.close()
             Client.paramiko_client = None
     
@@ -118,7 +111,7 @@ class Client(object):
         out = stdout.readlines()
         err = stderr.readlines()
         del stdin
-        if Client.ssh_preferences["SSH_VERBOSE"] or err:
+        if Client.ssh_verbose or err:
             with log.LogItem("Executing Paramiko/SSH command:"):
                 print("  >",cmd )
                 print("  > stdout:" )
@@ -144,221 +137,161 @@ class Client(object):
         last_try_success = Client.last_try_success
         delta = datetime.datetime.now() - last_try
         
-        if not (force or last_try_success or ( not last_try_success and delta.total_seconds() > Client.ssh_preferences["SSH_WAIT"] ) ):
-            msg ="SSH_WAIT prevented reattempt to connect. Next attempt only possible after {}s.".format(Client.ssh_preferences["SSH_WAIT"])
+        if not (force or last_try_success or ( not last_try_success and delta.total_seconds() > Client.ssh_wait ) ):
+            msg ="The ssh_wait setting prevented reattempt to connect. Next attempt only possible after {}s.".format(Client.ssh_wait)
             self.frame_set_status(msg)
             return None
         
         #retry to make ssh connection    
-        msg ="Creating and opening Paramiko/SSH client (SSH_KEEP_CLIENT=={},force_reconnect=={}).".format(Client.ssh_preferences["SSH_KEEP_CLIENT"],force)
+        msg ="Creating and opening Paramiko/SSH client (ssh_keep_client=={},force_reconnect=={}).".format(Client.ssh_keep_client,force)
         self.frame_set_status(msg)
         
-                try:
-                    ssh = paramiko.SSHClient()
-                    ssh.set_missing_host_key_policy(paramiko.AutoAddPolicy())
-                    if not Client.ssh_preferences["SSH_KEY"]:
-                        ssh.load_system_host_keys()
-                        ssh.connect(login_node, username=user_id,timeout=Client.ssh_preferences["SSH_TIMEOUT"])
-                    else:
-                        if not Client.pwd:
-                            ssh.connect( login_node, username=user_id
-                                       , key_filename=Client.ssh_preferences['SSH_KEY']
-                                       , timeout=Client.ssh_preferences["SSH_TIMEOUT"]
-                                       )
-                        else:
-                            ssh.connect( login_node, username=user_id
-                                       , key_filename=Client.ssh_preferences['SSH_KEY'], password=Client.pwd
-                                       , timeout=Client.ssh_preferences["SSH_TIMEOUT"]
-                                       )
-                                
-                except paramiko.ssh_exception.PasswordRequiredException as e:
-                    msg = "A pass phrase is needed to unlock your key. \nEnter pass phrase or press 'Cancel':"
-                    Client.pwd = self.need_pw(msg)
-                    if not Client.pwd:
-                        del ssh
-                        ssh = None
-                        Client.last_try = datetime.datetime.now()
-                        break
-    
-                except paramiko.ssh_exception.SSHException as e:
-                    msg = "A pass phrase might be needed to unlock your key. "\
-                          "In some cases paramiko does not recognise ssh keys "\
-                          "protected with a pass phrase as valid keys. If you "\
-                          "know you key is pass phrase protected, enter a pass "\
-                          "phrase, or press 'Cancel' otherwise."
-                    msg+= "\n\nException details:\n"+self.exception_to_str(e)
-                    Client.pwd = self.need_pw(msg)
-                    if not Client.pwd:
-                        del ssh
-                        ssh = None
-                        Client.last_try = datetime.datetime.now()
-                        break
-    
-                except paramiko.ssh_exception.AuthenticationException as e:
-                    msg = "Wrong pass phrase ...\nRe-enter pass phrase or press 'Cancel':"
-                    Client.pwd = self.need_pw(msg)
-                    if not Client.pwd:
-                        del ssh
-                        ssh = None
-                        Client.last_try = datetime.datetime.now()
-                        break
-                                        
-                except Exception as e:
-                    msg = "Unable to connect via Paramiko/SSH to "+str(user_id)+"@"+login_node
-                    msg+= "\nUnhandled Exception:"
-                    msg+= "\n\nException details:\n"+self.exception_to_str(e)
-                    ssh = None
-                    wx.MessageBox(msg, 'No Paramiko/SSH connection.',wx.OK | wx.ICON_INFORMATION)
-                    Client.last_try = datetime.datetime.now()
-                    break
-                    
+        
+        try:
+            ssh = paramiko.SSHClient()
+            ssh.set_missing_host_key_policy(paramiko.AutoAddPolicy())
+            if not Client.ssh_key:
+                ssh.load_system_host_keys()
+                ssh.connect(Client.login_node, username=Client.username,timeout=Client.ssh_timeout)
+            else:
+                if not Client.pwd:
+                    ssh.connect( Client.login_node, username=Client.username
+                               , key_filename=Client.ssh_key
+                               , timeout=Client.ssh_timeout
+                               )
                 else:
-                    Client.last_try_success = True
-                    break
-            
-            #end while not ssh
-            
-            msg = "Paramiko/SSH connection established: {}@{}".format(str(Client.user_id),Client.login_node) if ssh else \
-                  "Paramiko/SSH connection NOT established."
-            self.frame_set_status(msg)
+                    ssh.connect( Client.login_node, username=Client.username
+                               , key_filename=Client.ssh_key, password=Client.pwd
+                               , timeout=Client.ssh_timeout
+                               )
+        except paramiko.SSHException as e1:
+            #log.log_exception(e1)
+            if Client.ssh_key and Client.pwd is None:
+                try:
+                    ssh.connect( Client.login_node, username=Client.username
+                               , key_filename=Client.ssh_key, password='test'
+                               , timeout=Client.ssh_timeout
+                               )
+                except paramiko.ssh_exception.AuthenticationException as e2:
+                    #log.log_exception(e2)
+                    raise PassphraseNeeded
+                except:
+                    raise e1
+            else:
+                raise e1
+                
+        except Exception as e:
+            raise
+        else:
+            Client.last_try_success = True
+                        
+        msg = "Paramiko/SSH connection established: {}@{}".format(str(Client.username),Client.login_node) 
+        self.frame_set_status(msg)
 
         return ssh
-    
-    def exception_to_str(self,e):
-        s = StringIO.StringIO()
-        traceback.print_exc(limit=1,file=s)
-        s = s.getvalue()
-        return s
-    
-    def need_pw(self,msg):
-        dlg = wx.PasswordEntryDialog(None,msg)
-        res = dlg.ShowModal()
-        pw = dlg.GetValue()
-        dlg.Destroy()
-        if res!=wx.ID_OK:
-            pw = None
-        return pw
 
     def frame_set_status(self,msg,colour=wx.BLACK):
         if Client.frame:
             Client.frame.set_status_text(msg,colour)
    
-class InexistingKey(Exception):
-    pass
-         
-class SshPreferencesDialog(wx.Dialog):
-    def __init__(self, parent, title="SSH preferences"):
-        super(SshPreferencesDialog,self).__init__(parent, title=title, style=wx.DEFAULT_DIALOG_STYLE | wx.RESIZE_BORDER)
 
-        sizer = wx.BoxSizer(orient=wx.VERTICAL)
-        
-        lst=[] # all the widgets in the grid_layout
-        self.key2ctrl={} # map preference key to ctrl
-        
-        swap=True
-        ikey=-2 if swap else -1
+################################################################################
+# Client default ssh settings:
+Client.full_reset(defaults = {'ssh_work_offline' : False
+                             ,'ssh_keep_client'  : False
+                             ,'ssh_timeout'      : 15   #number of seconds that paramiko.sshclient.connect attempts to connect.
+                             ,'ssh_wait'         : 30
+                             ,'ssh_verbose'      : True #the minimum number of sceconds between two successive attempts 
+                                                        #to make an ssh connection if the first attempt was unsuccesful.
+                             ,'ssh_key'          : ""
+                             ,'ssh_keep_prefs'   : True
+                             }
+                 )
 
-        key="SSH_WORK_OFFLINE"
-        tip="Do not attempt to connect to the host."
-        lst.extend(wxtools.pair(self, label=SSH_DESCRIPTORS[key], value=Client.ssh_preferences[key],tip=tip,swap=swap))
-        lst[-2]=[lst[-2],0,wx.ALIGN_RIGHT]
-        self.key2ctrl[key] = lst[ikey][0] if isinstance(lst[ikey], list) else lst[ikey]
+################################################################################
+### test code                                                                ###
+################################################################################
+import unittest,traceback,sys
 
-        key="SSH_KEEP_CLIENT"
-        tip="Connect once to the host and keep the connection alive during the entire session."
-        lst.extend(wxtools.pair(self, label=SSH_DESCRIPTORS[key], value=Client.ssh_preferences[key] ,tip=tip,swap=swap))
-        lst[-2]=[lst[-2],0,wx.ALIGN_RIGHT]
-        self.key2ctrl[key] = lst[ikey][0] if isinstance(lst[ikey], list) else lst[ikey]
-        
-        key="SSH_VERBOSE"
-        tip="Verbose logging of SSH actions"
-        lst.extend(wxtools.pair(self, label=SSH_DESCRIPTORS[key], value=Client.ssh_preferences[key],tip=tip,swap=swap))
-        lst[-2]=[lst[-2],0,wx.ALIGN_RIGHT]
-        self.key2ctrl[key] = lst[ikey][0] if isinstance(lst[ikey], list) else lst[ikey]
-        
-        key="SSH_TIMEOUT"
-        tip="Give up trying to connect to the host after this many seconds."
-        lst.extend(wxtools.pair(self, label=SSH_DESCRIPTORS[key], value=Client.ssh_preferences[key], value_range=(0,120, 1), tip=tip,swap=swap))
-        self.key2ctrl[key] = lst[ikey][0] if isinstance(lst[ikey], list) else lst[ikey]
+class TestClient(unittest.TestCase):
+    def setUp(self):
+        unittest.TestCase.setUp(self)
+        print()
+    def test0(self):
+        Client.full_reset()
+        try:
+            ssh = Client()
+        except Exception as e:
+            assert isinstance(e,InvalidUsername)
 
-        key="SSH_WAIT"
-        tip="Do not retry to connect before this many seconds"
-        lst.extend(wxtools.pair(self, label=SSH_DESCRIPTORS[key], value=Client.ssh_preferences[key], value_range=(0,360,10), tip=tip,swap=swap))
-        self.key2ctrl[key] = lst[ikey][0] if isinstance(lst[ikey], list) else lst[ikey]
-        
-        swap=False
-        ikey=-2 if swap else -1
-
-        key="SSH_KEY"
-        tip="Path and filename of your ssh key for accessing the VSC clusters. If empty, Paramiko tries to find it automatically (not always successful)."
-        lst.extend(wxtools.pair(self, label=SSH_DESCRIPTORS[key], value=str(Client.ssh_preferences[key]), tip=tip))
-        #                                                    the str() converts unicode to str, which is what the TextCtrl expects
-        lst[-1]=[lst[-1],1,wx.EXPAND]
-        lst[-2]=[lst[-2],0,wx.ALIGN_RIGHT]
-        self.key2ctrl[key] = lst[ikey][0] if isinstance(lst[ikey], list) else lst[ikey]
-        
-        if Client.ssh_preferences[key] and not os.path.exists(Client.ssh_preferences[key]):
-            lst.append(wx.StaticText(self))
-            error = wx.StaticText(self, label="Private key refers to inexisting file.")
-            error.SetForegroundColour(wx.RED)
-            lst.append([error,1,wx.EXPAND])
-            
-        swap=True
-        ikey=-2 if swap else -1
-
-        key="SSH_KEEP_PREFS"
-        tip="Store the settings in the config file, as to make them effective also in your next Launcher setting."
-        lst.extend(wxtools.pair(self, label=SSH_DESCRIPTORS[key], value=Client.ssh_preferences[key], tip=tip,swap=swap))
-        lst[-1]=[lst[-1],1,wx.EXPAND]
-        lst[-2]=[lst[-2],0,wx.ALIGN_RIGHT]
-        self.key2ctrl[key] = lst[ikey][0] if isinstance(lst[ikey], list) else lst[ikey]
-
-        sizer.Add( wxtools.grid_layout( lst, ncols=2, growable_cols=[1] ),flag=wx.EXPAND )
-        
-        sizer.Add( wx.StaticText(self) )
-        
-        tip="Restore default settings"
-        self.wResetButton = wx.Button(self,ID_BUTTON_SSH_RESET,label=tip)
-
-        sizer.Add( self.wResetButton,flag=wx.EXPAND )
-        
-        sizer.Add( wx.StaticText(self) )
-
-        sizer.Add( self.CreateSeparatedButtonSizer(wx.CANCEL|wx.OK),flag=wx.EXPAND )
-        self.SetSizer(sizer)
-
-#         lst.append( wx.StaticText(self) )
-#         lst.append( wx.StaticText(self) )
-#         
-#         lst.append( wx.StaticText(self) )
-#         lst.append()
-        self.wResetButton.Bind(wx.EVT_BUTTON,self.reset_preferences)
-#         lst[-3][0].SetBackgroundStyle(wx.BG_STYLE_COLOUR)
-#         lst[-3][0].SetBackgroundColour(wx.Colour(0,0,255))
-                        
-    def reset_preferences(self,event):
-        reset_Client.ssh_preferences()
-        #update the dialog
-        for k,v in Client.ssh_preferences.iteritems():
-            self.dct[k].SetValue(v)
+    def test1(self):
+        Client.full_reset()
+        try:
+            ssh = Client(username='vsc20170')
+        except Exception as e:
+            assert isinstance(e,MissingLoginNode)
                 
-    def update_preferences(self):
-        some_value_has_changed = False
-        for key,ctrl in self.key2ctrl.iteritems():
-            ctrl_value = ctrl.GetValue()
-            crnt_value = Client.ssh_preferences[key]
-            value_has_changed = crnt_value!=ctrl_value
-            if value_has_changed:
-                print("changing Client.ssh_preferences[{}] from {} to {}.".format(key,crnt_value,ctrl_value))
-                Client.ssh_preferences[key] = ctrl_value
-                if key=="SSH_KEY":
-                    if not os.path.exists(ctrl_value):
-                        raise InexistingKey
-                    #destroy current connection if a new key is provided.
-                    del Client.paramiko_client
-                    Client.paramiko_client = None
-            some_value_has_changed |= value_has_changed
-        if not some_value_has_changed:
-            print("nothing changed.")
+    def test2(self):
+        #using inexistent key
+        Client.full_reset()
+        try:
+            Client(username='vsc20170', login_node='login.hpc.uantwerpen.be', key='i_m_not_there')
+        except Exception as e:
+            assert isinstance(e,InexistingKey)
+
+    def test3(self):
+        #using a valid key without a pass phrase
+        Client.full_reset()
+        ssh = Client(username='vsc20170',login_node='login.hpc.uantwerpen.be',key='id_rsa_npw')
+        self.assertTrue(ssh.connected())
+        ssh.execute('ls -l da*')
+        del ssh
+
+    def test4(self):
+        #using a valid key and a pass phrase when none is needed
+        #the pass phrase is ignored...
+        Client.full_reset()
+        try:
+            ssh = Client(username='vsc20170',login_node='login.hpc.uantwerpen.be',key='id_rsa_npw',pwd='no_pwd_needed')
+        except Exception as e:
+            raise
+        else: 
+            self.assertTrue(ssh.connected())
+            ssh.execute('ls -l da*')
+            del ssh
+
+    def test5(self):
+        #using pass phrase protected key but pass phrase not provided 
+        Client.full_reset()
+        Client.pwd = None
+        try:
+            Client(username='vsc20170',login_node='login.hpc.uantwerpen.be',key='id_rsa_eendjes')
+        except Exception as e:
+            #traceback.print_exc(file=sys.stdout)
+            assert isinstance(e,PassphraseNeeded)
+
+    def test6(self):
+        #using an invalid pass phrase protectd key with the pass phrase  
+        try:
+            ssh = Client(username='vsc20170',login_node='login.hpc.uantwerpen.be',key='id_rsa_eendjes',pwd='eendjes')
+        except Exception as e:
+            assert isinstance(e,paramiko.AuthenticationException)
+        else:
+            ssh.execute('ls -l da*')
+            del ssh
+
+    def test7(self):
+        #using a valid pass phrase protectd key with the pass phrase  
+        try:
+            ssh = Client(username='vsc20170',login_node='login.hpc.uantwerpen.be',key='id_rsa',pwd='Thezoo12')
+        except Exception as e:
+            assert isinstance(e,paramiko.AuthenticationException)
+        else:
+            ssh.execute('ls -l da*')
+            del ssh
             
-        return Client.ssh_preferences["SSH_KEEP_PREFS"]
+
+if __name__=='__main__':
+    Client.ssh_work_offline = False
+    unittest.main()
+    
