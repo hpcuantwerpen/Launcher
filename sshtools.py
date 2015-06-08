@@ -60,6 +60,7 @@ class Client(Settings):
         cls.last_try         = datetime.datetime(2014,12,31)
         cls.last_try_success = False
         cls.frame            = None
+        cls.key              = None
     
     def __init__(self,username=None,login_node=None,pwd=None,force=False,verbose=True,key=None):
         if Client.ssh_work_offline:
@@ -77,7 +78,8 @@ class Client(Settings):
         else:
             #create a new client
             if not is_valid_username(username):
-                raise InvalidUsername
+                if not is_valid_username(Client.username):
+                    raise InvalidUsername
             else:
                 Client.username = username
             if login_node:
@@ -139,13 +141,12 @@ class Client(Settings):
         
         if not (force or last_try_success or ( not last_try_success and delta.total_seconds() > Client.ssh_wait ) ):
             msg ="The ssh_wait setting prevented reattempt to connect. Next attempt only possible after {}s.".format(Client.ssh_wait)
-            self.frame_set_status(msg)
+            self.set_status_text(msg)
             return None
         
         #retry to make ssh connection    
         msg ="Creating and opening Paramiko/SSH client (ssh_keep_client=={},force_reconnect=={}).".format(Client.ssh_keep_client,force)
-        self.frame_set_status(msg)
-        
+        self.set_status_text(msg)
         
         try:
             ssh = paramiko.SSHClient()
@@ -174,26 +175,27 @@ class Client(Settings):
                                )
                 except paramiko.ssh_exception.AuthenticationException as e2:
                     #log.log_exception(e2)
+                    self.set_status_text('Connection FAILED ({})'.format(str(type(e2))))
                     raise PassphraseNeeded
                 except:
+                    self.set_status_text('Connection FAILED ({})'.format(str(type(e1))))
                     raise e1
             else:
+                self.set_status_text('Connection FAILED ({})'.format(str(type(e1))))
                 raise e1
                 
         except Exception as e:
+            self.set_status_text('Connection FAILED ({})'.format(str(type(e))))
             raise
         else:
             Client.last_try_success = True
                         
         msg = "Paramiko/SSH connection established: {}@{}".format(str(Client.username),Client.login_node) 
-        self.frame_set_status(msg)
-
+        self.set_status_text(msg)
         return ssh
 
-    def frame_set_status(self,msg,colour=wx.BLACK):
-        if Client.frame:
-            Client.frame.set_status_text(msg,colour)
-   
+    def set_status_text(self,msg,colour=wx.BLACK):
+        pass #todo
 
 ################################################################################
 # Client default ssh settings:

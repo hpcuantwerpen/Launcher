@@ -22,10 +22,13 @@ class LogItem(object):
 
 ################################################################################
 def log_exception(exception):
-    print("\n### Exception raised: #############################################################")
+    line = 80*'-'
+    s = "--- Exception raised: "+str(type(exception))+" "
+    s += line[len(s):]
+    print
+    print(s)
     traceback.print_exc(file=sys.stdout)
-    print( exception )
-    print(  "###################################################################################")
+    print(line)
         
 ################################################################################
 def start_log(wx_version='unknown',paramiko_version='unknown'):

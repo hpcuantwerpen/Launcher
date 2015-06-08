@@ -1,9 +1,15 @@
-import pickle,types
+from __future__ import print_function
+
+import pickle,types,os
+import log
+from indent import Indent
 
 class CfgMissingPath(Exception):
     pass
 
 class Config(object):
+    verbose = False
+    
     def __init__(self,path=None,clear=False):
         """ 
         Config Ctor. If path is None an empty Config object is created, otherwise, 
@@ -28,14 +34,26 @@ class Config(object):
         return p
             
     def save(self,path=None):
-        p = self._path(path)
-        pickle.dump(self.values,open(p,'w+'))
-        self.path = p
+        with log.LogItem('Saving config file:'):
+            p = self._path(path)
+            self.path = p
+            pickle.dump(self.values,open(p,'w+'))
+            print("    path: '{}'".format(p))
+            if Config.verbose:
+                print(Indent(str(self),6))
         
     def load(self,path=None):    
-        p = self._path(path)
-        self.values = pickle.load(open(p))
-        self.path = p
+        with log.LogItem('Loading config file:'):
+            p = self._path(path)
+            if os.path.exists(p):
+                self.values = pickle.load(open(p))
+            else:
+                if Config.verbose:
+                    print("Config file '{}' does not exist (it will be created when saving)")
+            self.path = p
+            print("   path: '{}'".format(p))
+            if Config.verbose:
+                print(Indent(str(self),6))
         
     def __getitem__(self,name):
         return self.values[name]
@@ -50,6 +68,16 @@ class Config(object):
     def inject_all(self,obj):
         for v in self.values.itervalues():
             v.inject(obj)    
+
+    def __str__(self):
+        s=""
+        for k,v in self.values.iteritems():
+            if ConfigValue.verbose:
+                s+= k+" :\n"
+                s+= str(Indent(str(v),2))
+            else:
+                s+= "{} : {}".format(k,v) 
+        return s
     
     def create(self, name, value=None, default=None, inject_in=None):
         if name in self.values:
@@ -58,6 +86,7 @@ class Config(object):
         return True
     
 class ConfigValue(object):
+    verbose = False
     def __init__(self, config, name, value=None, default=None, inject_in=None):
         """
         config    : Config objec that stores this ConfigValue
@@ -114,7 +143,20 @@ class ConfigValue(object):
         assert not isinstance(obj, Config), 'Injecting getters and setters in a Config object makes is unpickleable.'
         setattr(obj,'get_'+self.name,self.make_getter())
         obj.__dict__['set_'+self.name] = types.MethodType(make_setter(self.config, self.name),obj,type(object))
-        
+        if isinstance(self.default,(list,dict)):
+            obj.__dict__['add_to_'+self.name] = types.MethodType(make_adder(self.config, self.name),obj,type(object))
+            
+    def __str__(self, *args, **kwargs):
+        s=""
+        if ConfigValue.verbose:
+            s+= "name   : "+str(self.name)+"\n"
+        s+= "value  : "+str(self.value)
+        if ConfigValue.verbose:
+            s+= "\ndefault: "+str(self.default)
+            s+= "\nconfig : '{}'".format(str(self.config.path))
+        return s
+            
+################################################################################
 def make_setter(config, name):
     def setter(self, v):
         cfg[name].set(v)
@@ -128,6 +170,20 @@ def make_setter(config, name):
     return setter
 
 ################################################################################
+def make_adder(config, name):
+    def adder(self, v):
+        if isinstance(cfg[name].value,list):
+            cfg[name].value.append(v)
+        elif isinstance(cfg[name].value,dict):
+            assert isinstance(v,tuple), 'Expecting a tuple: (key,value)'
+            assert len(v)==2, 'Expecting a tuple: (key,value)'
+            cfg[name].value[v[0]] = v[1]
+        else:
+            assert False, 'ConfigValue must hold a list or a dictionary.'
+    cfg = config
+    return adder
+
+################################################################################
 ### test code
 ################################################################################
 import unittest
@@ -136,6 +192,10 @@ import unittest
 class TestConfig(unittest.TestCase):
     class FOO:
         pass
+    def setUp(self):
+        unittest.TestCase.setUp(self)
+        Config.verbose = True
+        ConfigValue.verbose = True        
     def testDefaultConfig(self):
         config = Config()
         self.assertEqual(config.values, {})
@@ -170,7 +230,29 @@ class TestConfig(unittest.TestCase):
         got_v = foo.get_v()
         self.assertEqual(got_v,0)
         foo.set_v(2)
-        self.assertEqual(v.get(),2)        
+        self.assertEqual(v.get(),2)
+        
+    def testAdderList(self):
+        config = Config(path='./testDefaultConfig.cfg',clear=True)
+        v = ConfigValue(config,'v',default=[])
+        foo = TestConfig.FOO()
+        v.inject(foo)
+        got_v = foo.get_v()
+        self.assertEqual(got_v,[])
+        foo.add_to_v(1)
+        foo.add_to_v(2)
+        self.assertEqual(v.get(),[1,2])
+        
+    def testAdderDict(self):
+        config = Config(path='./testDefaultConfig.cfg',clear=True)
+        v = ConfigValue(config,'v',default={})
+        foo = TestConfig.FOO()
+        v.inject(foo)
+        got_v = foo.get_v()
+        self.assertEqual(got_v,{})
+        foo.add_to_v((1,'one'))
+        foo.add_to_v((2,'two'))
+        self.assertEqual(v.get(),{1:'one',2:'two'})
         
 if __name__=='__main__':
     unittest.main()
