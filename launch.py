@@ -1242,7 +1242,7 @@ class Launcher(wx.Frame):
                         lsts.append([])
                         lst = lsts[-1]
                         lst.append(line)
-                    elif '  in line':
+                    elif ' ' in line:
                         ll = line.split()
                         lst.extend(ll)
                     else:
