@@ -34,8 +34,8 @@ class Launcher(transactions.TransactionManager):
         default = clusters.login_nodes[self.get_cluster()][0]
         self.config.create('login_node', default=default, inject_in=self)
         
-        default = clusters.decorated_node_set_names(self.get_cluster())[0]
-        self.config.create('selected_node_set_name', default=default, inject_in=self)
+        default = clusters.decorated_nodeset_names(self.get_cluster())[0]
+        self.config.create('selected_nodeset_name', default=default, inject_in=self)
         
         self.config.create('module_lists', default={}, inject_in=self)
 
@@ -43,17 +43,11 @@ class Launcher(transactions.TransactionManager):
 
         self.config.create('enforce_n_nodes', default=True, inject_in=self)
         
-        #create other variables        
-        self.n_nodes_req          =  1
-        self.n_cores_per_node_req =  1
-        self.n_cores_req          =  1
-        self.gb_per_core_req      = -1 # value to be retrieved from the nodeset
-        
-        self.wall_time_seconds = 3600
+        self.set_default_values_non_config()
 
         if not self.get_cluster() in clusters.cluster_names:
             self.config['cluster'].reset() # this will also set the node set
-        self.on_change_cluster()
+        self.change_cluster()
         
         if Launcher.is_testing:
             with log.LogItem('Config values'):
@@ -61,22 +55,33 @@ class Launcher(transactions.TransactionManager):
                     print('    '+k+' : '+str(v.value))
               
         self.is_resources_modified = 0 #start counting changes
+    
+    def set_default_values_non_config(self):
+        #create other variables than the config variables        
+        self.n_nodes_req          =  1
+        self.n_cores_per_node_req =  1
+        self.n_cores_req          =  1
+        self.gb_per_core_req      = -1 # value to be retrieved from the nodeset
+        
+        self.walltime_seconds = 3600
+        self.jobname = ''
         
     def __del__(self): #destructor
         self.config.save()
         
-    def on_change_cluster(self,new_cluster=None):
+    def change_cluster(self,new_cluster=None):
         if not new_cluster is None:
-            assert new_cluster in clusters.cluster_names, "Unknown cluster: '{}' ".format(new_cluster)
+            if not new_cluster in clusters.cluster_names:
+                raise UnknownCluster(new_cluster)
             self.set_cluster(new_cluster)
             cluster = new_cluster
         else:
             cluster = self.get_cluster()
 
-        self.node_set_names = clusters.decorated_node_set_names(cluster)
-        if not self.get_selected_node_set_name() in self.node_set_names:
-            self.config['selected_node_set_name'].reset()
-        self.on_change_selected_node_set_name()
+        self.nodeset_names = clusters.decorated_nodeset_names(cluster)
+        if not self.get_selected_nodeset_name() in self.nodeset_names:
+            self.config['selected_nodeset_name'].reset()
+        self.on_change_selected_nodeset_name()
                    
         self.modules = self.get_modules()
         
@@ -85,45 +90,49 @@ class Launcher(transactions.TransactionManager):
         with log.LogItem('[M] Accessing cluster:'):
             print('    cluster    = '+cluster)
             print('    login node = '+self.get_login_node())
-            print('    node set   = '+self.get_selected_node_set_name())
-            print('    modules    = '+str(self.modules))
-
-    def on_change_selected_node_set_name(self,new_selected_node_set_name=None):        
-        if not new_selected_node_set_name is None:
-            assert new_selected_node_set_name in self.node_set_names, \
-                "Node set '{}' does not belong to selected cluster '{}'.".format(new_selected_node_set_name,self.get_cluster())
-            self.set_selected_node_set_name(new_selected_node_set_name)
-            selected = new_selected_node_set_name
+            print('    node set   = '+self.get_selected_nodeset_name())
+            if Launcher.verbose:
+                print('    modules    = ')
+                print(Indent(self.modules,6))
+            else:
+                print("    modules    = [...]")
+                
+    def change_selected_nodeset_name(self,new_selected_nodeset_name=None):        
+        if not new_selected_nodeset_name is None:
+            if not new_selected_nodeset_name in self.nodeset_names:
+                raise UnknownNodeset("Nodeset '{}' not defined for cluster '{}.".format(new_selected_nodeset_name,self.get_cluster()))
+            self.set_selected_nodeset_name(new_selected_nodeset_name)
+            selected = new_selected_nodeset_name
         else:
-            selected = self.get_selected_node_set_name()
+            selected = self.get_selected_nodeset_name()
             
         #remove extras required by previous node set
-        if getattr(self, 'selected_node_set',None) and hasattr(self,'script'):
-            self.selected_node_set.script_extras(self.script,remove=True)
+        if getattr(self, 'selected_nodeset',None) and hasattr(self,'script'):
+            self.selected_nodeset.script_extras(self.script,remove=True)
         
         #set current node set
-        #print(self.node_set_names)
-        self.selected_node_set = clusters.node_sets[self.get_cluster()][self.node_set_names.index(selected)]
+        #print(self.nodeset_names)
+        self.selected_nodeset = clusters.nodesets[self.get_cluster()][self.nodeset_names.index(selected)]
 
         #add extras required by new node set
-        if self.selected_node_set and hasattr(self,'script'):
-            self.selected_node_set.script_extras(self.script)
+        if self.selected_nodeset and hasattr(self,'script'):
+            self.selected_nodeset.script_extras(self.script)
         
-        self.n_cores_per_node_req = self.selected_node_set.n_cores_per_node
-        self.n_cores_per_node_max = self.selected_node_set.n_cores_per_node        
+        self.n_cores_per_node_req = self.selected_nodeset.n_cores_per_node
+        self.n_cores_per_node_max = self.selected_nodeset.n_cores_per_node        
         self.request_nodes_and_cores_per_node()
 
     def n_nodes_max(self):
-        return self.selected_node_set.n_nodes
+        return self.selected_nodeset.n_nodes
 
     def n_cores_per_node_max(self):
-        return self.selected_node_set.n_cores_per_node
+        return self.selected_nodeset.n_cores_per_node
     
     def n_cores_max(self):
-        return self.selected_node_set.n_cores_per_node * self.selected_node_set.n_nodes
+        return self.selected_nodeset.n_cores_per_node * self.selected_nodeset.n_nodes
     
     def gb_per_core_max(self):
-        return self.selected_node_set.gb_per_node
+        return self.selected_nodeset.gb_per_node
     
     def increment(self,value):
         if value<0:
@@ -141,7 +150,7 @@ class Launcher(transactions.TransactionManager):
         self.request_nodes_and_cores_per_node()
 
     def request_nodes_and_cores_per_node(self):
-        n_cores,gb_per_core = self.selected_node_set.request_nodes_cores(self.n_nodes_req,self.n_cores_per_node_req)
+        n_cores,gb_per_core = self.selected_nodeset.request_nodes_cores(self.n_nodes_req,self.n_cores_per_node_req)
         self.n_cores_req  = n_cores
         self.gb_per_core_req = gb_per_core
         self.gb_total_granted = gb_per_core*n_cores
@@ -156,7 +165,7 @@ class Launcher(transactions.TransactionManager):
         self.request_cores_and_memory_per_core()
 
     def request_cores_and_memory_per_core(self):
-        n_nodes, n_cores, n_cores_per_node, gb_per_core, gb = self.selected_node_set.request_cores_memory(self.n_cores_req,self.gb_per_core_req)
+        n_nodes, n_cores, n_cores_per_node, gb_per_core, gb = self.selected_nodeset.request_cores_memory(self.n_cores_req,self.gb_per_core_req)
         self.n_nodes_req          = n_nodes
         self.n_cores_req          = n_cores
         self.n_cores_per_node_req = n_cores_per_node
@@ -225,26 +234,26 @@ class Launcher(transactions.TransactionManager):
                     lst = lsts[line]
                 else:
                     lst.append(line)
-#         module_list=[]
-#         for lst in lsts:
-#             module_list.extend( sorted( lst, key=lambda s: s.lower() ) )
+        
         #store for reuse when there is no connection
         cluster = self.get_cluster().lower()
         module_list = []
         for k,v in lsts.iteritems():
             if cluster in k.lower():
-                self.add_to_module_lists( (self.get_cluster(),module_list) )
+                module_list.append('### '+k+' ###')
+                module_list.extend(v) 
+        self.add_to_module_lists( (self.get_cluster(),module_list) )
         return module_list
     
-    def update_script_from_resources(self):       
-        with log.LogItem('update_script_from_resources()'):
-            if not self.is_resources_modified:
+    def update_script_from_resources(self,force=False):       
+        with log.LogItem('Updating script from resources:'):
+            if not force and not self.is_resources_modified:
                 print('    Script is already up to date.')
                 return False
             #make sure all values are transferred to self.script.values
             if not hasattr(self, 'script'):
                 self.script = pbs.Script()
-                self.selected_node_set.script_extras(self.script)
+                self.selected_nodeset.script_extras(self.script)
             if not 'n_nodes' in self.script.values: 
                 self.script.add_pbs_option('-l','nodes={}:ppn={}'.format(self.n_nodes_req,self.n_cores_per_node_req))
             else:
@@ -275,24 +284,92 @@ class Launcher(transactions.TransactionManager):
             self.script.values['enforce_n_nodes'] = self.get_enforce_n_nodes()
             if self.get_enforce_n_nodes():
                 self.script.add_pbs_option('-W','x=nmatchpolicy:exactnode')
-    
-            if self.wJobName.GetValue():
+            
+            if self.jobname:
                 if not 'job_name' in self.script.values:
                     self.script.add_pbs_option('-N',self.wJobName.GetValue())
                 else:
                     self.script.values['job_name'] = self.wJobName.GetValue()
-                    
-            lines = self.script.compose()
+            
+            self.script.set_comments(cluster=self.get_cluster(),nodes=self.selected_nodeset.name)
+            
+            lines = self.script.compose(add_comments=True)
             if Launcher.verbose:
-                print(Indent(l,'### begin script ###'))
-                for l in lines:
-                    print(Indent(l,6))
-                print(Indent(l,'### end script ###'))
+                print(Indent('### begin script ###',4))
+                print(Indent(lines,6))
+                print(Indent('### end   script ###',4))
             print("    Script updated.")
             self.is_script_modified = True
             self.is_resources_modified = 0
-            return True
-
+            return lines
+        
+    def update_resources_from_script(self,lines):
+        with log.LogItem('Updating resources from script:'):
+            if isinstance(lines,(str,unicode)):
+                lines = lines.split('\n')
+    
+            if not hasattr(self, 'script'):
+                self.script = pbs.Script()
+            self.script.parse(lines)        
+    
+            try:
+                cluster = self.script.get_cluster_from_comments()
+                self.change_cluster(cluster)
+            except UnknownCluster as e:
+                log.log_exception(e,msg_after="Using '{}' instead.".format(self.get_cluster()))
+                
+            try:
+                nodeset = self.script.get_nodeset_from_comments() 
+                self.change_selected_nodeset_name(nodeset)
+                self.selected_nodeset.script_extras(self.script)
+            except UnknownNodeset as e:
+                log.log_exception(e,msg_after="Using '{}' instead.".format(self.get_selected_nodeset_name()))
+            
+            if not hasattr(self.script,'values'):
+                return #there is nothing to update
+            
+            new_request = False
+            if self.n_nodes_req != self.script.values['n_nodes']:
+                self.n_nodes_req = self.script.values['n_nodes']
+                new_request = True
+            if self.n_cores_per_node_req != self.script.values['n_cores_per_node']:
+                self.n_cores_per_node_req = self.script.values['n_cores_per_node']
+                new_request = True
+            if new_request:
+                self.request_nodes_and_cores_per_node()
+                
+            self.update_value(self.wEnforceNNodes, 'enforce_n_nodes')
+            
+            v = self.script.values.get('walltime_seconds')
+            if v:
+                self.set_walltime(v)
+    
+            self.update_value(self.wNotifyAddress,'notify_address')
+            self.update_value(self.wNotifyAbort  ,'notify_abe',ContainsString('a'))
+            self.update_value(self.wNotifyBegin  ,'notify_abe',ContainsString('b'))
+            self.update_value(self.wNotifyEnd    ,'notify_abe',ContainsString('e'))
+    
+            self.update_value(self.wJobName      ,'job_name')
+        
+    def update_value(self,ctrl,varname,function=None):
+        if varname in self.script.values:
+            value = self.script.values[varname]
+            if not function is None:
+                value = function(value)
+            if ctrl.GetValue() == value:
+                return False
+            else:
+                ctrl.SetValue(value)
+                return True
+        else:
+            return False
+        
+################################################################################
+class UnknownCluster(Exception):
+    pass
+################################################################################
+class UnknownNodeset(Exception):
+    pass
 ################################################################################
 class AskPermissionToOverwrite(Exception):
     pass
@@ -329,18 +406,24 @@ class TestLauncher(unittest.TestCase):
         unittest.TestCase.setUp(self)
         sshtools.Client.username = 'vsc20170'
         sshtools.Client.ssh_key  = 'id_rsa_npw'
+        Launcher.verbose = True
         
     def testCtor(self):
         launcher = Launcher()
         self.assertEqual(launcher.get_cluster(), 'Hopper')
-        self.assertEqual(len(launcher.node_set_names), 2)
-        self.assertTrue(launcher.selected_node_set.name.startswith('Hopper-thin-nodes'), 2)
+        self.assertEqual(len(launcher.nodeset_names), 2)
+        self.assertTrue(launcher.selected_nodeset.name.startswith('Hopper-thin-nodes'), 2)
         self.assertEqual(launcher.get_login_node(), 'login.hpc.uantwerpen.be')
         self.assertEqual(launcher.n_nodes_req, 1)
         self.assertEqual(launcher.n_cores_req, 20)
         self.assertEqual(launcher.n_cores_per_node_req, 20)
         self.assertEqual(launcher.gb_per_core_req, launcher.gb_per_core_max()/20)
 
+    def testScriptGeneration(self):
+        launcher = Launcher()
+        launcher.update_script_from_resources(force=True)
+        
+        
 if __name__=='__main__':
 
     Launcher.is_testing = True

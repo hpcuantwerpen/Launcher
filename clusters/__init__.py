@@ -1,15 +1,15 @@
 import os, inspect, importlib
 
 ################################################################################
-def decorated_node_set_names(cluster):
+def decorated_nodeset_names(cluster):
     """ make a list with decorated ComputeNodeSet names for cluster <cluster>
     """
-    return [ node_set.name+' ({}Gb/node, {} cores/node)'.format(node_set.gb_per_node,node_set.n_cores_per_node)
-             for node_set in node_sets[cluster]
+    return [ nodeset.name+' ({}Gb/node, {} cores/node)'.format(nodeset.gb_per_node,nodeset.n_cores_per_node)
+             for nodeset in nodesets[cluster]
            ] 
 ################################################################################
-def undecorate(decorated_node_set_name):
-    return decorated_node_set_name.split('(')[0].strip()
+def undecorate(decorated_nodeset_name):
+    return decorated_nodeset_name.split('(')[0].strip()
 
 # get the path to the folder in which this file lives ( see also:
 #   http://stackoverflow.com/questions/50499/in-python-how-do-i-get-the-path-and-name-of-the-file-that-is-currently-executin/50905#50905
@@ -30,13 +30,13 @@ def import_clusters():
             module load cluster/haunter
     This is achieved by importing the cluster modules in the clusters package
     There should be a module for each cluster and each module must export
-      - node_sets   : a list of ComputeNodesets for that cluster
+      - nodesets   : a list of ComputeNodesets for that cluster
       - login_nodes : a list of login nodes for that cluster
       - before_qsub : [optional] a string with linux commands that must be executed before qsub.
                       The commands are separated with '&&' 
     """
     cluster_list=[] 
-    node_sets={}
+    nodesets={}
     login_nodes={}
     before_qsub={}
     for folder, subfolders, files in os.walk(clusters_folder):
@@ -45,14 +45,14 @@ def import_clusters():
                 cluster = os.path.splitext(fname)[0]
                 module = importlib.import_module('clusters.'+cluster)
                 cluster_list.append(cluster)
-                node_sets  [cluster] = module.node_sets
+                nodesets  [cluster] = module.nodesets
                 login_nodes[cluster] = module.login_nodes
                 
                 tmp = getattr(module,'before_qsub','').strip()
                 if tmp and not tmp.endswith('&&'):
                     tmp += ' && '
                 before_qsub[cluster] = tmp 
-    return cluster_list,node_sets,login_nodes,before_qsub
+    return cluster_list,nodesets,login_nodes,before_qsub
                 
 ################################################################################
-cluster_names,node_sets,login_nodes,before_qsub = import_clusters()
+cluster_names,nodesets,login_nodes,before_qsub = import_clusters()

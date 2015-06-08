@@ -21,14 +21,20 @@ class LogItem(object):
         print(footer)
 
 ################################################################################
-def log_exception(exception):
+def log_exception(exception,msg_before=None,msg_after=None):
     line = 80*'-'
+    if msg_before:
+        print(line)
+        print(msg_before)
     s = "--- Exception raised: "+str(type(exception))+" "
     s += line[len(s):]
     print
     print(s)
     traceback.print_exc(file=sys.stdout)
     print(line)
+    if msg_after:
+        print(msg_after)
+        print(line)
         
 ################################################################################
 def start_log(wx_version='unknown',paramiko_version='unknown'):

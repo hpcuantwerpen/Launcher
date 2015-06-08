@@ -1,4 +1,4 @@
-import math,re
+import math,re,datetime
 
 class RequestFailed(Exception):
     def __init__(self, message):
@@ -22,7 +22,7 @@ class ScriptExtras(object):
             if not remove:
                 script.add_pbs_option(o[0],v)
             else:
-                s = '#PBS -l '+v+'\n'
+                s = '\n#PBS -l '+v
                 script.parsed.remove(s)
     def __call__(self,script,remove=False,name=None):
         """ overwrite this to do other things than just add/remove pbs options"""
@@ -128,7 +128,7 @@ def set_attributes(obj,**kwargs):
     for k, v in kwargs.iteritems():
         setattr(obj, k, v)
 #==============================================================================
-shebang = "#!/bin/bash\n"
+shebang = "#!/bin/bash"
 
 class Script(object):
     """
@@ -156,10 +156,11 @@ class Script(object):
     def parse(self,lines):
         '''
         lines is a list of lines
-        a trailing '\n' is appended to lines without one.  
+        an initial '\n' is appended to lines without one.  
         '''
-        self.parsed=[]
-        self.values = {}
+        self.parsed   = []
+        self.comments = []
+        self.values   = {}
         for line in lines:
             self.parse1(line)
         #pprint.pprint(self.parsed)
@@ -202,12 +203,13 @@ class Script(object):
                     parsed_line = split_line[0]+' '+split_line[1]
                     for v in value:
                         parsed_line += ' '+v
-                    parsed_line += '\n'
+                    parsed_line = '\n'+parsed_line
                 except:
                     parsed_line = '???'+line
             else:
-                if line.startswith("#L#"):
+                if line.startswith("#La#"):
                     parsed_line = ''
+                    self.comments.append(line)
                 else:
                     parsed_line = line
         if isinstance(line,(str,unicode)):
@@ -244,15 +246,40 @@ class Script(object):
             self.parsed.insert(pos,s)
         self.parse1(pos)
             
-    def compose(self):
+    def compose(self,add_comments=False):
         if not self.values:
             return self.parsed
         script = []
         for line in self.parsed:
             s = self.re_variable.sub(self.repl_variable,line)
             script.append(s)
+        if add_comments and getattr(self,'comments',[]):
+            script[1:1] = self.comments
         return script
-        
+    
+    def set_comments(self,cluster=None,nodeset=None):
+        prefix = "\n#La# "
+        self.comments = []
+        self.comments.append(prefix+"Launcher generated this job script on "+str(datetime.datetime.now()))
+        if cluster:
+            self.comments.append(prefix+"  cluster = "+cluster)
+        if nodeset:
+            self.comments.append(prefix+"  nodeset = "+nodeset)
+
+    def get_cluster_from_comments(self):
+        cluster = None
+        for comment in self.comments:
+            if 'cluster' in comment:
+                cluster = comment.split('=')[-1].strip()
+                return cluster
+
+    def get_nodeset_from_comments(self):
+        nodeset = None
+        for comment in self.comments:
+            if 'nodeset' in comment:
+                nodeset = comment.split('=')[-1].strip()
+                return nodeset
+
     def repl_variable(self,matchobj):
         key = matchobj.group(1)
         try:
