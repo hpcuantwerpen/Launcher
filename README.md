@@ -64,7 +64,7 @@ The installer produces a report that you should check to assure that the install
 The temporary folder can be removed now.
 ```
 $ cd ..
-$ rm -rf some_tmp_dir
+$ del some_tmp_dir
 ```
 Happy Launching!
 
@@ -73,7 +73,7 @@ To download and run the Launcher installer proceed as follows. Open a terminal a
 ```
 $ mkdir some_tmp_dir && cd some_tmp_dir
 ```
-Downlaod the installer from the github repository:
+Download the installer from the github repository:
 ```
 $ wget https://github.com/hpcuantwerpen/Launcher/raw/master/installer.py
 ```
@@ -90,7 +90,7 @@ The installer produces a report that you should check to assure that the install
 The temporary folder can be removed now.
 ```
 $ cd ..
-$ del some_tmp_dir
+$ rm -rf some_tmp_dir
 ```
 
 Happy Launching!
@@ -100,3 +100,6 @@ This is identical to the Linux version. The only difference is that the path to 
 
 ###Installing updates
 Updates can be installed installed from the Launcher menu "Launcher/Check for updates". 
+
+###Starting Launcher
+Look in your home folder for a folder named "Launcher". It contains a startup script "Launcher.bat" or "Launcher.sh" depending on your OS.

@@ -520,7 +520,6 @@ def install_launcher(argv=[]):
                 args.force = True
                 success = install_step( create_startup_script, args )    
             if success:
-                remove_status() #avoid  interference during installation of next update
                 print '\nInstallation of Launcher finished successfully. Enjoy!'
 
             else:
@@ -529,7 +528,8 @@ def install_launcher(argv=[]):
                 print '\nInstallation of Launcher failed.'
     
     if success: 
-        os.remove(GLOBAL_PICKLED)
+        remove_status() #avoid  interference during installation of next update
+
     return success
     
 if __name__=="__main__":
