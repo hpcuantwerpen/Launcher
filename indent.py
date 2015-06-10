@@ -1,4 +1,5 @@
 from __future__ import print_function
+import copy
 
 class Indent(object):
     def __init__(self,source,indent=0,tabs=4,default_tab=4):
@@ -7,7 +8,7 @@ class Indent(object):
         tabs   : replace every occurence of '\t' by the appropriate number of spaces.
                  If tabs is an integer the text is tabbed at indent, indent+tabs,
                  indent+2*tabs, ...
-                 If tabs is a list of integers, then the text is tabbes at indent,
+                 If tabs is a list of integers, then the text is tabbed at indent,
                  indent+tabs[0], indent+tabs[1], ... If the list is exhausted, the
                  previous scheme takes over as if tabs==default_tab
         indent : integer, indent spaces are inserted at the beginning of every line        
@@ -34,7 +35,7 @@ class Indent(object):
         s0 = self.indent*' '
         if isinstance(self.source,dict):
             s_source = self.dict2str(self.source)
-        if isinstance(self.source,list):
+        elif isinstance(self.source,list):
             s_source = self.list2str(self.source)
         else:
             s_source = str(self.source)
@@ -57,18 +58,18 @@ class Indent(object):
         return s
     
     def dict2str(self,d):
-        s=str(d)
-        s=s.replace('{','{ ')
+        sd = copy.copy(d)
+        for k,v in sd.iteritems():
+            sd[k] = str(v)
+        s='{ '+str(sd)[1:-1]+'\n}'
         s=s.replace(':','\t:\n\t')
         s=s.replace(',', '\n,')
-        s=s.replace('}', '\n}')
         return s
         
     def list2str(self,d):
-        s=str(d)
-        s=s.replace('[','[ ')
+        sd = [ str(item) for item in d ]
+        s='[ '+str(sd)[1:-1]+'\n]'
         s=s.replace(',', '\n,')
-        s=s.replace(']', '\n]')
         return s
         
 #----------------------#

@@ -1,7 +1,8 @@
 from __future__ import print_function
 
-import os,re,errno
-import log,cfg,sshtools,constants,transactions,pbs
+import os,re,errno,datetime
+import log,cfg,sshtools,constants,transactions
+from script import Script,Shebang
 from indent import Indent
 import clusters
 
@@ -70,6 +71,8 @@ class Launcher(transactions.TransactionManager):
         self.config.save()
         
     def change_cluster(self,new_cluster=None):
+        if self.get_cluster()==new_cluster:
+            return #already ok
         if not new_cluster is None:
             if not new_cluster in clusters.cluster_names:
                 raise UnknownCluster(new_cluster)
@@ -81,7 +84,7 @@ class Launcher(transactions.TransactionManager):
         self.nodeset_names = clusters.decorated_nodeset_names(cluster)
         if not self.get_selected_nodeset_name() in self.nodeset_names:
             self.config['selected_nodeset_name'].reset()
-        self.on_change_selected_nodeset_name()
+        self.change_selected_nodeset_name()
                    
         self.modules = self.get_modules()
         
@@ -97,8 +100,11 @@ class Launcher(transactions.TransactionManager):
             else:
                 print("    modules    = [...]")
                 
-    def change_selected_nodeset_name(self,new_selected_nodeset_name=None):        
+    def change_selected_nodeset_name(self,new_selected_nodeset_name=None):
+        if self.get_selected_nodeset_name()==new_selected_nodeset_name:
+            return #already ok        
         if not new_selected_nodeset_name is None:
+            
             if not new_selected_nodeset_name in self.nodeset_names:
                 raise UnknownNodeset("Nodeset '{}' not defined for cluster '{}.".format(new_selected_nodeset_name,self.get_cluster()))
             self.set_selected_nodeset_name(new_selected_nodeset_name)
@@ -142,10 +148,14 @@ class Launcher(transactions.TransactionManager):
             return value+1
         
     def change_n_nodes_req(self,value):
+        if self.n_nodes_req == value:
+            return #already ok
         self.n_nodes_req = value
         self.request_nodes_and_cores_per_node()
 
     def change_n_cores_per_node_req(self,value):
+        if self.n_cores_per_node_req == value:
+            return #already ok
         self.n_cores_per_node_req = value
         self.request_nodes_and_cores_per_node()
 
@@ -157,10 +167,14 @@ class Launcher(transactions.TransactionManager):
         self.is_resources_modified = self.increment(self.is_resources_modified)
  
     def change_n_cores_req(self,value):
+        if self.n_cores_req == value:
+            return #already ok
         self.n_cores_req = value
         self.request_cores_and_memory_per_core()
         
     def change_gb_per_core_req(self,value):
+        if self.gb_per_core_req == value:
+            return #already ok
         self.gb_per_core_req = value
         self.request_cores_and_memory_per_core()
 
@@ -250,20 +264,20 @@ class Launcher(transactions.TransactionManager):
             if not force and not self.is_resources_modified:
                 print('    Script is already up to date.')
                 return False
-            #make sure all values are transferred to self.script.values
+
+            is_new_script = False
             if not hasattr(self, 'script'):
-                self.script = pbs.Script()
+                self.script = Script()
+                is_new_script = True
                 self.selected_nodeset.script_extras(self.script)
-            if not 'n_nodes' in self.script.values: 
-                self.script.add_pbs_option('-l','nodes={}:ppn={}'.format(self.n_nodes_req,self.n_cores_per_node_req))
-            else:
-                self.script.values['n_nodes'         ] = self.n_nodes_req
-                self.script.values['n_cores_per_node'] = self.n_cores_per_node_req
+                
+            self.script.add(Shebang())
             
-            if not 'walltime_seconds' in self.script.values:
-                self.script.add_pbs_option('-l', 'walltime='+pbs.walltime_seconds_to_str(self.walltime_seconds))
-            else:
-                self.script.values['walltime_seconds'] = self.walltime_seconds
+            self.script.add('#PBS -l nodes={}:ppn={}'.format(embrace('nodes', self.n_nodes_req         )
+                                                            ,embrace('ppn'  , self.n_cores_per_node_req)
+                                                            )
+                           )
+            self.script.add('#PBS -l walltime={}'.format(embrace('walltime',walltime_seconds_to_str(self.walltime_seconds))))
              
             notify= self.get_notify()
             notify_address = is_valid_mail_address(notify['address'])
@@ -274,96 +288,163 @@ class Launcher(transactions.TransactionManager):
                     if notify[c]:
                         abe+=c
                 if abe: 
-                    if not 'notify_address' in self.script.values:
-                        self.script.add_pbs_option('-M',notify['address'])
-                        self.script.add_pbs_option('-m',abe)
-                    else:
-                        self.script.values['notify_address'] = notify_address
-                        self.script.values['notify_abe'    ] = abe
+                    self.script.add('#PBS -M {}'.format(embrace('notify_adress',notify['address'])))
+                    self.script.add('#PBS -m {}'.format(embrace('notify_when'  ,abe              )))
                         
-            self.script.values['enforce_n_nodes'] = self.get_enforce_n_nodes()
             if self.get_enforce_n_nodes():
-                self.script.add_pbs_option('-W','x=nmatchpolicy:exactnode')
-            
+                self.script.add   ('#PBS -W x=nmatchpolicy:exactnode')
+            else:
+                self.script.remove('#PBS -W x=nmatchpolicy:exactnode')
+                
             if self.jobname:
-                if not 'job_name' in self.script.values:
-                    self.script.add_pbs_option('-N',self.wJobName.GetValue())
-                else:
-                    self.script.values['job_name'] = self.wJobName.GetValue()
+                self.script.add('#PBS -N {}'.format(embrace('jobname',self.jobname)))
             
-            self.script.set_comments(cluster=self.get_cluster(),nodes=self.selected_nodeset.name)
+            self.script.add("#La# Launcher generated this job script on "+str(datetime.datetime.now()))
+            self.script.add("#La#   cluster = "+self.get_cluster())
+            self.script.add("#La#   nodeset = "+self.get_selected_nodeset_name())
             
-            lines = self.script.compose(add_comments=True)
+            if is_new_script:
+                self.script.add('#')
+                self.script.add("#--- shell commands below ".ljust(80,'-'))
+                self.script.add('cd $PBS_O_WORKDIR')
+                
+            lines = self.script.get_lines()
             if Launcher.verbose:
                 print(Indent('### begin script ###',4))
-                print(Indent(lines,6))
+                print(Indent(self.script.script_lines,6))
                 print(Indent('### end   script ###',4))
             print("    Script updated.")
             self.is_script_modified = True
             self.is_resources_modified = 0
-            return lines
+            
+            return lines 
         
-    def update_resources_from_script(self,lines):
+    def update_resources_from_script(self,lines=None):
         with log.LogItem('Updating resources from script:'):
-            if isinstance(lines,(str,unicode)):
-                lines = lines.split('\n')
-    
+            if lines:
+                if not hasattr(self, 'script'):
+                    self.script = Script()
+                self.script.parse(lines)        
+            
             if not hasattr(self, 'script'):
-                self.script = pbs.Script()
-            self.script.parse(lines)        
-    
+                print("    No input lines provided, and script is empty, nothing to do.")
+                return
+            
             try:
-                cluster = self.script.get_cluster_from_comments()
+                cluster = self.script['cluster']
                 self.change_cluster(cluster)
             except UnknownCluster as e:
                 log.log_exception(e,msg_after="Using '{}' instead.".format(self.get_cluster()))
                 
             try:
-                nodeset = self.script.get_nodeset_from_comments() 
+                nodeset = self.script['nodeset']
                 self.change_selected_nodeset_name(nodeset)
-                self.selected_nodeset.script_extras(self.script)
             except UnknownNodeset as e:
                 log.log_exception(e,msg_after="Using '{}' instead.".format(self.get_selected_nodeset_name()))
-            
-            if not hasattr(self.script,'values'):
-                return #there is nothing to update
-            
+            self.selected_nodeset.script_extras(self.script)
+                        
             new_request = False
-            if self.n_nodes_req != self.script.values['n_nodes']:
-                self.n_nodes_req = self.script.values['n_nodes']
-                new_request = True
-            if self.n_cores_per_node_req != self.script.values['n_cores_per_node']:
-                self.n_cores_per_node_req = self.script.values['n_cores_per_node']
-                new_request = True
+            try:
+                nodes = self.script['nodes']
+            except KeyError:
+                nodes = self.n_nodes_req
+                pass
+            else:
+                if self.n_nodes_req != nodes:
+                    self.n_nodes_req = nodes
+                    new_request = True
+            try:
+                ppn = self.script['ppn']
+            except KeyError:
+                ppn = self.n_cores_per_node_req
+                pass
+            else:
+                if self.n_cores_per_node_req != ppn:
+                    self.n_cores_per_node_req = ppn
+                    new_request = True
             if new_request:
                 self.request_nodes_and_cores_per_node()
-                
-            self.update_value(self.wEnforceNNodes, 'enforce_n_nodes')
+                #the new request may have changed requested nodes or ppn 
+                if self.n_nodes_req!=nodes or self.n_cores_per_node_req!=ppn:
+                    self.script.add('#PBS -l nodes={}:ppn={}'.format(embrace('nodes', self.n_nodes_req         )
+                                                                    ,embrace('ppn'  , self.n_cores_per_node_req)
+                                                                    )
+                                   )
             
-            v = self.script.values.get('walltime_seconds')
-            if v:
-                self.set_walltime(v)
-    
-            self.update_value(self.wNotifyAddress,'notify_address')
-            self.update_value(self.wNotifyAbort  ,'notify_abe',ContainsString('a'))
-            self.update_value(self.wNotifyBegin  ,'notify_abe',ContainsString('b'))
-            self.update_value(self.wNotifyEnd    ,'notify_abe',ContainsString('e'))
-    
-            self.update_value(self.wJobName      ,'job_name')
-        
-    def update_value(self,ctrl,varname,function=None):
-        if varname in self.script.values:
-            value = self.script.values[varname]
-            if not function is None:
-                value = function(value)
-            if ctrl.GetValue() == value:
-                return False
+            self.set_enforce_n_nodes( self.script.has_line('#PBS -W x=nmatchpolicy:exactnode') )
+            
+            try:
+                walltime = self.script['walltime']
+            except KeyError:
+                pass
             else:
-                ctrl.SetValue(value)
-                return True
-        else:
-            return False
-        
+                seconds = str_to_walltime_seconds(walltime)
+                self.walltime_seconds = seconds
+    
+            notify = self.get_notify()
+            try:
+                notify['address'] = self.script['notify_address']
+            except KeyError:
+                pass
+            else:
+                abe = self.script['notify_when']
+                for c in 'abe':
+                    notify[c] = False
+                for c in abe:
+                    notify[c] = True
+            try:
+                self.jobname = self.script['job_name']
+            except KeyError:
+                pass
+
+            if Launcher.verbose:
+                print(Indent('### begin script ###',4))
+                print(Indent(self.script.script_lines,6))
+                print(Indent('### end   script ###',4))
+                print(Indent('Resources:',4))
+                for k,v in self.__dict__.iteritems():
+                    if not callable(v):
+                        print(Indent(k+' :\n\t'+str(v),6))
+            print("    Resources updated.")
+                
+################################################################################
+# walltime_units = {'s':    1
+#                  ,'m':   60
+#                  ,'h': 3600
+#                  ,'d':86400 }
+
+################################################################################
+def walltime_seconds_to_str(walltime_seconds):
+    hh = walltime_seconds/3600
+    vv = walltime_seconds%3600 #remaining seconds after subtracting the full hours hh
+    mm = vv/60
+    ss = vv%60                 #remaining seconds after also subtracting the full minutes mm
+    s = str(hh)
+    if hh>9:
+        s = s.rjust(2,'0')
+    s+=':'+str(mm).rjust(2,'0')+':'+str(ss).rjust(2,'0')
+    return s
+
+################################################################################
+re_walltime = re.compile(r'(\d+):(\d\d):(\d\d)')
+
+def str_to_walltime_seconds(walltime):
+    m = re_walltime.match(walltime)
+    if not m:
+        raise BadWalltimeFormat(walltime)
+    groups = m.groups()
+    hh = int(groups[0])
+    mm = int(groups[1])
+    ss = int(groups[2])
+    seconds = ss + 60*mm + 3600*hh
+    return seconds
+
+class BadWalltimeFormat(Exception):
+    pass
+
+################################################################################
+def embrace(varname,value):
+    return '{'+varname+'='+str(value)+'}'
 ################################################################################
 class UnknownCluster(Exception):
     pass
@@ -422,6 +503,10 @@ class TestLauncher(unittest.TestCase):
     def testScriptGeneration(self):
         launcher = Launcher()
         launcher.update_script_from_resources(force=True)
+        launcher.script['walltime'] = walltime_seconds_to_str(9001)
+        launcher.update_resources_from_script()
+        
+        
         
         
 if __name__=='__main__':

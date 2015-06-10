@@ -94,8 +94,6 @@ walltime_units = {'s':    1
                  ,'h': 3600
                  ,'d':86400 }
 
-walltime_pattern = re.compile(r'((\d+(\.\d*)?|\.\d+)([eE][+-]?\d+)?)\s*([dhms])')
-
 def walltime_seconds_to_str(walltime_seconds):
     hh = walltime_seconds/3600
     vv = walltime_seconds%3600 #remaining seconds after subtracting the full hours hh
@@ -107,6 +105,7 @@ def walltime_seconds_to_str(walltime_seconds):
     s+=':'+str(mm).rjust(2,'0')+':'+str(ss).rjust(2,'0')
     return s
 
+walltime_pattern = re.compile(r'((\d+(\.\d*)?|\.\d+)([eE][+-]?\d+)?)\s*([dhms])')
 def format_walltime(walltime):
     if not isinstance(walltime,str):
         walltime = str(walltime)+'s'

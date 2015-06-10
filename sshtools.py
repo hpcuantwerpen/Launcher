@@ -1,10 +1,9 @@
 from __future__ import print_function
 
-import paramiko,wx
+import paramiko
 
-import datetime,re,copy,os
+import datetime,re,os
 
-import wxtools
 import log
 from indent   import Indent
 from settings import Settings
@@ -22,8 +21,6 @@ SSH_DESCRIPTORS = {"SSH_WORK_OFFLINE": "Work offline"
 ### Model part of MVC                                                        ###
 ################################################################################
 
-
-ID_BUTTON_SSH_RESET = wx.NewId()
 ################################################################################
 _regexp_username = re.compile(r'vsc\d{5}')
 
@@ -194,7 +191,7 @@ class Client(Settings):
         self.set_status_text(msg)
         return ssh
 
-    def set_status_text(self,msg,colour=wx.BLACK):
+    def set_status_text(self,msg):
         pass #todo
 
 ################################################################################

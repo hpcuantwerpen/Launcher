@@ -76,7 +76,7 @@ class Config(object):
                 s+= k+" :\n"
                 s+= str(Indent(str(v),2))
             else:
-                s+= "{} : {}".format(k,v) 
+                s+= "{} : {}\n".format(k,v) 
         return s
     
     def create(self, name, value=None, default=None, inject_in=None):
