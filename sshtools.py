@@ -76,7 +76,7 @@ class Client(Settings):
             #create a new client
             if not is_valid_username(username):
                 if not is_valid_username(Client.username):
-                    raise InvalidUsername
+                    raise InvalidUsername(Client.username)
             else:
                 Client.username = username
             if login_node:

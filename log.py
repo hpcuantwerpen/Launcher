@@ -56,7 +56,9 @@ class LogItem(RedirectStdStreams): #context manager
     def __enter__(self):
         pass
     def __exit__(self, type_, value, traceback):
-        footer =">>> "+self.footer+' '+str((datetime.datetime.now()-self.start).total_seconds())+' s'
+        if self.footer:
+            self.footer+=' '
+        footer =">>> "+self.footer+str((datetime.datetime.now()-self.start).total_seconds())+' s'
         print(footer)
         super(LogItem,self).__exit__(type_, value, traceback)
         self.log(self.msg.getvalue())

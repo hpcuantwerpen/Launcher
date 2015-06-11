@@ -408,10 +408,10 @@ class Launcher(transactions.TransactionManager):
             print("    Resources updated.")
                 
 ################################################################################
-# walltime_units = {'s':    1
-#                  ,'m':   60
-#                  ,'h': 3600
-#                  ,'d':86400 }
+walltime_units = {'s':    1
+                 ,'m':   60
+                 ,'h': 3600
+                 ,'d':86400 }
 
 ################################################################################
 def walltime_seconds_to_str(walltime_seconds):

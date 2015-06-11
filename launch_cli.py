@@ -27,7 +27,6 @@ if __name__ == "__main__":
                        )
     args = parser.parse_args()
     
-    
     log_file = os.path.join(constants._LAUNCHER_HOME_,'Launcher.log')
     if os.path.exists(log_file):
         old_log = log_file+str(random.random())[1:]
@@ -35,16 +34,19 @@ if __name__ == "__main__":
     if args.printlog:
         log_file = None        
     session = LogSession(name='Launcher',filename=log_file)
-    
-    if args.pyqt5 and args.wxpython:
-        with LogItem('command line issue'):
-            print('    Both --pyqt5 and --wxpython have been specified on the command line.')
-            print('    PyQt5 has priority.')
+        
+    with LogItem('Command line arguments:'):
+        lst=str(args).replace('Namespace(','').replace(')','').replace(' ','').split(',')
+        print(Indent(lst,6))
+        if args.pyqt5 and args.wxpython:
+            print('    Issue:')
+            print('      Both --pyqt5 and --wxpython have been specified on the command line.')
+            print('      PyQt5 has priority.')
             args.wxpython = False
-    if not args.pyqt5 and not args.wxpython:
-        with LogItem('command lind issue'):
-            print('    No gui has been specified on the command line.')
-            print('    PyQt5 has priority.')
+        elif not args.pyqt5 and not args.wxpython:
+            print('    Issue:')
+            print('      No gui has been specified on the command line.')
+            print('      PyQt5 has priority.')
             args.pyqt5 = True
     
     if args.pyqt5:
@@ -53,7 +55,6 @@ if __name__ == "__main__":
     elif args.wxpython:
         gui_module  = None
         gui_version = None
-        
     
     with LogItem("Version info of used components",log_with=logging.info):
         paramiko_version = Launcher.sshtools.paramiko.__version__
@@ -91,4 +92,9 @@ if __name__ == "__main__":
                     break
             print("    Removed {} log files older than {} days.".format(removed,remove_logs_older_than))
     
+    exit_code = gui_module.start_gui(sys.argv)
+    
     del session
+    
+    sys.exit(exit_code)
+    
