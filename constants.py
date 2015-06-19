@@ -1,15 +1,34 @@
 import os,sys
+import log
+
+################################################################################
+def user_home():
+    """return the user's home folder"""
+    env_home = "HOME"
+    env_fmt = "${}"
+    if sys.platform=="win32":
+        env_home = "HOMEPATH"
+        env_fmt = "%{}%"
+    home = os.environ[env_home]
+    if not home:
+        msg = "Error: environmaent variable {} not found.".format(env_fmt.format(env_home))
+        raise EnvironmentError(msg)
+    if not os.path.exists(home):
+        msg = "Error: environmaent variable '${}' refers to inexisting location.".format(env_fmt.format(env_home))
+        raise EnvironmentError(msg)
+    return home
 
 ################################################################################
 def launcher_home():
-    env_home = "HOMEPATH" if sys.platform=="win32" else "HOME"
-    user_home = os.environ[env_home]
-    if not user_home or not os.path.exists(user_home):
-        msg = "Error: environmaent variable '${}' not found.".format(env_home)
-        raise EnvironmentError(msg)
-    home = os.path.join(user_home,'Launcher')
+    """"Return the launcher home folder"""
+    home = os.path.join(user_home(),'Launcher')
     if not os.path.exists(home):
-        os.mkdir(home)
+        with log.LogItem("Creating Launcher home folder"):
+            print("home")
+            try:
+                os.mkdir(home)
+            except Exception as e:
+                log.log_exception(e)
     return home
 
 ################################################################################
@@ -17,8 +36,11 @@ def git_version():
     """
     retrieve the SHA-1 checksum which identifies the git commit of the current version
     """
-    f = open(os.path.join(_LAUNCHER_HOME_,'Launcher/git_commit_id.txt'))
-    git_commit_id = f.readlines()[0].strip()
+    try:
+        f = open(os.path.join(_LAUNCHER_HOME_,'Launcher/git_commit_id.txt'))
+        git_commit_id = f.readlines()[0].strip()
+    except:
+        git_commit_id = ""
     return git_commit_id
 
 ################################################################################

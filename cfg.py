@@ -4,10 +4,13 @@ import pickle,types,os
 import log
 from indent import Indent
 
+################################################################################
 class CfgMissingPath(Exception):
     pass
 
+################################################################################
 class Config(object):
+################################################################################
     verbose = False
     
     def __init__(self,path=None,clear=False):
@@ -79,26 +82,41 @@ class Config(object):
                 s+= "{} : {}\n".format(k,v) 
         return s
     
-    def create(self, name, value=None, default=None, inject_in=None):
+    def create(self, name, value=None, default=None, choices=[], inject_in=None):
         if name in self.values:
             return False
-        ConfigValue(config=self,name=name,value=value,default=default,inject_in=inject_in)
+        ConfigValue(config=self,name=name,value=value,default=default,choices=choices, inject_in=inject_in)
         return True
     
+################################################################################
 class ConfigValue(object):
+################################################################################
     verbose = False
-    def __init__(self, config, name, value=None, default=None, inject_in=None):
+
+    def __init__(self, config, name, value=None, default=None, choices=[], inject_in=None):
         """
         config    : Config objec that stores this ConfigValue
         value     : current value assigned, can be a callable that returns the value
         default   : default value assigned, used by self.reset()
+        choices   : list of possible values
         inject_in : inject getter and setter methods in object 
         """
         assert isinstance(config,Config)
         self.name = name
         self.config = config
-        self.default = default
         
+        self.value = None
+        
+        self.default = None        
+        self.choices = choices
+        if self.choices:
+            assert isinstance(self.choices,list) 
+            if default is None: 
+                self.default = choices[0]
+        
+        if not default is None:
+            self.default = default
+            
         if callable(value):
             try:
                 self.value = value()
@@ -109,9 +127,10 @@ class ConfigValue(object):
                 self.read_value(name)
             else:
                 self.value = value
-        if self.value is None and not default is None:
-            self.value = default 
-                   
+                
+#         if self.value is None and not default is None:
+#             self.value = default 
+
         config.values[name] = self
         if not inject_in is None:
             self.inject(inject_in)

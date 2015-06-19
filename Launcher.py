@@ -1,14 +1,28 @@
 from __future__ import print_function
 
-import os,re,errno,datetime
-import log,cfg,sshtools,constants,transactions
+import os,re,errno,datetime,posixpath
+import log,cfg,sshtools,constants
 from script import Script,Shebang
 from indent import Indent
 import clusters
 
+################################################################################
+def add_trailing_separator(path):
+    path_sep = path
+    if not path_sep.endswith(os.sep):
+        path_sep+=os.sep
+    return path_sep
 
 ################################################################################
-class Launcher(transactions.TransactionManager): 
+def linux(path):
+    if os.sep!=posixpath.sep:
+        linux_path = path.replace(os.sep,posixpath.sep)
+        return linux_path
+    else:
+        return path
+
+################################################################################
+class Launcher(object): 
 ################################################################################
     """
     The Launcher Model part in the MVC approach. This contains only the logic, not the GUI part.
@@ -42,7 +56,15 @@ class Launcher(transactions.TransactionManager):
 
         self.config.create('notify', default={'address':'','a':False,'b':False,'e':False}, inject_in=self)
 
-        self.config.create('enforce_n_nodes', default=True, inject_in=self)
+        self.config.create('enforce_n_nodes'  , default=True, inject_in=self)
+        self.config.create('automatic_requests', default=True, inject_in=self)
+            
+        default = os.path.join(constants.launcher_home(),'jobs')
+        self.config.create('local_file_location',default=default,inject_in=self)
+        self.config.create('remote_file_location',choices=["$VSC_SCRATCH","$VSC_DATA"],inject_in=self)
+        self.config.create('subfolder',default='/',inject_in=self)
+        self.config.create('retrieve_copy_to_local_file_location',choices=[True,False],inject_in=self)
+        self.config.create('retrieve_copy_to_$VSC_DATA'          ,choices=[False,True],inject_in=self)
         
         self.set_default_values_non_config()
 
@@ -56,6 +78,7 @@ class Launcher(transactions.TransactionManager):
                     print('    '+k+' : '+str(v.value))
               
         self.is_resources_modified = 0 #start counting changes
+        self.is_script_modified = False
     
     def set_default_values_non_config(self):
         #create other variables than the config variables        
@@ -67,23 +90,21 @@ class Launcher(transactions.TransactionManager):
         self.walltime_seconds = 3600
         self.jobname = ''
         
-    def __del__(self): #destructor
-        self.config.save()
-        
     def change_cluster(self,new_cluster=None):
         if self.get_cluster()==new_cluster:
             return #already ok
         if not new_cluster is None:
+            if isinstance(new_cluster, int):
+                new_cluster = clusters.cluster_names[new_cluster]
             if not new_cluster in clusters.cluster_names:
                 raise UnknownCluster(new_cluster)
             self.set_cluster(new_cluster)
             cluster = new_cluster
         else:
+            #get the cluster from self.config
             cluster = self.get_cluster()
 
         self.nodeset_names = clusters.decorated_nodeset_names(cluster)
-        if not self.get_selected_nodeset_name() in self.nodeset_names:
-            self.config['selected_nodeset_name'].reset()
         self.change_selected_nodeset_name()
                    
         self.modules = self.get_modules()
@@ -103,18 +124,19 @@ class Launcher(transactions.TransactionManager):
     def change_selected_nodeset_name(self,new_selected_nodeset_name=None):
         if self.get_selected_nodeset_name()==new_selected_nodeset_name:
             return #already ok        
-        if not new_selected_nodeset_name is None:
-            
+        if new_selected_nodeset_name is None:
+            selected = self.get_selected_nodeset_name()
+            if not selected in self.nodeset_names:
+                selected = self.nodeset_names[0]
+        else:
             if not new_selected_nodeset_name in self.nodeset_names:
                 raise UnknownNodeset("Nodeset '{}' not defined for cluster '{}.".format(new_selected_nodeset_name,self.get_cluster()))
             self.set_selected_nodeset_name(new_selected_nodeset_name)
             selected = new_selected_nodeset_name
-        else:
-            selected = self.get_selected_nodeset_name()
             
         #remove extras required by previous node set
         if getattr(self, 'selected_nodeset',None) and hasattr(self,'script'):
-            self.selected_nodeset.script_extras(self.script,remove=True)
+            self.selected_nodeset.nodeset_features(self.script,remove=True)
         
         #set current node set
         #print(self.nodeset_names)
@@ -122,7 +144,7 @@ class Launcher(transactions.TransactionManager):
 
         #add extras required by new node set
         if self.selected_nodeset and hasattr(self,'script'):
-            self.selected_nodeset.script_extras(self.script)
+            self.selected_nodeset.nodeset_features(self.script)
         
         self.n_cores_per_node_req = self.selected_nodeset.n_cores_per_node
         self.n_cores_per_node_max = self.selected_nodeset.n_cores_per_node        
@@ -188,41 +210,46 @@ class Launcher(transactions.TransactionManager):
 
     def set_status_text(self,text):
         pass #todo
-
-    def save_job(self,mode):
-        """
-        ask > ask before overwrite.
-        """
-        folder = self.m_wLocalFileLocation.get()
-        pbs_sh = os.path.join(folder,'pbs.sh')
-        #is there anything to save?
-        if not (self.is_resources_modified or self.is_script_modified):
-            if not self.m_wJobName.get():
-                self.set_status_text("There is nothing to save.")
-                return True
-            if os.path.exists(pbs_sh):
-                self.set_status_text("Job script is already up to date.")
-                return True
-            
-        file_exists = os.path.exists(pbs_sh)
-        if mode=='w' and file_exists:
-            raise AskPermissionToOverwrite
-
-        if not self.wJobName.GetValue():
+    
+    def local_job_folder(self):
+        if not self.jobname:
             raise MissingJobName
-        
-        #actual save or overwrite
-        try:
-            my_makedirs(folder)
-            self.wScript.SaveFile(pbs_sh)
-        except Exception as e:
-            log.log_exception(e)
-            return False
+        job_folder = self.get_subfolder()
+        if not job_folder:
+            job_folder = self.get_local_file_location()
         else:
-            self.status_text = "Job script saved {} to '{}'.".format('(overwritten)' if file_exists else '', pbs_sh)
-            self.is_script_modified = False
-            return True
-        return False
+            job_folder = os.path.join(self.get_local_file_location(), job_folder)
+        job_folder = os.path.join(job_folder,self.jobname)
+        return job_folder
+    
+    def remote_job_folder(self):
+        """
+        use posixpath.join(a) because the remote path is always on UNIX
+        """
+    
+    def load_job(self):
+        """
+        """
+        filename = os.path.join(self.local_job_folder(),'pbs.sh')
+        #create a new script, if there was already a script it will be garbage collected
+        self.script = Script(filename=filename)
+        self.update_resources_from_script()
+            
+    def unsaved_changes(self):
+        """ Are there any unsaved changes? 
+        If nothing was changed to the default script options, False is returned
+        If nothing was changed since the last save, False is returned
+        """
+        return (self.is_resources_modified or (hasattr(self,'script') and self.script.is_modified))
+
+    def save_job(self):
+        """
+        """
+        if not self.update_script_from_resources():
+            #not really necessary - but clean anyway
+            self.update_resources_from_script()
+        filename = os.path.join(self.local_job_folder(),'pbs.sh')
+        self.script.write(filename)
 
     def get_modules(self):
 #         if hasattr(self,'is_initializing') and self.is_testing:
@@ -261,25 +288,21 @@ class Launcher(transactions.TransactionManager):
     
     def update_script_from_resources(self,force=False):       
         with log.LogItem('Updating script from resources:'):
-            if not force and not self.is_resources_modified:
-                print('    Script is already up to date.')
-                return False
-
             is_new_script = False
             if not hasattr(self, 'script'):
                 self.script = Script()
                 is_new_script = True
-                self.selected_nodeset.script_extras(self.script)
+                self.selected_nodeset.nodeset_features(self.script)
+            if not force and not self.is_resources_modified and not is_new_script:
+                print('    Script is already up to date.')
+                return False
                 
             self.script.add(Shebang())
             
-            self.script.add('#PBS -l nodes={}:ppn={}'.format(embrace('nodes', self.n_nodes_req         )
-                                                            ,embrace('ppn'  , self.n_cores_per_node_req)
-                                                            )
-                           )
-            self.script.add('#PBS -l walltime={}'.format(embrace('walltime',walltime_seconds_to_str(self.walltime_seconds))))
+            self.script.add('#PBS -l nodes={}:ppn={}'.format(self.n_nodes_req,self.n_cores_per_node_req))
+            self.script.add('#PBS -l walltime={}'.format(walltime_seconds_to_str(self.walltime_seconds)))
              
-            notify= self.get_notify()
+            notify = self.get_notify()
             notify_address = is_valid_mail_address(notify['address'])
             if notify_address:
                 notify['address'] = notify_address 
@@ -288,8 +311,8 @@ class Launcher(transactions.TransactionManager):
                     if notify[c]:
                         abe+=c
                 if abe: 
-                    self.script.add('#PBS -M {}'.format(embrace('notify_adress',notify['address'])))
-                    self.script.add('#PBS -m {}'.format(embrace('notify_when'  ,abe              )))
+                    self.script.add('#PBS -M {}'.format(notify['address']))
+                    self.script.add('#PBS -m {}'.format(abe              ))
                         
             if self.get_enforce_n_nodes():
                 self.script.add   ('#PBS -W x=nmatchpolicy:exactnode')
@@ -297,11 +320,11 @@ class Launcher(transactions.TransactionManager):
                 self.script.remove('#PBS -W x=nmatchpolicy:exactnode')
                 
             if self.jobname:
-                self.script.add('#PBS -N {}'.format(embrace('jobname',self.jobname)))
+                self.script.add('#PBS -N {}'.format(self.jobname))
             
-            self.script.add("#La# Launcher generated this job script on "+str(datetime.datetime.now()))
-            self.script.add("#La#   cluster = "+self.get_cluster())
-            self.script.add("#La#   nodeset = "+self.get_selected_nodeset_name())
+            self.script.add("#La# generated_on = "+str(datetime.datetime.now()))
+            self.script.add("#La#      cluster = "+self.get_cluster())
+            self.script.add("#La#      nodeset = "+self.get_selected_nodeset_name())
             
             if is_new_script:
                 self.script.add('#')
@@ -341,7 +364,7 @@ class Launcher(transactions.TransactionManager):
                 self.change_selected_nodeset_name(nodeset)
             except UnknownNodeset as e:
                 log.log_exception(e,msg_after="Using '{}' instead.".format(self.get_selected_nodeset_name()))
-            self.selected_nodeset.script_extras(self.script)
+            self.selected_nodeset.nodeset_features(self.script)
                         
             new_request = False
             try:
@@ -366,10 +389,7 @@ class Launcher(transactions.TransactionManager):
                 self.request_nodes_and_cores_per_node()
                 #the new request may have changed requested nodes or ppn 
                 if self.n_nodes_req!=nodes or self.n_cores_per_node_req!=ppn:
-                    self.script.add('#PBS -l nodes={}:ppn={}'.format(embrace('nodes', self.n_nodes_req         )
-                                                                    ,embrace('ppn'  , self.n_cores_per_node_req)
-                                                                    )
-                                   )
+                    self.script.add('#PBS -l nodes={}:ppn={}'.format(self.n_nodes_req,self.n_cores_per_node_req))
             
             self.set_enforce_n_nodes( self.script.has_line('#PBS -W x=nmatchpolicy:exactnode') )
             
@@ -383,17 +403,17 @@ class Launcher(transactions.TransactionManager):
     
             notify = self.get_notify()
             try:
-                notify['address'] = self.script['notify_address']
+                notify['address'] = self.script['-M']
             except KeyError:
                 pass
             else:
-                abe = self.script['notify_when']
+                abe = self.script['-m']
                 for c in 'abe':
                     notify[c] = False
                 for c in abe:
                     notify[c] = True
             try:
-                self.jobname = self.script['job_name']
+                self.jobname = self.script['-N']
             except KeyError:
                 pass
 
@@ -407,23 +427,14 @@ class Launcher(transactions.TransactionManager):
                         print(Indent(k+' :\n\t'+str(v),6))
             print("    Resources updated.")
                 
+    def get_gb_total_granted(self):
+        return round(self.gb_total_granted,3)
+    
 ################################################################################
 walltime_units = {'s':    1
                  ,'m':   60
                  ,'h': 3600
                  ,'d':86400 }
-
-################################################################################
-def walltime_seconds_to_str(walltime_seconds):
-    hh = walltime_seconds/3600
-    vv = walltime_seconds%3600 #remaining seconds after subtracting the full hours hh
-    mm = vv/60
-    ss = vv%60                 #remaining seconds after also subtracting the full minutes mm
-    s = str(hh)
-    if hh>9:
-        s = s.rjust(2,'0')
-    s+=':'+str(mm).rjust(2,'0')+':'+str(ss).rjust(2,'0')
-    return s
 
 ################################################################################
 re_walltime = re.compile(r'(\d+):(\d\d):(\d\d)')
@@ -457,13 +468,6 @@ class AskPermissionToOverwrite(Exception):
 ################################################################################
 class MissingJobName(Exception):
     pass
-################################################################################
-def is_valid_mail_address(address):
-    s = address.lower()
-    pattern=re.compile(r'\b[a-z0-9._%+-]+@[a-z0-9.-]+\.[a-z]{2,4}\b')
-    match = pattern.match(s)
-    return s if match else False
-
 ################################################################################
 def my_makedirs(path):
     """

@@ -33,68 +33,66 @@ if __name__ == "__main__":
         shutil.copy(log_file,old_log)
     if args.printlog:
         log_file = None        
-    session = LogSession(name='Launcher',filename=log_file)
+    with LogSession(name='Launcher',filename=log_file)
         
-    with LogItem('Command line arguments:'):
-        lst=str(args).replace('Namespace(','').replace(')','').replace(' ','').split(',')
-        print(Indent(lst,6))
-        if args.pyqt5 and args.wxpython:
-            print('    Issue:')
-            print('      Both --pyqt5 and --wxpython have been specified on the command line.')
-            print('      PyQt5 has priority.')
-            args.wxpython = False
-        elif not args.pyqt5 and not args.wxpython:
-            print('    Issue:')
-            print('      No gui has been specified on the command line.')
-            print('      PyQt5 has priority.')
-            args.pyqt5 = True
-    
-    if args.pyqt5:
-        gui_module = importlib.import_module('LauncherPyQt5')
-        gui_version = gui_module.__version__
-    elif args.wxpython:
-        gui_module  = None
-        gui_version = None
-    
-    with LogItem("Version info of used components",log_with=logging.info):
-        paramiko_version = Launcher.sshtools.paramiko.__version__
-        print("    Python version:")
-        print(Indent(sys.version,8))
-        print("    Python executable:")
-        print(Indent(sys.executable,8))
-        print("    gui version:")
-        print(Indent(gui_version,8))
-        print("    paramiko version:")
-        print(Indent(paramiko_version,8))
-        print("    Launcher version:")
-        s="v{}.{}.{}".format(*constants._LAUNCHER_VERSION_)
-        print(Indent(s,8))
-        print("    Platform:")
-        print(Indent(sys.platform,8))
-    
-    with LogItem("cleaning log files"):
-        if old_log:
-            print("    Renaming previous log file 'Launcher.log' to '{}'".format(old_log))
-        remove_logs_older_than = 14 
-        removed=0
-        if remove_logs_older_than:
-            now = time.time()
-            threshold = now - 60*60*24*remove_logs_older_than # Number of seconds in two days
-            for folder,sub_folders,files in os.walk(constants._LAUNCHER_HOME_):
-                if folder==constants._LAUNCHER_HOME_:
-                    for fname in files:
-                        if fname.startswith("Launcher.log."):
-                            fpath = os.path.join(folder,fname)
-                            ftime = os.path.getctime(fpath)
-                            if ftime<threshold:
-                                os.remove(fpath)
-                                removed += 1
-                    break
-            print("    Removed {} log files older than {} days.".format(removed,remove_logs_older_than))
-    
-    exit_code = gui_module.start_gui(sys.argv)
-    
-    del session
-    
+        with LogItem('Command line arguments:'):
+            lst=str(args).replace('Namespace(','').replace(')','').replace(' ','').split(',')
+            print(Indent(lst,6))
+            if args.pyqt5 and args.wxpython:
+                print('    Issue:')
+                print('      Both --pyqt5 and --wxpython have been specified on the command line.')
+                print('      PyQt5 has priority.')
+                args.wxpython = False
+            elif not args.pyqt5 and not args.wxpython:
+                print('    Issue:')
+                print('      No gui has been specified on the command line.')
+                print('      PyQt5 has priority.')
+                args.pyqt5 = True
+        
+        if args.pyqt5:
+            gui_module = importlib.import_module('LauncherPyQt5')
+            gui_version = gui_module.__version__
+        elif args.wxpython:
+            gui_module  = None
+            gui_version = None
+        
+        with LogItem("Version info of used components",log_with=logging.info):
+            paramiko_version = Launcher.sshtools.paramiko.__version__
+            print("    Python version:")
+            print(Indent(sys.version,8))
+            print("    Python executable:")
+            print(Indent(sys.executable,8))
+            print("    gui version:")
+            print(Indent(gui_version,8))
+            print("    paramiko version:")
+            print(Indent(paramiko_version,8))
+            print("    Launcher version:")
+            s="v{}.{}.{}".format(*constants._LAUNCHER_VERSION_)
+            print(Indent(s,8))
+            print("    Platform:")
+            print(Indent(sys.platform,8))
+        
+        with LogItem("cleaning log files"):
+            if old_log:
+                print("    Renaming previous log file 'Launcher.log' to '{}'".format(old_log))
+            remove_logs_older_than = 14 
+            removed=0
+            if remove_logs_older_than:
+                now = time.time()
+                threshold = now - 60*60*24*remove_logs_older_than # Number of seconds in two days
+                for folder,sub_folders,files in os.walk(constants._LAUNCHER_HOME_):
+                    if folder==constants._LAUNCHER_HOME_:
+                        for fname in files:
+                            if fname.startswith("Launcher.log."):
+                                fpath = os.path.join(folder,fname)
+                                ftime = os.path.getctime(fpath)
+                                if ftime<threshold:
+                                    os.remove(fpath)
+                                    removed += 1
+                        break
+                print("    Removed {} log files older than {} days.".format(removed,remove_logs_older_than))
+        
+        exit_code = gui_module.start_gui(sys.argv)
+        
     sys.exit(exit_code)
     

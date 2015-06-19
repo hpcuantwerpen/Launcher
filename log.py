@@ -8,7 +8,7 @@ from indent import Indent
 ################################################################################
 class LogSession(object):
     def __init__(self
-                , name  = None
+                , name
                 , filename = None
                 , format   = '%(levelname)s:%(message)s'
                 , level    = logging.INFO
@@ -18,8 +18,13 @@ class LogSession(object):
         
         with LogItem(header='Opening session:',log_with=logging.info):
             print("    "+self.name)
-            
-    def __del__(self):
+    
+    def __enter__(self):
+        pass
+     
+    def __exit__(self, exc_type, exc_value, traceback):
+        if not exc_type is None:
+            log_exception(exc_value)
         with LogItem(header='Closing session:',footer='Closed.',log_with=logging.info):
             print("    "+self.name)
         
