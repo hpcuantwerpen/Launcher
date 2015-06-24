@@ -18,10 +18,6 @@ SSH_DESCRIPTORS = {"SSH_WORK_OFFLINE": "Work offline"
                   }
 
 ################################################################################
-### Model part of MVC                                                        ###
-################################################################################
-
-################################################################################
 _regexp_username = re.compile(r'vsc\d{5}')
 
 def is_valid_username(username):
@@ -45,7 +41,6 @@ class PassphraseNeeded(Exception):
 ################################################################################
 class Client(Settings):
 ################################################################################
-
     @classmethod
     def full_reset(cls,defaults=None):
         #reset the ssh_preferences
@@ -210,87 +205,89 @@ Client.full_reset(defaults = {'ssh_work_offline' : False
 ################################################################################
 ### test code                                                                ###
 ################################################################################
-import unittest,traceback,sys
-
-class TestClient(unittest.TestCase):
-    def setUp(self):
-        unittest.TestCase.setUp(self)
-        print()
-    def test0(self):
-        Client.full_reset()
-        try:
-            ssh = Client()
-        except Exception as e:
-            assert isinstance(e,InvalidUsername)
-
-    def test1(self):
-        Client.full_reset()
-        try:
-            ssh = Client(username='vsc20170')
-        except Exception as e:
-            assert isinstance(e,MissingLoginNode)
-                
-    def test2(self):
-        #using inexistent key
-        Client.full_reset()
-        try:
-            Client(username='vsc20170', login_node='login.hpc.uantwerpen.be', key='i_m_not_there')
-        except Exception as e:
-            assert isinstance(e,InexistingKey)
-
-    def test3(self):
-        #using a valid key without a pass phrase
-        Client.full_reset()
-        ssh = Client(username='vsc20170',login_node='login.hpc.uantwerpen.be',key='id_rsa_npw')
-        self.assertTrue(ssh.connected())
-        ssh.execute('ls -l da*')
-        del ssh
-
-    def test4(self):
-        #using a valid key and a pass phrase when none is needed
-        #the pass phrase is ignored...
-        Client.full_reset()
-        try:
-            ssh = Client(username='vsc20170',login_node='login.hpc.uantwerpen.be',key='id_rsa_npw',pwd='no_pwd_needed')
-        except Exception as e:
-            raise
-        else: 
+if __name__=='__main__':
+    import unittest,traceback,sys
+    
+    ################################################################################
+    class TestClient(unittest.TestCase):
+    ################################################################################
+        def setUp(self):
+            unittest.TestCase.setUp(self)
+            print()
+        def test0(self):
+            Client.full_reset()
+            try:
+                ssh = Client()
+            except Exception as e:
+                assert isinstance(e,InvalidUsername)
+    
+        def test1(self):
+            Client.full_reset()
+            try:
+                ssh = Client(username='vsc20170')
+            except Exception as e:
+                assert isinstance(e,MissingLoginNode)
+                    
+        def test2(self):
+            #using inexistent key
+            Client.full_reset()
+            try:
+                Client(username='vsc20170', login_node='login.hpc.uantwerpen.be', key='i_m_not_there')
+            except Exception as e:
+                assert isinstance(e,InexistingKey)
+    
+        def test3(self):
+            #using a valid key without a pass phrase
+            Client.full_reset()
+            ssh = Client(username='vsc20170',login_node='login.hpc.uantwerpen.be',key='id_rsa_npw')
             self.assertTrue(ssh.connected())
             ssh.execute('ls -l da*')
             del ssh
+    
+        def test4(self):
+            #using a valid key and a pass phrase when none is needed
+            #the pass phrase is ignored...
+            Client.full_reset()
+            try:
+                ssh = Client(username='vsc20170',login_node='login.hpc.uantwerpen.be',key='id_rsa_npw',pwd='no_pwd_needed')
+            except Exception as e:
+                raise
+            else: 
+                self.assertTrue(ssh.connected())
+                ssh.execute('ls -l da*')
+                del ssh
+    
+        def test5(self):
+            #using pass phrase protected key but pass phrase not provided 
+            Client.full_reset()
+            Client.pwd = None
+            try:
+                Client(username='vsc20170',login_node='login.hpc.uantwerpen.be',key='id_rsa_eendjes')
+            except Exception as e:
+                #traceback.print_exc(file=sys.stdout)
+                assert isinstance(e,PassphraseNeeded)
+    
+        def test6(self):
+            #using an invalid pass phrase protectd key with the pass phrase  
+            try:
+                ssh = Client(username='vsc20170',login_node='login.hpc.uantwerpen.be',key='id_rsa_eendjes',pwd='eendjes')
+            except Exception as e:
+                assert isinstance(e,paramiko.AuthenticationException)
+            else:
+                ssh.execute('ls -l da*')
+                del ssh
+    
+        def test7(self):
+            #using a valid pass phrase protectd key with the pass phrase  
+            try:
+                ssh = Client(username='vsc20170',login_node='login.hpc.uantwerpen.be',key='id_rsa',pwd='Thezoo12')
+            except Exception as e:
+                assert isinstance(e,paramiko.AuthenticationException)
+            else:
+                ssh.execute('ls -l da*')
+                del ssh
+    ################################################################################
 
-    def test5(self):
-        #using pass phrase protected key but pass phrase not provided 
-        Client.full_reset()
-        Client.pwd = None
-        try:
-            Client(username='vsc20170',login_node='login.hpc.uantwerpen.be',key='id_rsa_eendjes')
-        except Exception as e:
-            #traceback.print_exc(file=sys.stdout)
-            assert isinstance(e,PassphraseNeeded)
-
-    def test6(self):
-        #using an invalid pass phrase protectd key with the pass phrase  
-        try:
-            ssh = Client(username='vsc20170',login_node='login.hpc.uantwerpen.be',key='id_rsa_eendjes',pwd='eendjes')
-        except Exception as e:
-            assert isinstance(e,paramiko.AuthenticationException)
-        else:
-            ssh.execute('ls -l da*')
-            del ssh
-
-    def test7(self):
-        #using a valid pass phrase protectd key with the pass phrase  
-        try:
-            ssh = Client(username='vsc20170',login_node='login.hpc.uantwerpen.be',key='id_rsa',pwd='Thezoo12')
-        except Exception as e:
-            assert isinstance(e,paramiko.AuthenticationException)
-        else:
-            ssh.execute('ls -l da*')
-            del ssh
-            
-
-if __name__=='__main__':
     Client.ssh_work_offline = False
     unittest.main()
     

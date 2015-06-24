@@ -4,7 +4,7 @@ import os, inspect, importlib
 def decorated_nodeset_names(cluster):
     """ make a list with decorated ComputeNodeSet names for cluster <cluster>
     """
-    return [ nodeset.name+' ({}Gb/node, {} cores/node)'.format(nodeset.gb_per_node,nodeset.n_cores_per_node)
+    return [ nodeset.name+' ({}Gb/node; {} cores/node)'.format(nodeset.gb_per_node,nodeset.n_cores_per_node)
              for nodeset in nodesets[cluster]
            ] 
 ################################################################################
@@ -28,6 +28,7 @@ def import_clusters():
         This is typically the case for the Ghent clusters where the cluster where 
         you will submit to is selected by loading a module, e.g. 
             module load cluster/haunter
+      - a dictionary containing the walltime limit for each cluster
     This is achieved by importing the cluster modules in the clusters package
     There should be a module for each cluster and each module must export
       - nodesets   : a list of ComputeNodesets for that cluster
@@ -35,24 +36,26 @@ def import_clusters():
       - before_qsub : [optional] a string with linux commands that must be executed before qsub.
                       The commands are separated with '&&' 
     """
-    cluster_list=[] 
-    nodesets={}
-    login_nodes={}
-    before_qsub={}
+    cluster_list  = [] 
+    nodesets      = {}
+    login_nodes   = {}
+    before_qsub   = {}
+    walltime_limit= {}
     for folder, subfolders, files in os.walk(clusters_folder):
         for fname in files:
             if fname.endswith('.py') and not fname=='__init__.py':
                 cluster = os.path.splitext(fname)[0]
                 module = importlib.import_module('clusters.'+cluster)
                 cluster_list.append(cluster)
-                nodesets  [cluster] = module.nodesets
+                nodesets   [cluster] = module.nodesets
                 login_nodes[cluster] = module.login_nodes
                 
                 tmp = getattr(module,'before_qsub','').strip()
                 if tmp and not tmp.endswith('&&'):
                     tmp += ' && '
-                before_qsub[cluster] = tmp 
-    return cluster_list,nodesets,login_nodes,before_qsub
+                before_qsub   [cluster] = tmp 
+                walltime_limit[cluster] = module.walltime_limit
+    return cluster_list,nodesets,login_nodes,before_qsub,walltime_limit
                 
 ################################################################################
-cluster_names,nodesets,login_nodes,before_qsub = import_clusters()
+cluster_names,nodesets,login_nodes,before_qsub,walltime_limit = import_clusters()

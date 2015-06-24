@@ -82,10 +82,14 @@ class Config(object):
                 s+= "{} : {}\n".format(k,v) 
         return s
     
-    def create(self, name, value=None, default=None, choices=[], inject_in=None):
+    def create(self, name, value=None, default=None, choices=[], choices_is_range=False, inject_in=None):
         if name in self.values:
             return False
-        ConfigValue(config=self,name=name,value=value,default=default,choices=choices, inject_in=inject_in)
+        ConfigValue(config=self, name=name
+                   , value=value, default=default
+                   , choices=choices,choices_is_range=choices_is_range
+                   , inject_in=inject_in
+                   )
         return True
     
 ################################################################################
@@ -93,12 +97,13 @@ class ConfigValue(object):
 ################################################################################
     verbose = False
 
-    def __init__(self, config, name, value=None, default=None, choices=[], inject_in=None):
+    def __init__(self, config, name, value=None, default=None, choices=[], choices_is_range=False, inject_in=None):
         """
         config    : Config objec that stores this ConfigValue
         value     : current value assigned, can be a callable that returns the value
         default   : default value assigned, used by self.reset()
         choices   : list of possible values
+        choices_is_range : if True a value is valid if choices[0]<=value<=choices[-1]
         inject_in : inject getter and setter methods in object 
         """
         assert isinstance(config,Config)
@@ -109,10 +114,15 @@ class ConfigValue(object):
         
         self.default = None        
         self.choices = choices
+        self.choices_is_range = choices_is_range
+        self.value_type = None
         if self.choices:
-            assert isinstance(self.choices,list) 
+            assert isinstance(self.choices,list)
+            self.value_type = type(self.choices[0]) 
             if default is None: 
                 self.default = choices[0]
+            else:
+                self.is_valid_raise(default)
         
         if not default is None:
             self.default = default
@@ -134,7 +144,35 @@ class ConfigValue(object):
         config.values[name] = self
         if not inject_in is None:
             self.inject(inject_in)
-        
+            
+    def is_valid(self,value):
+        """
+        check if value is compatible with choices
+        """
+        if not self.choices:
+            return True
+        if not type(value) is self.value_type:
+            if self.value_type(value)!=value: #allows type promotion
+                return False
+        if self.choices_is_range:
+            ok = self.choices[0]<=value
+            ok&= value<=self.choices[-1]
+        else:
+            ok = value in self.choices
+        return ok
+    
+    def is_valid_raise(self,value):
+        """raise ValueError if value is invalid"""
+        if self.is_valid(value):
+            return True
+        msg= "Attempt to set invalid ConfigValue '{}'"\
+             "\n\tvalue    = {}"\
+             "\n\tchoices  = {}"\
+             "\n\tis_range = {}"\
+             "\n\t`type    = {}"\
+             .format(self.name,value,self.choices,self.choices_is_range,self.value_type)
+        raise ValueError(msg)
+    
     def read_value(self,name):
         assert hasattr(self.config,'values'), "Config object '{}' has not loaded a config file.".format(str(self.config.path))
         if name in self.config.values:
@@ -143,10 +181,14 @@ class ConfigValue(object):
             self.value = self.default
 
     def get(self):
+#         if not self.is_valid(self.value):
+#             print('    WARNING: self.value not in self.choices, overwritten by self.default')
+#             self.value = self.default
         return self.value
     
     def set(self,value):
         """assignment"""
+        self.is_valid_raise(value)
         self.value = value
 
     def inc(self,value):
@@ -174,7 +216,7 @@ class ConfigValue(object):
             s+= "\ndefault: "+str(self.default)
             s+= "\nconfig : '{}'".format(str(self.config.path))
         return s
-            
+     
 ################################################################################
 def make_setter(config, name):
     def setter(self, v):
