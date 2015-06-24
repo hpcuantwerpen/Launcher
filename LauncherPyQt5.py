@@ -322,16 +322,6 @@ class MainWindow(QMainWindow):
         #=======================================================================
         # data connections
         #=======================================================================
-#         self.connections = Connections()
-#         script = self.launcher.script
-#         self.connections.add('nodes_ppn',WidgetScriptConnection(self.wNNodes        .value,self.wNNodes        .setValue,script,'nodes'   ))
-#         self.connections.add('nodes_ppn',WidgetScriptConnection(self.wNCoresPerNode .value,self.wNCoresPerNode .setValue,script,'ppn'     ))
-#         self.connections.add('notify'   ,WidgetScriptConnection(self.wNotifyAddress .text ,self.wNotifyAddress .setText ,script,'-M'      ))
-#         self.connections.add('notify'   ,WidgetScriptConnection(self.wNotify_abe    .text ,self.wNotify_abe    .setText ,script,'-m'      ))
-#         self.connections.add('walltime' ,WidgetScriptConnection(self.wWalltimeSeconds.text ,self.wWalltimeSeconds.setText ,script,'walltime'))
-#         self.connections.add('cluster'  ,WidgetScriptConnection(self.wCluster.currentText ,self.wCluster.setCurrentText ,script,'cluster' ))
-#         
-#         self.connections.add(self.wCluster      , self.launcher,'cluster'            ,'*')
         cnf = self.launcher.config
         scr = self.launcher.script
         self.cws_lists = cws.CWS_list()
