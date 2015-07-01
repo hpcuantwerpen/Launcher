@@ -3,11 +3,12 @@ config_value<->Widget<->Script connections
 """
 import cfg
 from PyQt5.QtWidgets import QLineEdit,QComboBox,QSpinBox,QDoubleSpinBox,\
-                            QCheckBox,QTextEdit
+                            QCheckBox
+from collections import OrderedDict
 import script
 
 ################################################################################
-def identity(v):
+def identity(v,dummy=None):
     return v
 
 ################################################################################
@@ -109,6 +110,7 @@ class CWS_QCheckBox(CWS_QWidget):
     def __init__(self,config_value,widget,script,script_attribute
                 ,  to_str=identity
                 ,from_str=identity
+                ,hide_if_false=False
                 ):
         """
         to_str and from_str convert between the script representation and the 
@@ -117,6 +119,7 @@ class CWS_QCheckBox(CWS_QWidget):
         assert type(widget) is QCheckBox
         self.  to_str =   to_str
         self.from_str = from_str
+        self.hide_if_false = hide_if_false
         super(CWS_QCheckBox, self).__init__(config_value,widget,script,script_attribute)
         
     def c2w(self):
@@ -126,27 +129,39 @@ class CWS_QCheckBox(CWS_QWidget):
         
     def w2c(self):
         if not self.config_value is None and not self.widget is None:
-            v = self.to_str(self.widget.checked(),self.config_value.get())
+            v = self.to_str(self.widget.isChecked(),self.config_value.get())
             self.config_value.set(v)
 
     def w2s(self):
         if not self.widget is None and not self.s_attr is None:
-            v = self.to_str(self.widget.checked(),self.script[self.s_attr])
-            self.script[self.s_attr] = v
+            if self.hide_if_false:
+                self.script.set_hidden(self.s_attr,not self.widget.isChecked())
+            else:
+                v = self.to_str(self.widget.isChecked(),self.script[self.s_attr])
+                self.script[self.s_attr] = v
         
     def s2w(self):
         if not self.widget is None and not self.s_attr is None:
-            v = self.from_str(self.script[self.s_attr])
-            self.widget.setValue(v)
+            if self.hide_if_false:
+                v = not self.script.is_hidden(self.s_attr)
+            else:
+                v = self.from_str(self.script[self.s_attr])
+            self.widget.setChecked(v)
             
     def c2s(self):
         if not self.config_value is None and not self.s_attr is None:
-            v = self.config_value.value
-            self.script[self.s_attr] = v
-    
+            if self.hide_if_false:
+                self.script.set_hidden(self.s_attr,self.config_value.get())
+            else:
+                v = self.config_value.value
+                self.script[self.s_attr] = v
+        
     def s2c(self):
         if not self.config_value is None and not self.s_attr is None:
-            v = self.script[self.s_attr]
+            if self.hide_if_false:
+                v = self.script.is_hidden(self.s_attr)
+            else:
+                v = self.script[self.s_attr]
             self.config_value.set(v)
         
 ################################################################################
@@ -170,15 +185,15 @@ class CWS_QLineEdit(CWS_QWidget):
         
     def w2c(self):
         if not self.config_value is None and not self.widget is None:
-            self.config_value.set(self.from_str(self.widget.value()))
+            self.config_value.set(self.from_str(self.widget.text()))
 
     def w2s(self):
         if not self.widget is None and not self.s_attr is None:
-            self.script[self.s_attr] = self.widget.value()
+            self.script[self.s_attr] = self.widget.text()
         
     def s2w(self):
         if not self.widget is None and not self.s_attr is None:
-            self.widget.setValue(self.script[self.s_attr])
+            self.widget.setText(self.script[self.s_attr])
             
     def c2s(self):
         if not self.config_value is None and not self.s_attr is None:
@@ -192,38 +207,56 @@ class CWS_QLineEdit(CWS_QWidget):
 class CWS_list():
 ################################################################################
     def __init__(self):
-        self.lists = {}
+        self.lists = OrderedDict()
+        self.on_2w = {}
+        self.on_2s = {}
 
     def add(self,key,cws):        
         if key in self.lists:
             self.lists[key].append(cws)
         else:
             self.lists[key] = [cws]
-        if key!='*':
-            self.add('*',cws)
+        if not key in self.on_2w:
+            self.on_2w[key]=[]
+            self.on_2s[key]=[]
 
     def c2w(self,key='*'):
-        for cws in self.lists[key]:
-            cws.c2w()
+        for k,cws_list in self.lists.iteritems():
+            if k==key or key=='*':
+                for cws in cws_list:
+                    cws.c2w()
+                for f in self.on_2w[k]:
+                    f()
                      
     def w2c(self,key='*'):
-        for cws in self.lists[key]:
-            cws.w2c()
+        for k,cws_list in self.lists.iteritems():
+            if k==key or key=='*':
+                for cws in cws_list:
+                    cws.w2c()
 
     def w2s(self,key='*'):
-        for cws in self.lists[key]:
-            cws.w2s()
+        for k,cws_list in self.lists.iteritems():
+            if k==key or key=='*':
+                for cws in cws_list:
+                    cws.w2s()
+                    
         
     def s2w(self,key='*'):
-        for cws in self.lists[key]:
-            cws.s2w()
+        for k,cws_list in self.lists.iteritems():
+            if k==key or key=='*':
+                for cws in cws_list:
+                    cws.s2w()
+                for f in self.on_2w[k]:
+                    f()
 
     def c2s(self,key='*'):
-        for cws in self.lists[key]:
-            cws.c2s()
+        for k,cws_list in self.lists.iteritems():
+            if k==key or key=='*':
+                for cws in cws_list:
+                    cws.c2s()
 
     def s2c(self,key='*'):
-        for cws in self.lists[key]:
-            cws.s2c()
-
- 
+        for k,cws_list in self.lists.iteritems():
+            if k==key or key=='*':
+                for cws in cws_list:
+                    cws.s2c()

@@ -1,8 +1,8 @@
 from __future__ import print_function
 
-import os
+import os,sys
 
-from PyQt5.QtCore import QT_VERSION_STR,Qt,QStringListModel
+from PyQt5.QtCore import QT_VERSION_STR,Qt
 __version__ = "PyQt5 "+QT_VERSION_STR
 
 from PyQt5.QtWidgets import QMainWindow,QTabWidget,QWidget,QLineEdit,QLabel,   \
@@ -11,12 +11,9 @@ from PyQt5.QtWidgets import QMainWindow,QTabWidget,QWidget,QLineEdit,QLabel,   \
      QFileDialog,QTextEdit
 
 import Launcher
-import clusters
 import constants
 from log import log_exception,LogItem,LogSession
-# from DataConnections import WidgetScriptConnection, Connections
 import cws
-from sshtools import is_valid_username
 
 ################################################################################
 class MainWindow(QMainWindow):
@@ -31,40 +28,10 @@ class MainWindow(QMainWindow):
 
         self.createUI()
         
-        #first pick up the default script parameters
-#         self.connections.receive_all('*')
+        self.cws_lists.c2w()
+
         with LogItem('Invisible widgets:'):
             print("    wWalltimeSeconds.text() = '{}'".format(self.wWalltimeSeconds.text()))
-            print("    wNotify_abe    .text() = '{}'".format(self.wNotify_abe.text()))
-        
-#         self.update_clusters()
-# 
-#         self.wWalltimeUnit.setCurrentText('hours')
-#         self.previous_walltime_unit_index = self.wWalltimeUnit.currentIndex()
-#         self.wWalltime_set_single_step()
-        
-#         address = self.launcher.get_notify_M()            
-#         if address:
-#             self.wNotifyAddress.setText(address)
-#         abe = self.launcher.get_notify_m()
-#         self.wNotifyAbort.setChecked('a' in abe)    
-#         self.wNotifyBegin.setChecked('b' in abe)    
-#         self.wNotifyEnd  .setChecked('e' in abe)
-#         self.wNotify_abe .setText(abe)
-
-#         self.wUsername.setText(self.launcher.config['username'].value)
-#         self.show_ssh_available()
-#         cfg_item = self.launcher.config['local_file_location']
-#         self.wLocal.setText(Launcher.add_trailing_separator(cfg_item.value))
-#         cfg_item = self.launcher.config['remote_file_location']
-#         self.wRemote.addItems(cfg_item.choices)
-#         self.wRemote.setCurrentText(cfg_item.value)
-#         self.change_subfolder(self.launcher.config['subfolder'].value)
-# 
-#         self.wRetrieveCopyToLocal   .setChecked(self.launcher.get_retrieve_copy_to_desktop())
-#         self.wRetrieveCopyToVSC_DATA.setChecked(self.launcher.get_retrieve_copy_to_VSC_DATA())
-# 
-#         self.wAutomaticRequests.setChecked(self.launcher.get_automatic_requests())
 
         n_waiting = len(self.launcher.get_submitted_jobs())
         if n_waiting>0:
@@ -119,7 +86,7 @@ class MainWindow(QMainWindow):
         grid.addWidget(self.wGbPerNode                     ,r,1)
         r+=1
         self.wEnforceNNodes = QCheckBox("Enforce nodes")
-        self.wEnforceNNodes.setChecked(self.launcher.get_enforce_n_nodes())
+#         self.wEnforceNNodes.setChecked(self.launcher.get_enforce_n_nodes())
         grid.addWidget(self.wEnforceNNodes                 ,r,0)
         self.wRequestNodes = QPushButton('make request')
         grid.addWidget(self.wRequestNodes                  ,r,1)
@@ -182,8 +149,8 @@ class MainWindow(QMainWindow):
         self.wNotifyBegin = QCheckBox("on begin")
         self.wNotifyEnd   = QCheckBox("on end")
         self.wNotifyAbort = QCheckBox("on abort")
-        self.wNotify_abe  = QLineEdit()
-        self.wNotify_abe   .setVisible(False)
+#         self.wNotify_abe  = QLineEdit()
+#         self.wNotify_abe   .setVisible(False)
         hbox_group.addWidget(self.wNotifyBegin)
         hbox_group.addWidget(self.wNotifyEnd)
         hbox_group.addWidget(self.wNotifyAbort)
@@ -269,22 +236,24 @@ class MainWindow(QMainWindow):
         
         vbox_group.addWidget(columns)
         
-        self.wSave        = QPushButton("Save")
-        self.wReload      = QPushButton("Reload")
-        self.wSubmit      = QPushButton("Submit")
-        self.wRetrieveAll = QPushButton("Retrieve results")
-        self.wRetrieveCopyToLocal    = QCheckBox("Copy results to desktop (local file location).")
-        self.wRetrieveCopyToVSC_DATA = QCheckBox("Copy results to $VSC_DATA.")
+        hbox = QHBoxLayout()
+        self.wReload = QPushButton("Reload")
+        self.wSave   = QPushButton("Save")
+        self.wSubmit = QPushButton("Submit")
+        hbox.addWidget(self.wReload)
+        hbox.addWidget(self.wSave)
+        hbox.addWidget(self.wSubmit)
         
-        grid = QGridLayout()
-        grid.setVerticalSpacing(5)
-        grid.addWidget(self.wSave                  ,0,0)
-        grid.addWidget(self.wReload                ,1,0)
-        grid.addWidget(self.wSubmit                ,2,0)
-        grid.addWidget(self.wRetrieveAll           ,0,1)
-        grid.addWidget(self.wRetrieveCopyToLocal   ,1,1)
-        grid.addWidget(self.wRetrieveCopyToVSC_DATA,2,1)
-        vbox_group.addLayout(grid)
+        
+#         grid = QGridLayout()
+#         grid.setVerticalSpacing(5)
+#         grid.addWidget(self.wSave                  ,0,0)
+#         grid.addWidget(self.wReload                ,1,0)
+#         grid.addWidget(self.wSubmit                ,2,0)
+#         grid.addWidget(self.wRetrieveAll           ,0,1)
+#         grid.addWidget(self.wCopyToDesktop   ,1,1)
+#         grid.addWidget(self.wCopyToVSC_DATA,2,1)
+        vbox_group.addLayout(hbox)
         #-----------------------------------------------------------------------        
         job_group.setLayout(vbox_group)
         vbox_page.addWidget(job_group)
@@ -302,7 +271,6 @@ class MainWindow(QMainWindow):
         hbox = QHBoxLayout()
         hbox.addWidget(QLabel("select module:"))
         self.wModules = QComboBox()
-#         self.wModules.addItems(self.launcher.modules)
         hbox.addWidget(self.wModules)
         vbox_page.addLayout(hbox)
         #-----------------------------------------------------------------------
@@ -311,7 +279,39 @@ class MainWindow(QMainWindow):
         # Retrieve page
         self.wRetrievePage = QWidget()
         #add restrieve page widgets
-        
+        vbox_page = QVBoxLayout()
+        hbox = QHBoxLayout()
+        self.wJobStatusButton = QPushButton("Job status (qstat -u):")
+        hbox.addWidget(self.wJobStatusButton)
+        hbox.addStretch()
+        self.wJobStatus = QTextEdit()
+        self.wSubmitted = QTextEdit()
+        self.wRetrieved = QTextEdit()
+        vbox_page.addLayout(hbox)
+        vbox_page.addWidget(self.wJobStatus)
+        vbox_page.addWidget(QLabel("Jobs submitted and not retrieved:"))
+        vbox_page.addWidget(self.wSubmitted)
+        vbox_page.addWidget(QLabel("Jobs retrieved during this Launcher session:"))
+        vbox_page.addWidget(self.wRetrieved)
+        grid = QGridLayout()
+        self.wRetrieveSelected = QPushButton("Retrieve results for the selected job id")
+#         self.wRetrieveSelected  .setEnabled(False)
+        self.wDeleteSelected   = QPushButton("Delete selected jobs (no retrieval)")
+#         self.wDeleteSelected    .setEnabled(False)
+        self.wRetrieveAll      = QPushButton("Retrieve results for all jobs")
+        self.wCopyToDesktop    = QCheckBox("Copy results to desktop")
+        self.wCopyToVSC_DATA   = QCheckBox("Copy results to $VSC_DATA")
+        self.wDeleteLocal      = QCheckBox("Delete local folder")
+        self.wDeleteRemote     = QCheckBox("Delete remote folder")
+        grid.addWidget(self.wCopyToDesktop   ,0,0)
+        grid.addWidget(self.wCopyToVSC_DATA  ,1,0)
+        grid.addWidget(self.wRetrieveSelected,2,0)
+        grid.addWidget(self.wDeleteLocal     ,0,1)
+        grid.addWidget(self.wDeleteRemote    ,1,1)
+        grid.addWidget(self.wDeleteSelected  ,2,1)
+        grid.addWidget(self.wRetrieveAll     ,3,0)
+        vbox_page.addLayout(grid)
+        self.wRetrievePage.setLayout(vbox_page)
         #=======================================================================
         self.wPages.addTab(self.wResourcesPage, "Resources")
         self.wPages.addTab(self.wScriptPage   , "Script")
@@ -325,25 +325,45 @@ class MainWindow(QMainWindow):
         cnf = self.launcher.config
         scr = self.launcher.script
         self.cws_lists = cws.CWS_list()
-        self.cws_lists.add('cluster'  ,cws.CWS_QComboBox(cnf['cluster'           ],self.wCluster          ,scr,'cluster' ))
-        self.cws_lists.add('cluster'  ,cws.CWS_QComboBox(cnf['nodeset'           ],self.wNodeset          ,scr,'nodeset' ))
-        self.cws_lists.add('resources',cws.CWS_QSpinBox (cnf['nodes'             ],self.wNNodes           ,scr,'nodes'   ))
-        self.cws_lists.add('resources',cws.CWS_QSpinBox (cnf['ppn'               ],self.wNCoresPerNode    ,scr,'ppn'     ))
-        self.cws_lists.add('resources',cws.CWS_QLineEdit(cnf['gbpn'              ],self.wGbPerNode        ,scr, None     ))
-        self.cws_lists.add('resources',cws.CWS_QCheckBox(cnf['automatic_requests'],self.wAutomaticRequests,scr, None     ))
-        self.cws_lists.add('walltime' ,cws.CWS_QSpinBox (cnf['walltime_seconds'  ],self.wWalltimeSeconds  ,scr,'walltime',to_script=Launcher.walltime_seconds_to_str,from_script=Launcher.str_to_walltime_seconds))
-        self.cws_lists.add('walltime' ,cws.CWS_QComboBox(cnf['walltime_unit'     ],self.wWalltimeUnit     ,scr, None     ))
-        self.cws_lists.add('notify'   ,cws.CWS_QLineEdit(cnf['notify_M'          ],self.wNotifyAddress    ,scr,'-M'      ))
-        self.cws_lists.add('notify'   ,cws.CWS_QCheckBox(cnf['notify_m'          ],self.wNotifyAbort      ,scr,'-m'      ,to_str=Launcher.abort_to_abe,from_str=Launcher.abe_to_abort))
-        self.cws_lists.add('notify'   ,cws.CWS_QCheckBox(cnf['notify_m'          ],self.wNotifyBegin      ,scr,'-m'      ,to_str=Launcher.begin_to_abe,from_str=Launcher.abe_to_begin))
-        self.cws_lists.add('notify'   ,cws.CWS_QCheckBox(cnf['notify_m'          ],self.wNotifyEnd        ,scr,'-m'      ,to_str=Launcher.  end_to_abe,from_str=Launcher.abe_to_end  ))
-        self.cws_lists.add('job'      ,cws.CWS_QLineEdit(cnf['username'          ],self.wUsername         ,scr, None     ))
+        self.cws_lists.add('cluster'  ,cws.CWS_QComboBox(cnf['cluster'             ],self.wCluster          ,scr,'cluster' ))
+        self.cws_lists.add('cluster'  ,cws.CWS_QComboBox(cnf['nodeset'             ],self.wNodeset          ,scr,'nodeset' ))
+        self.cws_lists.add('resources',cws.CWS_QSpinBox (cnf['nodes'               ],self.wNNodes           ,scr,'nodes'   ))
+        self.cws_lists.add('resources',cws.CWS_QSpinBox (cnf['ppn'                 ],self.wNCoresPerNode    ,scr,'ppn'     ))
+        self.cws_lists.add('resources',cws.CWS_QLineEdit(cnf['gbpn'                ],self.wGbPerNode        ,scr, None     ))
+        self.cws_lists.add('resources',cws.CWS_QCheckBox(cnf['automatic_requests'  ],self.wAutomaticRequests,scr, None     ))
+        self.cws_lists.add('resources',cws.CWS_QCheckBox(cnf['enforce_n_nodes'     ],self.wEnforceNNodes    ,scr,'x'
+                                                        ,hide_if_false=True                                                ))
+        self.cws_lists.add('walltime' ,cws.CWS_QSpinBox (cnf['walltime_seconds'    ],self.wWalltimeSeconds  ,scr,'walltime'
+                                                        ,  to_script=Launcher.walltime_seconds_to_str
+                                                        ,from_script=Launcher.str_to_walltime_seconds                      ))
+        self.cws_lists.add('walltime' ,cws.CWS_QComboBox(cnf['walltime_unit'       ],self.wWalltimeUnit     ,scr, None     ))
+        self.cws_lists.add('notify'   ,cws.CWS_QLineEdit(cnf['notify_M'            ],self.wNotifyAddress    ,scr,'-M'      ))
+        self.cws_lists.add('notify'   ,cws.CWS_QCheckBox(cnf['notify_m'            ],self.wNotifyAbort      ,scr,'-m'      
+                                                        ,  to_str=Launcher.abort_to_abe
+                                                        ,from_str=Launcher.abe_to_abort                                    ))
+        self.cws_lists.add('notify'   ,cws.CWS_QCheckBox(cnf['notify_m'            ],self.wNotifyBegin      ,scr,'-m'     
+                                                        ,  to_str=Launcher.begin_to_abe
+                                                        ,from_str=Launcher.abe_to_begin                                    ))
+        self.cws_lists.add('notify'   ,cws.CWS_QCheckBox(cnf['notify_m'            ],self.wNotifyEnd        ,scr,'-m'    
+                                                        ,  to_str=Launcher.end_to_abe
+                                                        ,from_str=Launcher.abe_to_end                                      ))
+        self.cws_lists.add('job'      ,cws.CWS_QLineEdit(cnf['username'            ],self.wUsername         ,scr, None     ))
+        self.cws_lists.add('job'      ,cws.CWS_QLineEdit(cnf['local_file_location' ],self.wLocal            ,scr, None     ))
+        self.cws_lists.add('job'      ,cws.CWS_QComboBox(cnf['remote_file_location'],self.wRemote           ,scr, None     ))
+        self.cws_lists.add('job'      ,cws.CWS_QLineEdit(cnf['subfolder'           ],self.wSubfolder        ,scr, None     ))
+        self.cws_lists.add('job'      ,cws.CWS_QLineEdit(cnf['jobname'             ],self.wJobname          ,scr,'-N'      ))
+        self.cws_lists.add('job'      ,cws.CWS_QCheckBox(cnf['copy_to_desktop'     ],self.wCopyToDesktop    ,scr, None     ))
+        self.cws_lists.add('job'      ,cws.CWS_QCheckBox(cnf['copy_to_VSC_DATA'    ],self.wCopyToVSC_DATA   ,scr, None     ))
+        
+        self.cws_lists.on_2w['cluster'  ].append(self.on_cluster_2w  )
+        self.cws_lists.on_2w['resources'].append(self.on_resources_2w)
+        self.cws_lists.on_2w['walltime' ].append(self.on_walltime_2w )
           
         #=======================================================================
         # signal connections
         #=======================================================================
-        self.wCluster           .currentIndexChanged .connect(self.update_cluster)
-        self.wNodeset           .currentIndexChanged .connect(self.update_nodeset)
+        self.wCluster           .currentIndexChanged .connect(self.wCluster_on_currentIndexChanged)
+        self.wNodeset           .currentIndexChanged .connect(self.wNodeset_on_currentIndexChanged)
         self.wRequestNodes      .clicked             .connect(self.wRequestNodes_on_clicked)
         self.wRequestCores      .clicked             .connect(self.wRequestCores_on_clicked)
         self.wAutomaticRequests .toggled             .connect(self.wAutomaticRequests_on_toggled)
@@ -353,11 +373,7 @@ class MainWindow(QMainWindow):
         self.wGbPerCore         .valueChanged        .connect(self.wGbPerCore_on_valueChanged)
         self.wWalltime          .valueChanged        .connect(self.wWalltime_on_valueChanged)
         self.wWalltimeUnit      .currentIndexChanged .connect(self.wWalltimeUnit_on_currentIndexChanged)
-        self.wWalltimeSeconds   .valueChanged        .connect(self.wWalltimeSeconds_on_valueChanged)
         self.wNotifyAddress     .returnPressed       .connect(self.wNotifyAddress_on_returnPressed)
-        self.wNotifyAbort       .toggled             .connect(self.notify_abe_changed)
-        self.wNotifyBegin       .toggled             .connect(self.notify_abe_changed)
-        self.wNotifyEnd         .toggled             .connect(self.notify_abe_changed)
         self.wUsername          .returnPressed       .connect(self.wUsername_on_returnPressed)
         self.wChooseLocal       .clicked             .connect(self.wChooseLocal_on_clicked)
         self.wChooseSubfolder   .clicked             .connect(self.wChooseSubfolder_on_clicked)
@@ -366,9 +382,13 @@ class MainWindow(QMainWindow):
         self.wRemote            .currentIndexChanged .connect(self.wRemote_on_currentIndexChanged)
         self.wSave              .clicked             .connect(self.wSave_on_clicked)
         self.wReload            .clicked             .connect(self.wReload_on_clicked)
+        self.wJobStatusButton   .clicked             .connect(self.wJobStatusButton_on_clicked)
         self.wSubmit            .clicked             .connect(self.wSubmit_on_clicked)
         self.wModules           .currentIndexChanged .connect(self.wModules_on_currentIndexChanged)
+#         self.wSubmitted         .selectionChanged    .connect(self.wSubmitted_on_selectionChanged)
         self.wRetrieveAll       .clicked             .connect(self.wRetrieveAll_on_clicked)
+        self.wRetrieveSelected  .clicked             .connect(self.wRetrieveSelected_on_clicked)
+        self.wDeleteSelected    .clicked             .connect(self.wDeleteSelected_on_clicked)
         #=======================================================================
        
         #=======================================================================
@@ -378,7 +398,61 @@ class MainWindow(QMainWindow):
 #         action = menu.addAction('Change File Path')
 #         action.triggered.connect(self.changeFilePath)   
 
-    def show_ssh_available(self):
+    def on_cluster_2w(self):
+        self.wModules.clear()
+        try:
+            self.wModules.addItems(self.launcher.get_modules())
+        except Exception as e:
+            log_exception(e)
+        
+    def on_resources_2w(self):
+        v = self.wNNodes.value() * self.wNCoresPerNode.value()
+        self.wNCores.setValue(v)
+        
+        v = float(self.wGbPerNode.text())/self.wNCoresPerNode.value()
+        self.wGbPerCore.setValue(v)
+        
+        v = float(self.wGbPerNode.text())*self.wNNodes.value()
+        self.wGbTotal.setText(str(round(v,3)))
+        
+        self.wNCores   .setRange(1,self.launcher.nodeset.n_nodes*self.launcher.nodeset.n_cores_per_node)
+        
+        gb_per_node = float(self.wGbPerNode.text())
+        self.wGbPerCore.setRange(gb_per_node/self.wNCoresPerNode.value(),gb_per_node)
+        
+        v = self.wAutomaticRequests.isChecked()
+        self.wRequestCores.setEnabled(not v)
+        self.wRequestNodes.setEnabled(not v)
+        
+    def on_walltime_2w(self):
+        walltime = self.wWalltimeSeconds.value()
+        walltime/= float(Launcher.walltime_units[self.wWalltimeUnit.currentText()])
+        self.wWalltime.setValue(walltime)
+        self.wWalltime_adapt_to_unit()
+        self.wWalltimeUnit_on_currentIndexChanged()
+        
+    def wWalltime_adapt_to_unit(self):
+        unit = self.wWalltimeUnit.currentText() 
+        if unit=='seconds':
+            step = 15.
+        elif unit=='minutes':
+            step = 15.
+        elif unit=='hours':
+            step = 1
+        else:
+            step = 0.25
+        self.wWalltime.setSingleStep(step)
+        walltime_limit = Launcher.clusters.walltime_limit[self.wCluster.currentText()]
+        walltime_limit/= Launcher.walltime_units[unit]
+        self.wWalltime.setRange(0,walltime_limit)
+
+    def show_ssh_available(self,retry=False):
+        if not Launcher.sshtools.Client.last_try_success and retry:
+            try:
+                ssh = Launcher.sshtools.Client(self.launcher.get_username(),self.launcher.get_login_node())
+                ssh.close()
+            except Exception as e:
+                log_exception(e)
         if Launcher.sshtools.Client.last_try_success:
             text = "Connected"
             self.wConnected.setStyleSheet("")
@@ -388,7 +462,7 @@ class MainWindow(QMainWindow):
         self.wConnected.setText(text)
 
     def wAutomaticRequests_on_toggled(self):
-        with LogItem("Signal received: wAutomaticRequests_on_toggled()"):
+        with LogItem("Signal received: {}()".format(sys._getframe().f_code.co_name)):
             print("    self.ignore_signals = {}".format(self.ignore_signals))
             if self.ignore_signals:
                 return
@@ -397,7 +471,7 @@ class MainWindow(QMainWindow):
             self.wRequestCores.setEnabled(manual)
             
     def wNNodes_on_valueChanged(self):
-        with LogItem("Signal received: wNNodes_on_valueChanged()"):
+        with LogItem("Signal received: {}()".format(sys._getframe().f_code.co_name)):
             print("    self.ignore_signals = {}".format(self.ignore_signals))
             if self.ignore_signals:
                 return
@@ -405,7 +479,7 @@ class MainWindow(QMainWindow):
                 self.wRequestNodes_on_clicked()
             
     def wNCoresPerNode_on_valueChanged(self):
-        with LogItem("Signal received: wNCoresPerNode_on_valueChanged()"):
+        with LogItem("Signal received: {}()".format(sys._getframe().f_code.co_name)):
             print("    self.ignore_signals = {}".format(self.ignore_signals))
             if self.ignore_signals:
                 return
@@ -413,11 +487,11 @@ class MainWindow(QMainWindow):
                 self.wRequestNodes_on_clicked()
             
     def wRequestNodes_on_clicked(self):
-        with LogItem("Signal received: wRequestNodes_on_clicked()"):
+        with LogItem("Signal received: {}()".format(sys._getframe().f_code.co_name)):
             print("    self.ignore_signals = {}".format(self.ignore_signals))
             if self.ignore_signals:
                 return
-            n_cores,gb_per_core = self.selected_nodeset.\
+            n_cores,gb_per_core = self.launcher.nodeset.\
                 request_nodes_cores(self.wNNodes.value(),self.wNCoresPerNode.value())
             
             with IgnoreSignals(self):
@@ -427,7 +501,7 @@ class MainWindow(QMainWindow):
 #             self.connections.send_all('nodes_ppn')
         
     def wNCores_on_valueChanged(self):
-        with LogItem("Signal received: wNCores_on_valueChanged()"):
+        with LogItem("Signal received: {}()".format(sys._getframe().f_code.co_name)):
             print("    self.ignore_signals = {}".format(self.ignore_signals))
             if self.ignore_signals:
                 return
@@ -435,7 +509,7 @@ class MainWindow(QMainWindow):
                 self.wRequestCores_on_clicked()
             
     def wGbPerCore_on_valueChanged(self):
-        with LogItem("Signal received: wGbPerCore_on_valueChanged()"):
+        with LogItem("Signal received: {}()".format(sys._getframe().f_code.co_name)):
             print("    self.ignore_signals = {}".format(self.ignore_signals))
             if self.ignore_signals:
                 return
@@ -443,42 +517,31 @@ class MainWindow(QMainWindow):
                 self.wRequestCores_on_clicked()
     
     def wWalltime_on_valueChanged(self):
-        with LogItem("Signal received: wWalltime_on_valueChanged()"):
+        with LogItem("Signal received: {}()".format(sys._getframe().f_code.co_name)):
             print("    self.ignore_signals = {}".format(self.ignore_signals))
             if self.ignore_signals:
                 return
-            walltime_seconds = self.wWalltime.value() * Launcher.walltime_units[self.wWalltimeUnit.currentText()[0]]
-            self.wWalltimeSeconds.setValue(Launcher.walltime_seconds_to_str(walltime_seconds))
-#             self.connections.send_all('walltime')
+            seconds = self.wWalltime.value() * Launcher.walltime_units[self.wWalltimeUnit.currentText()]
+            print("    self.wWalltime_seconds.setValue({})".format(seconds))
+            self.wWalltimeSeconds.setValue(seconds)
         
     def wWalltimeUnit_on_currentIndexChanged(self):
-        with LogItem("Signal received: wWalltimeUnit_on_currentIndexChanged()"):
+        with LogItem("Signal received: {}()".format(sys._getframe().f_code.co_name)):
             print("    self.ignore_signals = {}".format(self.ignore_signals))
             if self.ignore_signals:
                 return
-            walltime_seconds = self.wWalltime.value() * Launcher.walltime_units[self.previous_walltime_unit_index]
-            wint = walltime_seconds / float(Launcher.walltime_units[self.wWalltimeUnit.currentIndex()])
-            wrem = walltime_seconds % float(Launcher.walltime_units[self.wWalltimeUnit.currentIndex()])
-            if wrem:
-                wint+=1
-            self.wWalltime.setValue(wint)
-    
-    def wWalltimeSeconds_on_valueChanged(self):
-        with LogItem("Signal received: wWalltimeSeconds_on_valueChanged()"):
-            print("    self.ignore_signals = {}".format(self.ignore_signals))
-            if self.ignore_signals:
-                return
-            walltime_seconds = Launcher.str_to_walltime_seconds(self.wWalltimeSeconds.text())
-            unit = Launcher.walltime_units[self.wWalltimeUnit.currentText()[0]]
-            walltime = walltime_seconds / float(unit)
+            walltime = self.wWalltimeSeconds.value()
+            unit = Launcher.walltime_units[self.wWalltimeUnit.currentText()]
+            walltime/= float(unit)
+            self.wWalltime_adapt_to_unit()
             self.wWalltime.setValue(walltime)
-        
+    
     def wRequestCores_on_clicked(self):
-        with LogItem("Signal received: wRequestCores_on_clicked()"):
+        with LogItem("Signal received: {}()".format(sys._getframe().f_code.co_name)):
             print("    self.ignore_signals = {}".format(self.ignore_signals))
             if self.ignore_signals:
                 return
-            n_nodes, n_cores, n_cores_per_node, gb_per_core, gb = self.selected_nodeset. \
+            n_nodes, n_cores, n_cores_per_node, gb_per_core, gb = self.launcher.nodeset. \
                 request_cores_memory(self.wNCores.value(),self.wGbPerCore.value())
                                   
             with IgnoreSignals(self):
@@ -487,69 +550,36 @@ class MainWindow(QMainWindow):
                 self.wNCoresPerNode.setValue(n_cores_per_node)
                 self.wGbPerCore    .setValue(gb_per_core)
                 self.wGbTotal      .setText (str(round(gb,3)))
-#             self.connections.send_all('nodes_ppn')
 
-    def update_clusters(self,check_for_new = False):
-        """"""
-#         with LogItem("Signal received: update_clusters()"):
-#             print("    self.ignore_signals = {}".format(self.ignore_signals))
-#             if self.ignore_signals:
-#                 return
-        if check_for_new:
-            clusters.import_clusters()
-        self.wCluster.clear()
-        self.wCluster.addItems(Launcher.clusters.cluster_names)
-        self.update_cluster()
+#     def update_clusters(self,check_for_new = False):
+#         if check_for_new:
+#             clusters.import_clusters()
+#         self.wCluster.clear()
+#         self.wCluster.addItems(Launcher.clusters.cluster_names)
+#         self.update_cluster()
 
-    def update_cluster(self,arg=None):
-        with LogItem("Signal received: update_cluster()"):
+    def wCluster_on_currentIndexChanged(self):
+        with LogItem("Signal received: {}()".format(sys._getframe().f_code.co_name)):
             print("    self.ignore_signals = {}".format(self.ignore_signals))
             if self.ignore_signals:
                 return
-#             cluster = self.wCluster.currentText()
-#             with IgnoreSignals(self):
-#                 self.wNodeset.clear()
-#                 nodeset_names = clusters.decorated_nodeset_names(cluster)
-#                 self.wNodeset.addItems(nodeset_names)
-#                 self.wNodeset.setCurrentIndex(0)
-#             self.update_nodeset()
-#             self.launcher.cluster_on_changed()
-#             with IgnoreSignals(self):
-#                 self.wModules.clear()
-#                 self.wModules.addItems(self.launcher.modules)
+            self.launcher.change_cluster(value=self.wCluster.currentText(),update=True)
+            with IgnoreSignals(self):
+                self.cws_lists.c2w('cluster')
+                self.cws_lists.c2w('resources')
+                self.cws_lists.c2w('walltime')
             
-    def update_nodeset(self,arg=None):
-        with LogItem("Signal received: update_nodeset()"):
+    def wNodeset_on_currentIndexChanged(self,arg=None):
+        with LogItem("Signal received: wNodeset_on_currentIndexChanged()"):
             print("    self.ignore_signals = {}".format(self.ignore_signals))
             if self.ignore_signals:
                 return
-#         #remove extras required by previous node set
-#         if getattr(self, 'selected_nodeset',None):
-#             self.selected_nodeset.nodeset_features(self.launcher.script,remove=True)
-#         
-#         #set current node set
-#         #print(self.nodeset_names)
-#         cluster  = self.wCluster.currentText()
-#         selected = self.wNodeset.currentText()
-# #         print(selected)
-# #         print(clusters.decorated_nodeset_names(cluster))
-# #         print(clusters.nodesets[self.wCluster.currentText()])
-#         self.selected_nodeset = clusters.nodesets[self.wCluster.currentText()][clusters.decorated_nodeset_names(cluster).index(selected)]
-# 
-#         #add extras required by new node set
-#         if self.selected_nodeset :
-#             self.selected_nodeset.nodeset_features(self.launcher.script)
-#        
-#         self.wNNodes       .setRange(1,self.selected_nodeset.n_nodes)
-#         self.wNCoresPerNode.setRange(1,self.selected_nodeset.n_cores_per_node)
-#         self.wNCores       .setRange(1,self.selected_nodeset.n_nodes*self.selected_nodeset.n_cores_per_node)
-#         self.wGbPerCore    .setRange(0,self.selected_nodeset.gb_per_node)
-#         with IgnoreSignals(self):
-#             self.wNCoresPerNode.setValue(self.selected_nodeset.n_cores_per_node)
-#             self.wNCores       .setValue(self.selected_nodeset.n_cores_per_node*self.wNNodes.value())
-#             self.wGbPerCore    .setValue(self.selected_nodeset.gb_per_node/self.wNCoresPerNode.value())
-#             self.wGbPerNode .setText(str(round(self.selected_nodeset.gb_per_node,3)))
-#             self.wGbTotal   .setText(str(round(self.selected_nodeset.gb_per_node*self.wNNodes.value(),3)))
+            self.launcher.change_nodeset(value=self.wNodeset.currentText(),update=True)
+            with IgnoreSignals(self):
+                self.cws_lists.c2w('cluster')
+                self.cws_lists.c2w('resources')
+                self.cws_lists.c2w('walltime')
+            
         
     def change_subfolder(self,subfolder):
         if subfolder:
@@ -581,31 +611,16 @@ class MainWindow(QMainWindow):
                                     , buttons=QMessageBox.Ok
                                     )
             
-    def notify_abe_changed(self):
-        with LogItem("Signal received: notify_abe_changed()"):
-            print("    self.ignore_signals = {}".format(self.ignore_signals))
-            if self.ignore_signals:
-                return
-            abe = ''
-            if self.wNotifyAbort.isChecked():
-                abe+='a'
-            if self.wNotifyBegin.isChecked():
-                abe+='b'
-            if self.wNotifyEnd  .isChecked():
-                abe+='e'
-            self.wNotify_abe.setText(abe)
-            self.launcher.set_notify_m(abe)
-#             self.connections.send_all('notify')
-        
     def wUsername_on_returnPressed(self): 
         with LogItem("Signal received: wUsername_on_returnPressed()"):
             print("    self.ignore_signals = {}".format(self.ignore_signals))
             if self.ignore_signals:
                 return
             username = self.wUsername.text()
-            if is_valid_username(username):
+            if Launcher.sshtools.is_valid_username(username):
                 self.wUsername.setStyleSheet('color: rgb(0,0,0)') 
                 self.launcher.set_username(username)
+                self.show_ssh_available(retry=True)
             else:             
                 self.wUsername.setStyleSheet('color: rgb(255,0,0)')
                 QMessageBox.warning( self
@@ -620,7 +635,8 @@ class MainWindow(QMainWindow):
             if self.ignore_signals:
                 return
             local_file_location = self.launcher.get_local_file_location()
-            local_file_location = QFileDiagetExistingDirectory(caption='Choose Local file location', directory=local_file_location, options=QFileDiaShowDirsOnly)
+            local_file_location = QFileDialog.getExistingDirectory( caption='Choose Local file location'
+                                                                  , directory=local_file_location, options=QFileDialog.ShowDirsOnly)
             if local_file_location:
                 local_file_location = Launcher.add_trailing_separator(local_file_location)
                 self.wLocal.setText(local_file_location)
@@ -632,7 +648,8 @@ class MainWindow(QMainWindow):
             if self.ignore_signals:
                 return
             local_file_location = self.launcher.get_local_file_location()
-            subfolder = QFileDiagetExistingDirectory(caption='Choose Local file location', directory=local_file_location, options=QFileDiaShowDirsOnly)
+            subfolder = QFileDialog.getExistingDirectory( caption='Choose Local file location'
+                                                        , directory=local_file_location, options=QFileDialog.ShowDirsOnly)
             if not subfolder:
                 return
             if not subfolder.startswith(local_file_location):
@@ -656,7 +673,8 @@ class MainWindow(QMainWindow):
             if self.ignore_signals:
                 return
             parent_folder = os.path.join(self.wLocal.text(),self.wSubfolder.text())
-            jobname_folder = QFileDiagetExistingDirectory(caption='Choose jobname (=folder)', directory=parent_folder, options=QFileDiaShowDirsOnly)
+            jobname_folder = QFileDialog.getExistingDirectory( caption='Choose jobname (=folder)'
+                                                             , directory=parent_folder, options=QFileDialog.ShowDirsOnly)
             if not jobname_folder:
                 return
             if not jobname_folder.startswith(parent_folder):
@@ -694,23 +712,47 @@ class MainWindow(QMainWindow):
                             if answer==QMessageBox.Cancel:
                                 return
                         parent_folder = os.path.join(self.wLocal.text(),self.wSubfolder.text())
-                        self.launcher.load_job(parent_folder,self.wJobname.text())
+                        self.load_job(parent_folder,self.wJobname.text())
     
     def wPages_on_page_change(self):
         with LogItem("Signal received: wPages_on_page_change()"):
             print("    self.ignore_signals = {}".format(self.ignore_signals))
             if self.ignore_signals:
                 return
+
             if self.wPages.currentWidget()==self.wResourcesPage:
-                text = self.wScript.toPlainText()
-                self.launcher.script.parse(text)
-#                 self.connections.receive_all('*')
-                
+                self.script_to_resources()
+                                
             elif self.wPages.currentWidget()==self.wScriptPage:
-                self.wScript.setPlainText(self.launcher.script.get_text())
+                self.resources_to_script()
                 
             elif self.wPages.currentWidget()==self.wRetrievePage:
-                print("retrieve")
+                self.wJobStatusButton_on_clicked()
+                self.list_submitted_jobs()
+                self.list_retrieved_jobs()
+            
+            #self.previousPage = self.wPages.currentWidget()
+            
+    def wJobStatusButton_on_clicked(self):
+        s = self.launcher.job_status()
+        self.wJobStatus.setText(s)
+        
+    def list_submitted_jobs(self):
+        s = self.launcher.list_jobs(self.launcher.get_submitted_jobs())
+        self.wSubmitted.setText(s)        
+
+    def list_retrieved_jobs(self):
+        s = self.launcher.list_jobs(self.launcher.retrieved_jobs)
+        self.wRetrieved.setText(s)        
+        
+    def script_to_resources(self):
+        text = self.wScript.toPlainText()
+        self.launcher.script.parse(text)
+        self.cws_lists.s2w('*')
+    
+    def resources_to_script(self):
+        self.cws_lists.w2s('*')
+        self.wScript.setPlainText(self.launcher.script.get_text())
     
     def wRemote_on_currentIndexChanged(self):
         with LogItem("Signal received: wRemote_on_currentIndexChanged()"):
@@ -718,10 +760,10 @@ class MainWindow(QMainWindow):
             if self.ignore_signals:
                 return
             if self.wRemote.currentText()=="$VSC_SCRATCH":
-                self.wRetrieveCopyToVSC_DATA.setEnabled(True)
+                self.wCopyToVSC_DATA.setEnabled(True)
             else:
-                self.wRetrieveCopyToVSC_DATA.setChecked(False)
-                self.wRetrieveCopyToVSC_DATA.setEnabled(False)
+                self.wCopyToVSC_DATA.setChecked(False)
+                self.wCopyToVSC_DATA.setEnabled(False)
     
     def wSave_on_clicked(self):
         with LogItem("Signal received: wSave_on_clicked()"):
@@ -746,7 +788,11 @@ class MainWindow(QMainWindow):
                                              )
                 if answer==QMessageBox.Open:
                     parent_folder = os.path.join(self.wLocal.text(),self.wSubfolder.text())
-                    self.launcher.load_job(parent_folder,self.wJobname.text())
+                    self.load_job(parent_folder,self.wJobname.text())
+    
+    def load_job(self,parent_folder,jobname):
+        self.launcher.load_job(parent_folder,jobname)
+        self.cws_lists.s2w()
     
     def wSubmit_on_clicked(self):
         with LogItem("Signal received: wSubmit_on_clicked()"):
@@ -762,12 +808,63 @@ class MainWindow(QMainWindow):
             print("    self.ignore_signals = {}".format(self.ignore_signals))
             if self.ignore_signals:
                 return
-            if not self.wRetrieveCopyToLocal.isChecked() and not self.wRetrieveCopyToVSC_DATA.isChecked():
+            if not self.wCopyToDesktop.isChecked() and not self.wCopyToVSC_DATA.isChecked():
                 msg = "Nothing to do.\nCheck at least one of the 'Copy to ...' checkboxes to specify a destination for the results."
                 QMessageBox.warning( self, '', msg)
     
             self.launcher.retrieve_finished_jobs()
                 
+    def wRetrieveSelected_on_clicked(self):
+        with LogItem("Signal received: wRetrieveSelected_on_clicked()"):
+            print("    self.ignore_signals = {}".format(self.ignore_signals))
+            if self.ignore_signals:
+                return
+            if not self.wCopyToDesktop.isChecked() and not self.wCopyToVSC_DATA.isChecked():
+                msg = "Nothing to do.\nCheck at least one of the 'Copy to ...' checkboxes to specify a destination for the results."
+                QMessageBox.warning( self, '', msg)
+            
+            job_id = self.wSubmitted.textCursor().selectedText()
+            job_data = self.launcher.get_submitted_jobs().get(job_id,None)
+            if job_data:
+                print('    retrieving job : '+job_id)
+                self.launcher.retrieve_finished_job_wrapper(job_id)
+                self.list_retrieved_jobs()
+                self.list_submitted_jobs()
+            else:
+                print("    job '{}' not found.".format(job_id))
+                msg = "Double click a job id to make a valid selection."
+                QMessageBox.warning( self, '', msg)
+                
+    def wDeleteSelected_on_clicked(self):
+        with LogItem("Signal received: wDeleteSelected_on_clicked()"):
+            print("    self.ignore_signals = {}".format(self.ignore_signals))
+            if self.ignore_signals:
+                return
+            job_id = self.wSubmitted.textCursor().selectedText()
+            job_data = self.launcher.get_submitted_jobs().get(job_id,None)
+            if not job_data:
+                job_id = self.wRetrieved.textCursor().selectedText()
+                job_data = self.launcher.get_submitted_jobs().get(job_id,None)
+            if job_data:
+                username = job_data['username']
+                cluster  = job_data['cluster' ]
+                local_folder = None
+                remote_folder= None
+                data_folder  = None
+                if self.wDeleteLocal.isChecked():
+                    local_folder = job_data['local folder'  ]
+                if self.wDeleteRemote.isChecked():
+                    remote_folder = job_data['remote folder']
+                    data_folder   = job_data['data folder'  ]
+                print('    retrieving job : '+job_id)
+                self.launcher.delete_job(username, cluster, local_folder, remote_folder, data_folder)
+                self.list_retrieved_jobs()
+                self.list_submitted_jobs()
+            else:
+                print("    job '{}' not found.".format(job_id))
+                msg = "Double click a job id to make a valid selection."
+                QMessageBox.warning( self, '', msg)
+                    
     def wModules_on_currentIndexChanged(self):
         with LogItem("Signal received: wModules_on_currentIndexChanged()"):
             print("    self.ignore_signals = {}".format(self.ignore_signals))
@@ -775,25 +872,19 @@ class MainWindow(QMainWindow):
                 return
             if not self.wModules.currentText().startswith('#'):
                 self.wScript.append("module load "+self.wModules.currentText())
-                
-    def wWalltime_set_single_step(self):
-        """ step is the unit just below the current 
-        """
-        i = self.wWalltimeUnit.currentIndex() 
-        if i==0:
-            step = 1
-        elif i<3:
-            step = 1./60
-        else:
-            step = 1./24
-        self.wWalltime.setSingleStep(step)
-    
+                    
     def set_status_text(self,text,timeout=10000):
         self.statusBar().showMessage(text,msecs=timeout)
     
     def closeEvent(self, *args, **kwargs):
         with LogItem("Closing LauncherPyQt5.MainWindow"):
+            self.cws_lists.w2c()
             self.launcher.config.save()
+            self.cws_lists.w2s()
+            if self.launcher.script.unsaved_changes():
+                pass
+            print('unsaved changes =',self.launcher.script.unsaved_changes())
+            
         return QMainWindow.closeEvent(self, *args, **kwargs)
     
 ################################################################################

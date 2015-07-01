@@ -82,15 +82,19 @@ class Config(object):
                 s+= "{} : {}\n".format(k,v) 
         return s
     
-    def create(self, name, value=None, default=None, choices=[], choices_is_range=False, inject_in=None):
-        if name in self.values:
-            return False
-        ConfigValue(config=self, name=name
-                   , value=value, default=default
-                   , choices=choices,choices_is_range=choices_is_range
-                   , inject_in=inject_in
-                   )
-        return True
+    def create(self, name, value=None, default=None, choices=[], choices_is_range=False, inject_in=None, update=False):
+        if not name in self.values:
+            ConfigValue(config=self, name=name
+                       , value=value, default=default
+                       , choices=choices,choices_is_range=choices_is_range
+                       , inject_in=inject_in
+                    )
+#             return True
+        else:
+            if update:
+                self.values[name].update(value=value, default=default, choices=choices, choices_is_range=choices_is_range)
+#             return False
+            
     
 ################################################################################
 class ConfigValue(object):
@@ -144,6 +148,21 @@ class ConfigValue(object):
         config.values[name] = self
         if not inject_in is None:
             self.inject(inject_in)
+            
+    def update(self, value=None, default=None, choices=[], choices_is_range=False):
+        if choices:         #update self.choices
+            self.choices = choices
+            self.choices_is_range = choices_is_range
+        if default:         #update default
+            self.is_valid_raise(default)
+            self.default = default
+        elif self.choices:  #update default 
+            self.default = self.choices[0]
+        if value:           #update value
+            self.is_valid_raise(value)
+            self.value = value
+        elif self.default:  #update value
+            self.value = self.default
             
     def is_valid(self,value):
         """

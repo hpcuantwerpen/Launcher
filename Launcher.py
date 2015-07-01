@@ -81,44 +81,40 @@ class Launcher(object):
     is_testing = False
     verbose    = False
 
-    def change_cluster(self,value=None,default=None,choices=[],inject_in=None):
-        self.config.create('cluster',value=value,default=default,choices=choices            , inject_in=inject_in)
+    def change_cluster(self,value=None,default=None,choices=[],inject_in=None,update=False):
+        self.config.create('cluster',value=value,default=default,choices=choices            , inject_in=inject_in, update=update)
         cluster = self.config['cluster'].get()
-        self.change_nodeset(               choices=clusters.decorated_nodeset_names(cluster), inject_in=inject_in)
+        self.change_nodeset(               choices=clusters.decorated_nodeset_names(cluster), inject_in=inject_in, update=update)
         self.config.create('walltime_seconds', default=3600, choices=[1,clusters.walltime_limit[cluster]]
-                                             , choices_is_range=True                        , inject_in=inject_in)
-        self.config.create('walltime_unit'   , default='hours', choices=list(walltime_units), inject_in=inject_in)
-        self.config.create('username'        , default=None                                 , inject_in=inject_in)
-        self.config.create('login_node'      , choices=clusters.login_nodes[cluster]        , inject_in=inject_in)
-        self.config.create('module_lists'    , default={}                                   , inject_in=inject_in)
-        try:
-            modules = self.get_modules()              
-        except Exception as e:
-            log_exception(e)
-        else:
-            self.config['module_lists'].get()[cluster] = modules
-    def change_nodeset(self,value=None,default=None,choices=[],inject_in=None):
-        self.config.create('nodeset',value=value,default=default,choices=choices            , inject_in=inject_in)
+                                             , choices_is_range=True                        , inject_in=inject_in, update=update)
+        self.config.create('walltime_unit'   , default='hours', choices=list(walltime_units), inject_in=inject_in, update=update)
+        self.config.create('username'        , default=None                                 , inject_in=inject_in, update=update)
+        self.config.create('login_node'      , choices=clusters.login_nodes[cluster]        , inject_in=inject_in, update=update)
+        self.config.create('module_lists'    , default={}                                   , inject_in=inject_in, update=False)
+        self.get_modules()              
+            
+    def change_nodeset(self,value=None,default=None,choices=[],inject_in=None,update=False):
+        self.config.create('nodeset',value=value,default=default,choices=choices            , inject_in=inject_in, update=update)
         cluster = self.config['cluster'].get()
         nodeset_name = self.config['nodeset'].get()
         nodeset_index= self.config['nodeset'].choices.index(nodeset_name)
         nodeset = clusters.nodesets[cluster][nodeset_index]
-        self.change_nodes(choices=[1,nodeset.n_nodes]         , choices_is_range=True       , inject_in=inject_in)
-        self.change_ppn  (choices=[1,nodeset.n_cores_per_node], choices_is_range=True       , inject_in=inject_in)
-        self.change_gbpn (value=nodeset.gb_per_node                                         , inject_in=inject_in)
-    
+        self.change_nodes(choices=[1,nodeset.n_nodes]         , choices_is_range=True       , inject_in=inject_in, update=update)
+        self.change_ppn  (choices=[1,nodeset.n_cores_per_node], choices_is_range=True       , inject_in=inject_in, update=update)
+        self.change_gbpn (value=nodeset.gb_per_node                                         , inject_in=inject_in, update=update)
+        self.nodeset = nodeset
         
-    def change_nodes(self,value=None,default=None,choices=[],choices_is_range=False,inject_in=None):
+    def change_nodes(self,value=None,default=None,choices=[],choices_is_range=False,inject_in=None,update=False):
         self.config.create('nodes',value=value,default=default
-                          , choices=choices, choices_is_range=choices_is_range, inject_in=inject_in)
+                          , choices=choices, choices_is_range=choices_is_range, inject_in=inject_in,update=update)
     
-    def change_ppn(self,value=None,default=None,choices=[],choices_is_range=False,inject_in=None):
+    def change_ppn(self,value=None,default=None,choices=[],choices_is_range=False,inject_in=None,update=False):
         self.config.create('ppn'  ,value=value,default=choices[-1]
-                          , choices=choices, choices_is_range=choices_is_range, inject_in=inject_in)
+                          , choices=choices, choices_is_range=choices_is_range, inject_in=inject_in, update=update)
     
-    def change_gbpn(self,value=None,default=None,choices=[],choices_is_range=False,inject_in=None):
+    def change_gbpn(self,value=None,default=None,choices=[],choices_is_range=False,inject_in=None,update=False):
         self.config.create('gbpn',value=value,default=default
-                          , choices=choices, choices_is_range=choices_is_range, inject_in=inject_in)
+                          , choices=choices, choices_is_range=choices_is_range, inject_in=inject_in, update=update)
     
     def __init__(self,reset=False):        
         cfg.Config.verbose = True
@@ -142,15 +138,17 @@ class Launcher(object):
         self.config.create('notify_M', default='your.email@address.here', inject_in=self)
         self.config.create('notify_m', default='e'                      , inject_in=self)
 
-        self.config.create('enforce_n_nodes'   , choices=[True,False], inject_in=self)
-        self.config.create('automatic_requests', choices=[True,False], inject_in=self)
+        self.config.create('enforce_n_nodes'     , choices=[True,False] , inject_in=self)
+        self.config.create('automatic_requests'  , choices=[True,False] , inject_in=self)
             
         default = os.path.join(constants.launcher_home(),'jobs')
-        self.config.create('local_file_location',default=default,inject_in=self)
-        self.config.create('remote_file_location',choices=["$VSC_SCRATCH","$VSC_DATA"],inject_in=self)
-        self.config.create('subfolder',default='',inject_in=self)
-        self.config.create('retrieve_copy_to_desktop' ,choices=[True,False],inject_in=self)
-        self.config.create('retrieve_copy_to_VSC_DATA',choices=[False,True],inject_in=self)
+        self.config.create('local_file_location' , default=default      , inject_in=self)
+        self.config.create('remote_file_location'
+                                 , choices=["$VSC_SCRATCH","$VSC_DATA"] , inject_in=self)
+        self.config.create('subfolder'           , default=''           , inject_in=self)
+        self.config.create('jobname'             , default=''           , inject_in=self)
+        self.config.create('copy_to_desktop'     , choices=[True,False] , inject_in=self)
+        self.config.create('copy_to_VSC_DATA'    , choices=[False,True] , inject_in=self)
         
         if Launcher.is_testing:
             with LogItem('Config values'):
@@ -160,6 +158,9 @@ class Launcher(object):
         Script.auto_unhide = True
         self.script = Script(config=self.config)
         self.script.set_unsaved_changes(False)
+        self.retrieved_jobs = OrderedDict()
+        self.summary = [0,0,0,0,0]
+
     
     def load_job(self,parent_folder,jobname):
         """
@@ -266,7 +267,7 @@ class Launcher(object):
             else:
                 job_id = out[0].split('.')[0]
                 msg = 'Submitted job : job_id = '+job_id
-                if self.get_retrieve_copy_to_VSC_DATA():
+                if self.get_copy_to_VSC_DATA():
                     vsc_data_folder='$VSC_DATA'
                     folders_loc = local_folder .split(os.sep)
                     folders_rmt = remote_folder.split(posixpath.sep)
@@ -278,14 +279,15 @@ class Launcher(object):
                         vsc_data_folder = posixpath.join(vsc_data_folder,folders_rmt[i])
                 else:
                     vsc_data_folder = ''
-                self.get_submitted_jobs()[job_id] = {'cluster'            : self.get_cluster()
-                                                    ,'username'           : self.get_username()
-                                                    ,'job_folder_local'   : local_folder
-                                                    ,'job_folder_remote'  : remote_folder
-                                                    ,'job_folder_VSC_DATA': vsc_data_folder
-                                                    ,'jobname'            : jobname
-                                                    ,'status'             : 'submitted'
-                                                    }
+                job_data = OrderedDict()
+                job_data['jobname'        ] = jobname
+                job_data['cluster'        ] = self.get_cluster()
+                job_data['username'       ] = self.get_username()
+                job_data['local folder'   ] = local_folder
+                job_data['remote folder'  ] = remote_folder
+                job_data['VSC_DATA folder'] = vsc_data_folder
+                job_data['status'         ] = 'submitted'
+                self.get_submitted_jobs()[job_id] = job_data 
             self.set_status_text(msg)
                  
         ssh.close()
@@ -306,20 +308,20 @@ class Launcher(object):
           this gives a list of folders and files (full name)
             tree -fi
         """
-#         cluster      = job_data['cluster']
-#         user_id      = job_data['user_id']
-        local_folder = job_data['local_folder']
-        remote_folder= job_data['remote_folder']
-        jobname      = job_data['jobname']
+        cluster      = job_data['cluster'      ]
+        username     = job_data['username'     ]
+        local_folder = job_data['local folder' ]
+        remote_folder= job_data['remote folder']
+        jobname      = job_data['jobname'      ]
         try:
-            ssh = sshtools.Client(self.get_username(),self.get_login_node())
+            ssh = sshtools.Client(username,clusters.login_nodes[cluster][0])
             ssh_ftp = ssh.open_sftp()
         except Exception as e:
             log_exception(e)
             self.set_status_text("Failed to retrieve job {} : '{}': No connection established.".format(job_id,jobname))
             job_data['status'] = 'not retrieved due to no connection (Paramiko/SSH).'
             return FJR_NO_CONNECTION
-        if self.get_retrieve_copy_to_VSC_DATA():
+        if self.get_copy_to_VSC_DATA():
             pass
         try:
             cmd = 'cd '+remote_folder
@@ -344,11 +346,11 @@ class Launcher(object):
             out,err = ssh.execute(cmd)
             remote_folders = make_tree_output_relative(out)
             for f in remote_folders:
-                if self.get_retrieve_copy_to_desktop():
+                if self.get_copy_to_desktop():
                     lf = os.path.join(local_folder,f)
                     self.set_status_text("Creating local folder '{}'.".format(lf))
                     my_makedirs(lf)
-                if self.get_retrieve_copy_to_VSC_DATA():
+                if self.get_copy_to_VSC_DATA():
                     lf = os.path.join('$VSC_DATA',f)
                     self.set_status_text("Creating $VSC_DATA folder '{}'.".format(lf))
                     cmd = "mkdir -p "+lf
@@ -357,11 +359,11 @@ class Launcher(object):
             for f in remote_files_and_folders:
                 if not f in remote_folders:
                     rf = os.path.join(remote_folder,f)
-                    if self.get_retrieve_copy_to_desktop():
+                    if self.get_copy_to_desktop():
                         lf = os.path.join(local_folder,f)
                         self.set_status_text("Copying remote file '{}' to '{}'.".format(rf,lf))
                         ssh_ftp.get(rf,lf) 
-                    if self.get_retrieve_copy_to_VSC_DATA():
+                    if self.get_copy_to_VSC_DATA():
                         lf = os.path.join(self.vsc_data_folder,f)
                         self.set_status_text("Copying remote file '{}' to '{}'.".format(rf,lf))
                         cmd = "cp {} {}".format(rf,lf)
@@ -378,93 +380,117 @@ class Launcher(object):
             ssh.close()
             return FJR_ERROR
         
+    def retrieve_finished_job_wrapper(self,job_id):
+        submitted_jobs = self.get_submitted_jobs() 
+        job_data = submitted_jobs[job_id]
+        ret = self.retrieve_finished_job(job_id,job_data)
+        if ret == FJR_SUCCESS:
+            self.retrieved_jobs[job_id] = job_data
+            del  submitted_jobs[job_id]
+        elif ret == FJR_INEXISTING:
+            self.retrieved_jobs[job_id] = job_data
+            del  submitted_jobs[job_id]
+        self.summary[ret]+=1
+        
     def retrieve_finished_jobs(self):
         self.set_status_text('Starting to retrieve finished jobs ...')
         self.retrieved_jobs = {}
-        summary = [0,0,0,0,0]
-        for job_id,job_data in self.get_submitted_jobs().iteritems():
-            ret = self.retrieve_finished_job(job_id,job_data)
-            if ret == FJR_SUCCESS:
-                self.retrieved_jobs[job_id] = job_data
-            elif ret == FJR_INEXISTING:
-                del self.config.submitted[job_id]
-                print("Removed job {}: remote directory no longer exists.".format(job_id))
-                pprint.pprint(job_data)
-                print
-            summary[ret]+=1
-        for key in self.retrieved_jobs:
-            del self.get_submitted_jobs()[key] # can't do this on the fly
 
-        tot = sum(summary)
-        summary.append(tot)
-        summary.append(summary[5]-summary[0])
-        msg='Retrieved={}, removed={}, not finished={}, no connection={}, error={}, total={}, remaining={}'.format(*summary)
+        for job_id in self.get_submitted_jobs().keys():
+            self.retrieve_finished_job_wrapper(job_id)
+
+        tot = sum(self.summary)
+        self.summary.append(tot)
+        self.summary.append(self.summary[5]-self.summary[0])
+        msg='Retrieved={}, removed={}, not finished={}, no connection={}, error={}, total={}, remaining={}'.format(*self.summary)
         self.set_status_text(msg)
         
         with LogItem("Retrieved jobs:"):
             print(Indent(self.retrieved_jobs,indent=4))
+    
+    def delete_job(self,username,cluster,local_folder=None,remote_folder=None,data_folder=None):
+        if local_folder:
+            shutil.rmtree(local_folder)
+        ssh = sshtools.Client(username=username,login_node=clusters.login_nodes[cluster][0])
+        if remote_folder:
+            cmd = 'rm -rf '+remote_folder
+            ssh.execute(cmd)
+        if data_folder:
+            cmd = 'rm -rf '+remote_folder
+            ssh.execute(cmd)
 
-    def show_retrieved_jobs(self):
-        if not hasattr(self,'retrieved_jobs'):
-            self.retrieved_jobs = {}
-        self.show_jobs(self.wJobsRetrieved,self.retrieved_jobs)
-    
-    def show_submitted_jobs(self):
-        self.show_jobs(self.wJobsSubmitted,self.get_submitted_jobs(),none="All finished jobs are retrieved.\n")        
-        ssh = sshtools.Client(self.get_username(),self.get_login_node())
-        if ssh.connected():
-            cmd = "qstat -u "+self.wUserId.GetValue()
-            out,err = ssh.execute(cmd)
-            ssh.close()
-            for line in out:
-                self.wJobsSubmitted.AppendText(line)
-            del err
-        else:
-            msg = 'No info on status of submitted jobs (no Paramiko/SSH connection).'
-            self.set_status_text(msg)
-            
-    def show_jobs(self,textctrl,jobs,none="-- none --"):
-        """
-        show information on a set of jobs in textctrl
-        """
-        textctrl.SetValue('')
-        if jobs:
-            for k,v in jobs.iteritems():
-                textctrl.AppendText("job_id={}\n".format(k))
-                for kk,vv in v.iteritems():
-                    textctrl.AppendText("   {:<13} : '{}'\n".format(kk,vv))
-                textctrl.AppendText("\n")
-        else:
-            textctrl.SetValue(none)
-            
-    def get_modules(self):
+    def job_status(self):
         username = self.get_username()
-        if not username:
-            username = sshtools.Client.username
-        ssh = sshtools.Client(username,self.get_login_node())
-        stdout, stderr = ssh.execute('module avail -t')
-        lines = stderr # yes, module avail writes to stderr
-        del stdout
-        ssh.close()
-        
-        lsts = {}
-        for line in lines:
-            line = line.strip()
-            if line:
-                if line.startswith('/'):
-                    lsts[line] = []
-                    lst = lsts[line]
-                else:
-                    lst.append(line)
-        
-        cluster = self.get_cluster().lower()
-        module_list = []
-        for k,v in lsts.iteritems():
-            if cluster in k.lower():
-                module_list.append('### '+k+' ###')
-                module_list.extend(v) 
-        return module_list
-    
+        cluster  = self.get_cluster ()
+        try:
+            ssh = sshtools.Client(username,clusters.login_nodes[cluster][0])
+        except Exception as e:
+            log_exception(e)
+            s = 'No info on status of submitted jobs (no Paramiko/SSH connection).'
+        else:
+            cmd = "qstat -u "+username
+            out,err = ssh.execute(cmd)
+            del err
+            ssh.close()
+            s=''
+            for line in out:
+                s+=line
+        return s
+            
+    def list_jobs(self,jobs): 
+        s = ""
+        for job_id,job_data in jobs.iteritems():
+            s+='\n'+'job id'.ljust(17)+': '+str(job_id)
+            for k,v in job_data.iteritems():
+                s+='\n  '+ k.ljust(15)+': '+v
+        if s:
+            s=s[1:]
+        return s
+    def get_modules(self):
+        today = datetime.datetime.today()
+        today = (today.year,today.month,today.day)
+        cluster = self.get_cluster()
+        try:
+            modules = self.get_module_lists()[cluster]
+        except Exception as e:
+            log_exception(e)
+        else:
+            if isinstance(modules,tuple) and not modules[1]<today:
+                with LogItem("Looking for module list."):
+                    print("    Module list for {} : {} modules available (found in config file).".format(cluster,len(modules[0])))
+                return modules[0]  # no need to retrieve the module list again
+        try:
+            ssh = sshtools.Client(self.get_username(),self.get_login_node())
+            stdout, stderr = ssh.execute('module avail -t')
+            lines = stderr # yes, module avail writes to stderr
+            del stdout
+            ssh.close()
+            
+            lsts = {}
+            for line in lines:
+                line = line.strip()
+                if line:
+                    if line.startswith('/'):
+                        lsts[line] = []
+                        lst = lsts[line]
+                    else:
+                        lst.append(line)
+            
+            c = cluster.lower()
+            module_list = []
+            for k,v in lsts.iteritems():
+                if c in k.lower():
+                    module_list.append('### '+k+' ###')
+                    module_list.extend(v) 
+        except Exception as e:
+            log_exception(e)
+        else:
+            with LogItem("Looking for module list."):
+                print("    Module list retrieved for {} : {} modules available.".format(cluster,len(module_list)))
+            self.get_module_lists()[cluster] = (module_list,today)
+            return module_list
+        return ["### module list not available ###"]
+
 ################################################################################
 re_walltime = re.compile(r'(\d+):(\d\d):(\d\d)')
 
@@ -503,16 +529,18 @@ def abort_to_abe(abort,abe):
         if not 'a' in abe:
             abe+='a'
     else:
-        abe = abe.replace('a','')            
+        abe = abe.replace('a','')      
+    return abe      
 ################################################################################
 def abe_to_begin(abe):
     return 'b' in abe
 def begin_to_abe(begin,abe):
     if begin:
         if not 'b' in abe:
-            abe+=''
+            abe+='b'
     else:
         abe = abe.replace('b','')            
+    return abe      
 ################################################################################
 def abe_to_end(abe):
     return 'e' in abe
@@ -522,6 +550,7 @@ def end_to_abe(end,abe):
             abe+='e'
     else:
         abe = abe.replace('e','')            
+    return abe      
 ################################################################################
 class UnknownCluster(Exception):
     pass

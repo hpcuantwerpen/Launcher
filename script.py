@@ -656,6 +656,7 @@ class Script(object):
             for sl in self.script_lines:
                 if not sl.hidden:
                     sl.compose()
+                if not sl.hidden:
                     self.text += sl.text
         return self.text
     
