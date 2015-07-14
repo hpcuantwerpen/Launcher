@@ -1,9 +1,10 @@
-#include <QString>
 #include <QtTest>
-#include <QtDebug>
-#include <iostream>
 
 #include "cfg.h"
+
+
+#include <iostream>
+using std::logic_error;
 
 class CfgTest : public QObject
 {
@@ -50,6 +51,9 @@ void CfgTest::testCase1()
     QList<QVariant> choices;
     choices.append(1);
     choices.append(3);
+    std::cout << choices.first().typeName() << choices.first().type() << std::endl;
+    item.set_choices(choices);
+    choices.append(4);
     item.set_choices(choices);
     QVERIFY2(item.default_value()==1, "Failure");
     item.set_value(3);
@@ -57,12 +61,33 @@ void CfgTest::testCase1()
     try {
         item.set_value(2);
         QVERIFY2(false, "Failure");
-    } catch(std::exception e) {}
+    } catch(logic_error &e) {
+        std::cout << "(Intentional) Error: " << e.what();
+    }
+    try {
+        item.set_choices(choices,true);
+        QVERIFY2(false, "Failure");
+    } catch(logic_error &e) {
+        std::cout << "(Intentional) Error: " << e.what();
+    }
+    choices.removeAt(2);
     item.set_choices(choices,true);
     item.set_value(2);
     QVERIFY2(item.value()==2, "Failure");
-    item.set_value(2.5);
-    QVERIFY2(item.value()==2.5, "Failure");
+    try {
+        item.set_value(2.5);
+        QVERIFY2(false, "Failure");
+    } catch(logic_error &e) {
+        std::cout << "(Intentional) Error: " << e.what();
+    }
+    try {
+        choices.first()=4;
+        choices.last() =3;
+        item.set_choices(choices,true);
+        QVERIFY2(false, "Failure");
+    } catch(logic_error &e) {
+        std::cout << "(Intentional) Error: " << e.what();
+    }
 }
 
 QTEST_APPLESS_MAIN(CfgTest)

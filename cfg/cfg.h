@@ -6,28 +6,13 @@
 #include <QVariant>
 #include <QList>
 
-#include <exception>
+#include <stdexcept>
 
 namespace cfg
 {//-----------------------------------------------------------------------------
     class Item;
  //-----------------------------------------------------------------------------
     typedef QMap<QString,Item> Config_t;
- //-----------------------------------------------------------------------------
-//    todo
-//    class InvalidValue : public std::exception
-//    {
-//    public:
-//        InvalidValue() {}
-//        virtual char const* what() const throw() {
-//            return what_.;
-//        }
-//        virtual ~InvalidValue() throw() {}
-//    private:
-//        QString what_;
-//    };
-//    todo
-//    class InvalidType : public std::exception
  //-----------------------------------------------------------------------------
     class Item
     {
@@ -80,6 +65,7 @@ namespace cfg
         QVariant        default_value_;
         QList<QVariant> choices_;
         bool            choices_is_range_;
+        QVariant::Type  range_type_;
     };
  //-----------------------------------------------------------------------------
     QDataStream &operator<<(QDataStream& ds, Item const& item);

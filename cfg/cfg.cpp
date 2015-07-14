@@ -6,6 +6,21 @@
 
 namespace cfg
 {//-----------------------------------------------------------------------------
+    QString rangeToString( QList<QVariant> const& range, bool add_type = false )
+    {
+        QString qs = "[";
+        qs.append( range.first().toString() );
+        if( add_type )
+            qs.append( " (").append(range.first().typeName()).append(")");
+        for( int i=1; i<range.size(); ++i ) {
+            qs.append(", ").append(range[i].toString());
+            if( add_type )
+                qs.append( " (").append(range[i].typeName()).append(")");
+        }
+        qs.append("]");
+        return qs;
+    }
+ //-----------------------------------------------------------------------------
     Item::Item(const QString &name) : name_(name) {}
  //-----------------------------------------------------------------------------
     Item::Item(Item const& rhs)
@@ -21,18 +36,36 @@ namespace cfg
         bool ok = true;
         if( this->choices_is_range_ ) {
             if( !choices_.empty() ) {
-                //todo make sure this fails when a float value is given for int range.
-                QVariant const& c0 = this->choices().first();
-                ok = c0 <= value;
-                ok&=       value <= this->choices().last();
+                ok = value.type()==this->range_type_
+                  && this->choices().first() <= value
+                  &&                            value <= this->choices().last();
+                if( !ok && trow ) {
+                    QString qs = "Value ";
+                    qs.append( value.toString() )
+                      .append(" (")
+                      .append( value.typeName() )
+                      .append(") is not in ")
+                      .append( this->choices().first().typeName() )
+                      .append(" range ")
+                      .append( rangeToString(this->choices()) )
+                      .append(".\n")
+                      ;
+                    throw std::logic_error(qs.toStdString());
+                }
             }
         } else {
             if( !choices_.empty() ) {
                 ok = this->choices().contains(value);
+                if( !ok && trow ) {
+                    QString qs = "Value ";
+                    qs.append( value.toString() )
+                      .append(" is not a valid choice. Valid choices are: ")
+                      .append( rangeToString( this->choices() ) )
+                      .append(".\n")
+                      ;
+                    throw std::logic_error(qs.toStdString());
+                }
             }
-        }
-        if( !ok and trow ) {
-            throw std::exception();
         }
         return ok;
     }
@@ -42,25 +75,47 @@ namespace cfg
       , bool                   is_range
       )
     {
-        this->choices_ = choices;
-        if( choices.empty() ) {
-            this->choices_is_range_ = false;
+        if( is_range )
+        {// validate the range
+            if( choices.size() > 2 ) {
+                QString qs = "Ranges of more than 2 elements are invalid: range is ";
+                qs.append( rangeToString( choices ) ).append(".\n");
+                throw std::logic_error(qs.toStdString());
+            }
+            if( choices.first().typeName() != choices.last().typeName() ) {
+                QString qs = "The elements of a range must be of the same type: range is ";
+                qs.append( rangeToString( choices, true ) ).append(".\n");
+                throw std::logic_error(qs.toStdString());
+            }
+            QVariant::Type range_type = choices.first().type();
+            if( range_type != QVariant::Int
+             && range_type != QVariant::Double ) {
+                QString qs = "The elements of a range must be of type int or double: range is ";
+                qs.append( rangeToString( choices, true ) ).append(".\n");
+                throw std::logic_error(qs.toStdString());
+            }
+            if( choices.first() > choices.last() ) {
+                QString qs = "Empty range (the first element is larger than the last): range is ";
+                qs.append( rangeToString( choices ) ).append(".\n");
+                throw std::logic_error(qs.toStdString());
+            }
+            this->range_type_ = range_type;
         } else {
-            this->choices_is_range_ = is_range;
-            this->default_value_ = choices.at(0);
-
-            if( this->default_value_==QVariant() ) {
-                this->default_value_ = choices.at(0);
-            } else if( !this->is_valid(this->default_value_) ) {
-                this->default_value_ = choices.at(0);
-            }
-
-            if( this->value_==QVariant() ) {
-                this->value_ = this->default_value_;
-            } else if( !this->is_valid(this->value_) ) {
-                this->value_ = this->default_value_;
-            }
+            this->range_type_ = QVariant::Invalid;
         }
+    // initialize *this
+       this->choices_is_range_ = is_range;
+       this->choices_ = choices;
+    // adjust default value
+       if( (this->default_value_==QVariant()) || (!this->is_valid(this->default_value_)) )
+       {// there is no current default value or it is invalid
+           this->default_value_ = choices.at(0);
+       }
+    // adjust value
+       if( (this->value_==QVariant()) || (!this->is_valid(this->value_)) )
+       {// there is no current value or it is invalid
+           this->value_ = this->default_value_;
+       }
     }
  //-----------------------------------------------------------------------------
     void Item::set_default_value(QVariant const& default_value)
