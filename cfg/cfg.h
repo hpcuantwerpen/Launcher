@@ -71,8 +71,8 @@ namespace cfg
     QDataStream &operator<<(QDataStream& ds, Item const& item);
     QDataStream &operator>>(QDataStream& ds, Item      & item);
  //-----------------------------------------------------------------------------
-    void load(QString const& filename, Config_t      & config);
-    void save(QString const& filename, Config_t const& config);
+    void load(Config_t      & config, QString const& filename);
+    void save(Config_t const& config, QString const& filename);
  //-----------------------------------------------------------------------------
 }// namespace cfg
 

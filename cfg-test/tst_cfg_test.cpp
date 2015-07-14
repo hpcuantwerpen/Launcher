@@ -1,5 +1,8 @@
 #include <QtTest>
 
+#include <QDataStream>
+#include <QIODevice>
+
 #include "cfg.h"
 
 
@@ -16,6 +19,7 @@ public:
 private Q_SLOTS:
     void testCase0();
     void testCase1();
+    void testCase2();
 };
 
 CfgTest::CfgTest()
@@ -87,6 +91,53 @@ void CfgTest::testCase1()
         QVERIFY2(false, "Failure");
     } catch(logic_error &e) {
         std::cout << "(Intentional) Error: " << e.what();
+    }
+}
+
+void CfgTest::testCase2()
+{
+    {
+        cfg::Item item("item");
+        QList<QVariant> choices;
+        choices.append(1);
+        choices.append(2);
+        item.set_choices(choices);
+
+        QFile file("item.txt");
+        file.open(QIODevice::WriteOnly|QIODevice::Truncate);
+        QDataStream ds(&file);
+
+        ds << item;
+    }
+    {
+        cfg::Item item;
+
+        QFile file("item.txt");
+        file.open(QIODevice::ReadOnly);
+        QDataStream ds(&file);
+
+        ds >> item;
+
+        QVERIFY2(item.name()=="item", "Failure");
+        QVERIFY2(item.value()==1, "Failure");
+        QVERIFY2(item.default_value()==1, "Failure");
+        QVERIFY2(item.choices().first()==1, "Failure");
+        QVERIFY2(item.choices().last ()==2, "Failure");
+
+        cfg::Config_t config;
+        config[item.name()] = item;
+        cfg::save(config,"config.cfg");
+    }
+    {
+        cfg::Config_t config;
+        cfg::load(config, "config.cfg");
+        cfg::Item & item = config["item"];
+
+        QVERIFY2(item.name()=="item", "Failure");
+        QVERIFY2(item.value()==1, "Failure");
+        QVERIFY2(item.default_value()==1, "Failure");
+        QVERIFY2(item.choices().first()==1, "Failure");
+        QVERIFY2(item.choices().last ()==2, "Failure");
     }
 }
 

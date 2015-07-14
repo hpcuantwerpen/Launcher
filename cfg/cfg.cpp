@@ -160,7 +160,7 @@ namespace cfg
         return ds;
     }
  //-----------------------------------------------------------------------------
-    QDataStream &operator>>(QDataStream& ds, Item      & item)
+    QDataStream &operator>>(QDataStream& ds, Item & item)
     {
         QString         name;
         QVariant        value, default_value;
@@ -178,7 +178,7 @@ namespace cfg
     }
 
  //-----------------------------------------------------------------------------
-    void load(QString const& filename, Config_t& config)
+    void load(Config_t& config, QString const& filename)
     {
         QFile file(filename);
         file.open(QIODevice::ReadOnly);
@@ -186,7 +186,7 @@ namespace cfg
         ds >> config;
     }
  //-----------------------------------------------------------------------------
-    void save(QString const& filename, Config_t const& config)
+    void save(Config_t const& config, QString const& filename)
     {
         QFile file(filename);
         file.open(QIODevice::WriteOnly|QIODevice::Truncate);
