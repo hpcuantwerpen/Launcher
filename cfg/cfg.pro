@@ -9,6 +9,7 @@ QT       -= gui
 TARGET = cfg
 TEMPLATE = lib
 CONFIG += staticlib
+CONFIG += c++11
 
 SOURCES += cfg.cpp
 

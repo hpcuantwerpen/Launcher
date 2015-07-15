@@ -11,6 +11,7 @@ QT       -= gui
 TARGET = tst_ssh2_test
 CONFIG   += console
 CONFIG   -= app_bundle
+CONFIG += c++11
 
 TEMPLATE = app
 

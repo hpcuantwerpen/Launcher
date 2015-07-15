@@ -9,6 +9,7 @@ QT       -= gui
 TARGET = ssh2
 TEMPLATE = lib
 CONFIG += staticlib
+CONFIG += c++11
 
 SOURCES += ssh2.cpp
 

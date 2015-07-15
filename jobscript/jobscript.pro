@@ -9,6 +9,7 @@ QT       -= gui
 TARGET = jobscript
 TEMPLATE = lib
 CONFIG += staticlib
+CONFIG += c++11
 
 SOURCES += jobscript.cpp
 
