@@ -4,17 +4,14 @@
 #
 #-------------------------------------------------
 
+include(../common.pri)
+
 QT       -= gui
 
 TARGET = cfg
 TEMPLATE = lib
 CONFIG += staticlib
-CONFIG += c++11
 
 SOURCES += cfg.cpp
 
 HEADERS += cfg.h
-unix {
-    target.path = /usr/lib
-    INSTALLS += target
-}

@@ -3,20 +3,20 @@
 # Project created by QtCreator 2015-07-14T10:24:34
 #
 #-------------------------------------------------
+include(../common.pri)
 
 QT       -= gui
 
-TARGET = ssh2
+TARGET = ssh2tools
 TEMPLATE = lib
 CONFIG += staticlib
-CONFIG += c++11
 
-SOURCES += ssh2.cpp
+SOURCES += ssh2tools.cpp
 
-HEADERS += ssh2.h
-unix {
-    LIBS += -L/opt/local/lib/ -lssh2
-    INCLUDEPATH += /opt/local/include
-    target.path = /usr/lib
-    INSTALLS += target
-}
+HEADERS += ssh2tools.h
+
+arg_path = ..
+arg_lib  = toolbox
+include(../depend_on_lib.pri)
+
+include(libssh2.pri)

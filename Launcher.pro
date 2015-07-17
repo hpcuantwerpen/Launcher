@@ -1,16 +1,18 @@
 TEMPLATE = subdirs
 
-SUBDIRS += \
-    cfg \
-    cfg-test \
-    Launcher \
-#    ssh2 \
-#    ssh2-test \
-    jobscript \
-    jobscript-test
 
-cfg-test.depends = cfg
-ssh2-test.depends = ssh2
-jobscript-test.depends = jobscript
+SUBDIRS +=          \
+    toolbox         \
+    toolbox_test    \
+    cfg             \
+    cfg_test        \
+    Launcher        \
+    ssh2tools       \
+    ssh2tools_test  \
+    jobscript       \
+    jobscript_test
 
-CONFIG += c++11
+  toolbox_test.depends = toolbox
+      cfg_test.depends = cfg
+ssh2tools_test.depends = ssh2tools toolbox
+jobscript-test.depends = jobscript toolbox

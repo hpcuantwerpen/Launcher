@@ -4,14 +4,7 @@
 #include <stdexcept>
 
 namespace pbs
-{//=============================================================================
- /* ShellCommand
-    +- UserComment
-       +- Shebang
-       +- LauncherComment
-       +- PbsDirective
-  */
- //=============================================================================
+{//-----------------------------------------------------------------------------
     template <class T>
     T* create(QString const& line )
     {
@@ -25,73 +18,11 @@ namespace pbs
         }
         return ptrT;
     }
- //=============================================================================
-    class ShellCommand
-    {
-    public:
-        ShellCommand(QString const& line);
-        virtual void init() {}
-        virtual ~ShellCommand() {}
-
-        static ShellCommand* parse ( QString const &line);
-
-        virtual int ordinate() const;
-    private:
-        QString text_;
-        static int ordinate_;
-    };
- //=============================================================================
-    class UserComment : public ShellCommand
-    {
-    public:
-        UserComment(QString const& line);
-
-        static UserComment* parse( QString const &line);
-
-        virtual int ordinate() const;
-    private:
-    };
- //=============================================================================
-    class Shebang: public UserComment
-    {
-    public:
-        Shebang(QString const& line);
-
-        static Shebang* parse( QString const &line);
-
-        virtual int ordinate() const;
-    private:
-    };
- //=============================================================================
-    class LauncherComment : public UserComment
-    {
-    public:
-        LauncherComment(QString const& line);
-        virtual void init();
-
-        static LauncherComment* parse( QString const &line);
-
-        virtual int ordinate() const;
-    private:
-        static QRegularExpression lc_line_pattern_;
-        static QRegularExpression lc_parm_pattern_;
-    };
-    QRegularExpression LauncherComment::lc_line_pattern_("#La#(\\s+)(.+)");
-    QRegularExpression LauncherComment::lc_parm_pattern_("(\\w+)\\s*=\\s*(.+)");
- //=============================================================================
-    class PbsDirective : public UserComment
-    {
-    public:
-        PbsDirective(QString const& line);
-        virtual void init();
-
-        static PbsDirective* parse( QString const &line);
-
-        virtual int ordinate() const;
-    private:
-    };
- //=============================================================================
-
+ //-----------------------------------------------------------------------------
+    ShellCommand * parse(QString const & line) {
+        return ShellCommand::parse(line);
+    }
+ //-----------------------------------------------------------------------------
     ShellCommand*
     ShellCommand::
     parse( QString const &line )
@@ -141,11 +72,6 @@ namespace pbs
         else
             return create<LauncherComment>(line);
     }
-    void
-    LauncherComment::
-    init()
-    {
-    }
  //-----------------------------------------------------------------------------
     PbsDirective*
     PbsDirective::
@@ -156,339 +82,59 @@ namespace pbs
         else
             return create<PbsDirective>(line);
     }
-    void
-    PbsDirective::
-    init()
-    {
-    }
  //-----------------------------------------------------------------------------
     ShellCommand::
-    ShellCommand(QString const& line)
+    ShellCommand(QString const& line, int ordinate, types::Type type)
       : text_(line)
+      , ordinate_(ordinate)
+      , type_(type)
     {}
  //-----------------------------------------------------------------------------
     UserComment::
-    UserComment(QString const& line)
-      : ShellCommand(line)
+    UserComment(QString const& line, int ordinate, types::Type type)
+      : ShellCommand(line,ordinate,type)
     {}
  //-----------------------------------------------------------------------------
     Shebang::
-    Shebang( QString const &line)
-      : UserComment(line)
+    Shebang( QString const &line, int ordinate, types::Type type)
+      : UserComment(line,ordinate,type)
     {}
  //-----------------------------------------------------------------------------
     LauncherComment::
-    LauncherComment( QString const &line)
-      : UserComment(line)
+    LauncherComment( QString const &line, int ordinate, types::Type type)
+      : UserComment(line,ordinate,type)
     {}
  //-----------------------------------------------------------------------------
     PbsDirective::
-    PbsDirective( QString const &line)
-      : UserComment(line)
+    PbsDirective( QString const &line, int ordinate, types::Type type)
+      : UserComment(line,ordinate,type)
     {}
  //-----------------------------------------------------------------------------
-    int ShellCommand::ordinate() const {
-        return 10;
+    void LauncherComment::init()
+    {
+        QRegularExpression lc_parm_pattern("(\\w+)\\s*=\\s*(.+)");
+        QRegularExpressionMatch m = lc_parm_pattern.match( this->text_);
+        if( m.hasMatch() )
+            this->parms_[m.captured(1)] = m.captured(2);
+        else
+            throw_<std::logic_error>("Ill formed LauncherComment: %1",this->text_);
     }
  //-----------------------------------------------------------------------------
-    int UserComment::ordinate() const {
-        return -1;
+    void LauncherComment::compose()
+    {
+//        this->text_ = QString("#La# ")
+//                .append(this->parms_[0].first)
+//                .append(" = ")
+//                .append(this->parms_[0].second)
+//                ;
+    }
+
+ //-----------------------------------------------------------------------------
+    void PbsDirective::init()
+    {
     }
  //-----------------------------------------------------------------------------
-    int Shebang::ordinate() const {
-        return 0;
-    }
- //-----------------------------------------------------------------------------
-    int LauncherComment::ordinate() const {
-        return 1;
-    }
- //-----------------------------------------------------------------------------
-    int PbsDirective::ordinate() const {
-        return 2;
-    }
- //-----------------------------------------------------------------------------
-
-//    Derived=[]
-//    @classmethod
-//    def parse(cls,text):
-//        #print cls,text
-//        if cls.test(text):
-//            for D in cls.Derived:
-//                result = D.parse(text)
-//                if result:
-//                    return result
-//            return cls(text)
-//        else:
-//            return None
-
-//    @classmethod
-//    def test(cls,text):
-//        return True
-
-//    def __init__(self,text,hidden=False):
-//        self.hidden = hidden
-//        self.text = text
-//        self.compose()
-
-//    def compose(self):
-//        if not self.text.endswith('\n'):
-//            self.text += '\n'
-
-//    def __str__(self):
-//        self.compose()
-//        n=20
-//        h = 'H' if self.hidden else ' '
-//        s = ('('+self.__class__.__name__+')').ljust(n)+h+self.text
-//        return s
-
-//    def __eq__(self,right_operand):
-//        """ Return True if self and right_operand represent the same line in the script."""
-//        if isinstance(right_operand,ShellCommand):
-//            return self.text==right_operand.text
-//        return False
-
-//    def ordinate(self):
-//        return 10 # always at end of script
-
 /*
-
-################################################################################
-def set_is_modified(object):
-    object.text=''
-
-################################################################################
-def is_modified(object):
-    return object.text==''
-
-################################################################################
-################################################################################
-class UserComment(ShellCommand):
-    Derived=[]
-    @classmethod
-    def test(cls,text):
-        ok = text.startswith('#')
-        #print cls,ok
-        return ok
-
-    def __eq__(self,right_operand):
-        """ Return True if self and right_operand represent the same line in the script."""
-        if isinstance(right_operand,UserComment):
-            return self.text==right_operand.text
-        return False
-
-    def ordinate(self):
-        return -1 # can appear anywhere in script
-
-################################################################################
-class Shebang(UserComment):
-    default = '#!/bin/bash'
-    Derived=[]
-
-    @classmethod
-    def test(cls,text):
-        ok = text.startswith('#!')
-        #print cls,ok
-        return ok
-
-    def __init__(self,text=None):
-        self.hidden = False
-        self.text = Shebang.default if not text else text
-        ShellCommand.compose(self)
-
-    def __eq__(self,right_operand):
-        """ Return True if self and right_operand represent the same line in the script."""
-        if isinstance(right_operand,Shebang):
-            return True
-        return False
-
-    def ordinate(self):
-        return 0 # always on first line of script
-
-################################################################################
-class LauncherComment(UserComment):
-    Derived=[]
-
-    @classmethod
-    def test(cls,text):
-        ok = text.startswith('#La#')
-        #print cls,ok
-        return ok
-
-    lc_line_pattern = re.compile(r'#La#(\s+)(.+)')
-    lc_parm_pattern = re.compile(r'(\w+)\s*=\s*(.+)')
-
-    def __init__(self,text):
-        text = text.strip()
-        m = LauncherComment.lc_line_pattern.match(text)
-        self.parms = {}
-        if m:
-            mgroups=m.groups()
-            self.space = mgroups[0]
-            self.value = mgroups[1]
-            m = LauncherComment.lc_parm_pattern.match(self.value)
-            if m:
-                mgroups=m.groups()
-                self.parms[mgroups[0]] = mgroups[1]
-        else:
-            raise LauncherCommentNotMatched(text)
-        super(LauncherComment,self).__init__(text)
-        ShellCommand.compose(self)
-
-    def compose(self):
-        if is_modified(self):
-            if self.parms: #compose self.value
-                self.value = ''
-                for k,v in self.parms.iteritems():
-                    self.value += '{}{} = {}'.format(self.space,k,v)
-            self.text = '#La# '+self.value
-            ShellCommand.compose(self)
-
-    def __eq__(self,right_operand):
-        """ Return True if self and right_operand represent the same line in the script."""
-        if isinstance(right_operand,LauncherComment):
-            if not self.parms and not right_operand.parms:
-                return False
-            #all parameter keys must be the same
-            for k in self.parms.iterkeys():
-                if not k in right_operand.parms:
-                    return False
-            return True
-        return False
-
-    def ordinate(self):
-        return 1 #after Shebang and before PBSDirectives
-
-################################################################################
-class LauncherCommentNotMatched(Exception):
-    pass
-
-################################################################################
-class PBSDirective(UserComment):
-################################################################################
-    Derived=[]
-
-    @classmethod
-    def test(cls,text):
-        ok = text.startswith('#PBS')
-        #print cls,ok
-        return ok
-
-    pbs_line_pattern = re.compile(r'#PBS\s+(-\w)\s+([^\s]*)(\s*#.+)?')
-    pbs_parm_pattern = re.compile(r':((\w+)=((\d{1,2}:\d\d:\d\d)|([\w.-]+)))(.*)')
-    pbs_feat_pattern = re.compile(r':(\w+)(.*)')
-
-    def __init__(self,text):
-        #remove trailing whitespace
-        text = text.strip()
-        #Make sure that the line starts with uppercase '#PBS'
-        if not text.startswith('#PBS'):
-            if text.upper().startswith('#PBS'):
-                text = '#PBS '+text[5:]
-            else:
-                text = '#PBS '+text
-        self.parms = OrderedDict()
-        self.comment = ''
-        #match the basic PBS line pattern
-        m = PBSDirective.pbs_line_pattern.match(text)
-        if not m:
-            raise PbsPatternNotMatched(text)
-        mgroups = m.groups()
-        #print mgroups
-        self.flag  = mgroups[0]
-        self.value = mgroups[1]
-        if not mgroups[2] is None:
-            self.comment = mgroups[2]
-        #match the value pattern
-        remainder =':'+self.value
-        #look for parameters
-        m = PBSDirective.pbs_parm_pattern.match(remainder)
-        if m:
-            while m:
-                mgroups = m.groups()
-                #print mgroups
-                self.parms[mgroups[1]] = int_float_str(mgroups[2])
-                #print self.parms
-                remainder = mgroups[-1]
-                m = PBSDirective.pbs_parm_pattern.match(remainder)
-            #look for features
-            self.features = []
-            m = PBSDirective.pbs_feat_pattern.match(remainder)
-            while m:
-                mgroups = m.groups()
-                self.features.append(mgroups[0])
-                #print self.parms
-                remainder = mgroups[-1]
-                m = PBSDirective.pbs_feat_pattern.match(remainder)
-            assert remainder=='',"PBS line not fully matched, remainder='{}'".format(remainder)
-        super(PBSDirective,self).__init__(text)
-        ShellCommand.compose(self)
-
-    def compose(self):
-        if is_modified(self):
-            if self.parms:
-                value = ''
-                for k,v in self.parms.iteritems():
-                    value+=':{}={}'.format(k,v)
-                for f in self.features:
-                    value+=':'+f
-                self.value = value[1:]
-            if not self.value:
-                self.hidden = True
-            if not self.hidden:
-                self.text = '#PBS {} {}{}'.format(self.flag,self.value,self.comment)
-            ShellCommand.compose(self)
-
-    def __eq__(self,right_operand):
-        """ Return True if self and right_operand represent the same line in the script."""
-        if isinstance(right_operand,PBSDirective):
-            if not self.flag==right_operand.flag:
-                #different flags are never equal
-                return False
-            #cases below have the same flag
-            if not self.parms and not right_operand.parms:
-                #lhs and rhs have no parameters, hence equal
-                return True
-            #otherwise they should have at least one common parameter
-            for k in self.parms.iterkeys():
-                if k in right_operand.parms:
-                    return True
-        #in all other cases
-        return False
-
-    def ordinate(self):
-        return 2 # after LauncherComments and before ShellCommands
-
-################################################################################
-class PbsPatternNotMatched(Exception):
-    pass
-################################################################################
-def int_float_str(value_str):
-    try:
-        v=int(value_str)
-        return v
-    except:
-        try:
-            v=float(value_str)
-            return v
-        except:
-            return value_str
-
-################################################################################
-class UnableToParsePBSDirective(Exception):
-    pass
-
-################################################################################
-ShellCommand.Derived = [UserComment]
-UserComment .Derived = [Shebang,LauncherComment,PBSDirective]
-
-################################################################################
-def cfg_get(config,attrib,default='dummy'):
-    if config:
-        v = config[attrib].get()
-    else:
-        v = default
-    return v
-
 ################################################################################
 class Script(object):
 ################################################################################

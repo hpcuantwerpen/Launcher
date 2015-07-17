@@ -3,8 +3,8 @@
 #include <QDataStream>
 #include <QIODevice>
 
-#include "cfg.h"
-
+#include <cfg.h>
+//#include "../cfg/cfg.h"
 
 #include <iostream>
 using std::logic_error;
@@ -143,4 +143,4 @@ void CfgTest::testCase2()
 
 QTEST_APPLESS_MAIN(CfgTest)
 
-#include "tst_cfg_test.moc"
+#include "cfg_test.moc"

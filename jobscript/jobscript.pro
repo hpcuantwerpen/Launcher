@@ -4,17 +4,18 @@
 #
 #-------------------------------------------------
 
+include(../common.pri)
+
 QT       -= gui
 
 TARGET = jobscript
 TEMPLATE = lib
 CONFIG += staticlib
-CONFIG += c++11
 
 SOURCES += jobscript.cpp
 
 HEADERS += jobscript.h
-unix {
-    target.path = /usr/lib
-    INSTALLS += target
-}
+
+arg_path = ..
+arg_lib  = toolbox
+include(../depend_on_lib.pri)

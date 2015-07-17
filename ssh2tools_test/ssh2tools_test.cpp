@@ -1,6 +1,6 @@
 #include <QString>
 #include <QtTest>
-#include "ssh2.h"
+#include "ssh2tools.h"
 
 class Ssh2_test : public QObject
 {
@@ -21,9 +21,11 @@ void Ssh2_test::testCase1()
 {
     ssh2::Session s;
     s.open();
+    s.exec("uptime");
+    s.close();
     QVERIFY2(true, "Failure");
 }
 
 QTEST_APPLESS_MAIN(Ssh2_test)
 
-#include "tst_ssh2_test.moc"
+#include "ssh2tools_test.moc"
