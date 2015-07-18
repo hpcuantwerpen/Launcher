@@ -112,12 +112,17 @@ namespace pbs
  //-----------------------------------------------------------------------------
     void LauncherComment::init()
     {
-        QRegularExpression lc_parm_pattern("(\\w+)\\s*=\\s*(.+)");
-        QRegularExpressionMatch m = lc_parm_pattern.match( this->text_);
-        if( m.hasMatch() )
-            this->parms_[m.captured(1)] = m.captured(2);
-        else
-            throw_<std::logic_error>("Ill formed LauncherComment: %1",this->text_);
+        QRegularExpressionMatch m;
+        QRegularExpression re("#La#(\\s+)(.+)"); // line pattern
+        m = re.match( this->text_ );
+        if( !m.hasMatch() )
+            throw_<std::runtime_error>("Ill formed LauncherComment: %1",this->text_);
+        this->value_ = m.captured((2));
+        re.setPattern("(\\w+)\\s*=\\s*(.+)"); // parameter pattern
+        m = re.match( this->value_ );
+        if( !m.hasMatch() )
+            throw_<std::runtime_error>("Ill formed LauncherComment: %1",this->text_);
+        this->parms_[m.captured(1)] = m.captured(2);
     }
  //-----------------------------------------------------------------------------
     void LauncherComment::compose()
@@ -128,12 +133,86 @@ namespace pbs
 //                .append(this->parms_[0].second)
 //                ;
     }
-
+ //-----------------------------------------------------------------------------
+//    QString const&
+//    ShellCommand::
+//    parm_value( QString const & key ) const {
+//        return this->parms_[key];
+//    }
  //-----------------------------------------------------------------------------
     void PbsDirective::init()
     {
+        QRegularExpressionMatch m;
+        QRegularExpression re("#PBS\\s+(-\\w)\\s+([^\\s]*)(\\s*#.+)?");
+        m = re.match( this->text_ );
+        if( !m.hasMatch() )
+            throw_<std::runtime_error>("Ill formed PbsDirective: %1",this->text_);
+        this->flag_    = m.captured((1));
+        this->value_   = m.captured((2));
+        this->comment_ = m.captured((3));
+        re.setPattern(":((\\w+)=((\\d{1,2}:\\d\\d:\\d\\d)|([\\w.-]+)))(.*)");
+        QString remainder = QString(':')+this->value_;
+     // look for parameters
+        m = re.match(remainder);
+        if( m.hasMatch() )
+        {
+            while( m.hasMatch() ) {
+                this->parms_[m.captured(1)] = m.captured(2);
+                remainder = m.captured(m.lastCapturedIndex());
+                m = re.match(remainder);
+            }
+         // look for features
+            re.setPattern(":(\\w+)(.*)");
+            m = re.match(remainder);
+            while( m.hasMatch() ) {
+                this->feats_.append(m.captured(0));
+                remainder = m.captured(m.lastCapturedIndex());
+                m = re.match(remainder);
+            }
+            if( !remainder.isEmpty() )
+                throw_<std::runtime_error>("PBS line not fully matched, remainder='%1'", remainder );
+        }
     }
  //-----------------------------------------------------------------------------
+    Script::
+    Script( QString       const* filepath
+          , Lines_t       const* lines
+          , cfg::Config_t const* config
+          )
+    {
+        this->filepath_ = ( filepath ? *filepath : QString() );
+     // we ar here:>>
+        #create default lines. which store dummy parameters
+        this->add(Shebang())
+
+        this->add("#La# generated_on = {}".format(datetime.datetime.now()))
+        this->add("#La#      cluster = {}".format(cfg_get(config,'cluster'              ,)))
+        this->add("#La#      nodeset = {}".format(cfg_get(config,'nodeset')))
+
+        this->add('#PBS -l nodes={}:ppn={}'.format(cfg_get(config,'nodes',1)
+                                                 ,cfg_get(config,'ppn'  ,1)))
+
+        this->add('#PBS -l walltime={}'.format(cfg_get(config,'walltime','1:00:00')))
+
+        this->add('#PBS -M {}'.format(cfg_get(config,'notify_M','your.email@address.here')))
+        this->add('#PBS -m {}'.format(cfg_get(config,'notify_m','e')))
+
+        this->add('#PBS -W x=nmatchpolicy:exactnode')
+
+        this->add('#PBS -N dummy',hidden=True)
+
+        this->add('#')
+        this->add("#--- shell commands below ".ljust(80,'-'))
+        this->add('cd $PBS_O_WORKDIR')
+
+        set_is_modified(self)
+        this->_unsaved_changes = True
+        #parse file, then lines
+        this->read(filepath)
+        this->parse(lines)
+    }
+ //=============================================================================
+}// namespace pbs
 /*
 ################################################################################
 class Script(object):
@@ -602,9 +681,3 @@ if __name__=='__main__':
 
     unittest.main()
 */
- //=============================================================================
-}// namespace pbs
-
-Jobscript::Jobscript()
-{
-}

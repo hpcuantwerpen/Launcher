@@ -23,5 +23,7 @@ arg_lib  = jobscript
 include(../depend_on_lib.pri)
 arg_lib  = toolbox
 include(../depend_on_lib.pri)
+arg_lib  = cfg
+include(../depend_on_lib.pri)
 
 #INCLUDEPATH += ../toolbox

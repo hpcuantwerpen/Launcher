@@ -15,4 +15,4 @@ SUBDIRS +=          \
   toolbox_test.depends = toolbox
       cfg_test.depends = cfg
 ssh2tools_test.depends = ssh2tools toolbox
-jobscript-test.depends = jobscript toolbox
+jobscript-test.depends = jobscript toolbox cfg

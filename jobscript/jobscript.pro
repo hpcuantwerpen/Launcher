@@ -19,3 +19,6 @@ HEADERS += jobscript.h
 arg_path = ..
 arg_lib  = toolbox
 include(../depend_on_lib.pri)
+arg_lib  = cfg
+include(../depend_on_lib.pri)
+
