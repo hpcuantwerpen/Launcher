@@ -68,11 +68,36 @@ namespace cfg
         QVariant::Type  range_type_;
     };
  //=============================================================================
-    QDataStream &operator<<(QDataStream& ds, Item const& item);
-    QDataStream &operator>>(QDataStream& ds, Item      & item);
+    QDataStream &operator<<( QDataStream& ds, Item const& item );
+    QDataStream &operator>>( QDataStream& ds, Item      & item );
  //=============================================================================
-    void load(Config_t      & config, QString const& filename);
-    void save(Config_t const& config, QString const& filename);
+    void load( Config_t      & config, QString const& filename );
+    void save( Config_t const& config, QString const& filename );
+ //=============================================================================
+    template <class T>
+    QVariant
+    cfg_get
+      ( Config_t const& config
+      , QString  const& key
+      , T        const& default_value )
+    {
+        if (config.contains(key) ) {
+            return config[key].value();
+        } else {
+            QVariant q(default_value);
+            return q;
+        }
+    }
+ //=============================================================================
+    template <class T>
+    QString
+    cfg_get_str
+      ( Config_t const& config
+      , QString  const& key
+      , T        const& default_value )
+    {
+        return cfg_get(config,key,default_value).toString();
+    }
  //=============================================================================
 }// namespace cfg
 

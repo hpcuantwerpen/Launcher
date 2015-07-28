@@ -12,9 +12,21 @@ TARGET = jobscript
 TEMPLATE = lib
 CONFIG += staticlib
 
-SOURCES += jobscript.cpp
+SOURCES += jobscript.cpp \
+    text.cpp \
+    shellcommand.cpp \
+    usercomment.cpp \
+    shebang.cpp \
+    launchercomment.cpp \
+    pbsdirective.cpp
 
-HEADERS += jobscript.h
+HEADERS += jobscript.h \
+    text.h \
+    shellcommand.h \
+    usercomment.h \
+    shebang.h \
+    launchercomment.h \
+    pbsdirective.h
 
 arg_path = ..
 arg_lib  = toolbox

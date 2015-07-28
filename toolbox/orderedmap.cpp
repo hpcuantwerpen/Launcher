@@ -19,7 +19,15 @@ namespace toolbox
         }
         return this->not_found; // key not found
     }
-//-----------------------------------------------------------------------------
+ //-----------------------------------------------------------------------------
+    bool
+    OrderedMap::
+    contains( QString const& key ) const
+    {
+        int i = this->index(key);
+        return i != this->not_found;
+    }
+ //-----------------------------------------------------------------------------
     QString const&
     OrderedMap::
     operator[]( QString const& key ) const

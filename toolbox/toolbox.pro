@@ -17,8 +17,10 @@ CONFIG += staticlib
 HEADERS += orderedmap.h     \
            warn_.h          \
            throw_.h         \
-           toolbox.h
+           toolbox.h \
+    datetime_now.h
 
 SOURCES += orderedmap.cpp   \
-           warn_.cpp
+           warn_.cpp \
+    datetime_now.cpp
 

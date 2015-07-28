@@ -19,8 +19,8 @@ namespace toolbox
         QString const& operator[]( QString const& key ) const;
         QString      & operator[]( QString const& key );
         int            index     ( QString const& key ) const;
+        bool           contains  ( QString const& key ) const;
         using OrderedMapBase_t::operator[];
-    private:
         enum {not_found = -1};
     };
  //=============================================================================
@@ -34,7 +34,6 @@ namespace toolbox
     public:
         void append( QString const& value );
         int index  ( QString const& value ) const;
-    private:
         enum {not_found = -1};
     };
  //=============================================================================
