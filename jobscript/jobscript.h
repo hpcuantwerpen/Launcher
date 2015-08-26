@@ -1,4 +1,4 @@
-#ifndef JOBSCRIPT_H
+    #ifndef JOBSCRIPT_H
 #define JOBSCRIPT_H
 
 #include <QString>
@@ -52,6 +52,9 @@ namespace pbs
 
         void    add_parameters( QString const& key, Parameters_t const& parms );
         void remove_parameters( QString const& key, Parameters_t const& parms );
+
+        void    add_features( QString const& key, Features_t const& features );
+        void remove_features( QString const& key, Features_t const& features );
 
     private:
         ScriptLines_t lines_;

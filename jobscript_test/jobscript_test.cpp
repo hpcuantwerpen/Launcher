@@ -63,6 +63,18 @@ void Jobscript_test::testCase2()
 {
     try {
         pbs::Script script;
+        script["-M"] = "engelbert.tijskens@uantwerpen.be";
+        QString s = script.text();
+        std::cout << s.toStdString();
+        script.write("testCase2.sh",false);
+        std::cout<<"writing script to file" << std::endl;
+    } catch(std::exception &e) {
+        std::cout << "Error: " << e.what() <<std::endl;
+        QVERIFY2(false, "Failure");
+    }
+    try {
+        std::cout<<"reading script from file" << std::endl;
+        pbs::Script script("testCase2.sh");
         QString s = script.text();
         std::cout << s.toStdString();
     } catch(std::exception &e) {

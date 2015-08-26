@@ -5,7 +5,7 @@
 
 namespace toolbox
 {//-----------------------------------------------------------------------------
-    typedef QVector< QPair<QString,QString> > OrderedMapBase_t;
+ // OrderedMap
  //-----------------------------------------------------------------------------
     int
     OrderedMap::
@@ -52,6 +52,37 @@ namespace toolbox
     }
  //-----------------------------------------------------------------------------
     int
+    OrderedMap::
+    add( OrderedMap const & om_rhs )
+    {
+        std::for_each( om_rhs.cbegin(), om_rhs.cend(),
+                      [&] ( OrderedMapBase_t::value_type const& v )
+                      {   (*this)[v.first] = v.second;
+                      }
+                     );
+        return om_rhs.size();
+    }
+ //-----------------------------------------------------------------------------
+    int
+    OrderedMap::
+    remove( OrderedMap const & om_rhs )
+    {
+        int removed = 0;
+        std::for_each( om_rhs.cbegin(), om_rhs.cend(),
+                      [&] ( OrderedMapBase_t::value_type const& v )
+                      {   int iv = this->index(v.first);
+                          if( iv != this->not_found ) {
+                              this->removeAt(iv);
+                              ++removed;
+                          }
+                      }
+                     );
+        return removed;
+    }
+ //-----------------------------------------------------------------------------
+ // OrderedSet
+ //-----------------------------------------------------------------------------
+    int
     OrderedSet::
     index( QString const & value ) const
     {
@@ -64,13 +95,38 @@ namespace toolbox
         return this->not_found; // key not found
     }
  //-----------------------------------------------------------------------------
-    void
+    int
     OrderedSet::
-    append(QString const& value )
+    add( OrderedSet const& os_rhs )
     {
-        int i = this->index(value);
-        if( i==this->not_found )
-            OrderedSetBase_t::append(value);
+        int added = 0;
+        std::for_each( os_rhs.cbegin(), os_rhs.cend(),
+                       [&] ( OrderedSetBase_t::value_type const& feature )
+                       {   int i = this->index(feature) ;
+                           if( i != this->not_found ) {
+                               this->append(feature);
+                               ++added;
+                           }
+                        }
+                     );
+        return added;
+    }
+ //-----------------------------------------------------------------------------
+    int
+    OrderedSet::
+    remove( OrderedSet const& os_rhs )
+    {
+        int removed = 0;
+        std::for_each( os_rhs.cbegin(), os_rhs.cend(),
+                       [&] ( OrderedSetBase_t::value_type const& feature )
+                       {   int i = this->index(feature) ;
+                           if( i != this->not_found ) {
+                               this->removeAt(i);
+                               ++removed;
+                           }
+                        }
+                     );
+        return removed;
     }
  //-----------------------------------------------------------------------------
 }// namespace toolbox

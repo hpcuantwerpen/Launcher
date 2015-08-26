@@ -5,7 +5,6 @@
 #include <QPair>
 #include <QString>
 
-#pragma message("orderedmap.h")
 namespace toolbox
 {//=============================================================================
     typedef QVector< QPair<QString,QString> > OrderedMapBase_t;
@@ -22,6 +21,13 @@ namespace toolbox
         bool           contains  ( QString const& key ) const;
         using OrderedMapBase_t::operator[];
         enum {not_found = -1};
+        int add( OrderedMap const & om_rhs );
+         // add all parameters in om_rhs to *this (just like the python
+         // dictionary update method)
+         // returns the number of changed entries
+        int remove( OrderedMap const & om_rhs );
+         // remove all parameters in om_rhs from *this
+         // returns the number of removed entries
     };
  //=============================================================================
 
@@ -32,9 +38,14 @@ namespace toolbox
  //=============================================================================
     {
     public:
-        void append( QString const& value );
         int index  ( QString const& value ) const;
         enum {not_found = -1};
+        int add( OrderedSet const& os_rhs );
+         // append all features in os_rhs to *this
+         // returns the number of added entries
+        int remove( OrderedSet const& os_rhs );
+         // remove all features in os_rhs from *this
+         // returns the number of removed entries
     };
  //=============================================================================
 }// namespace toolbox
