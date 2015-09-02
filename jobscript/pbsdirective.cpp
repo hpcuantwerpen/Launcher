@@ -30,7 +30,7 @@ namespace pbs
         this->flag_    = m.captured((1));
         this->value_   = m.captured((2));
         this->comment_ = m.captured((3));
-        re.setPattern(":((\\w+)=((\\d{1,2}:\\d\\d:\\d\\d)|([\\w.-]+)))(.*)");
+        re.setPattern(":(\\w+)=((\\d{1,2}:\\d\\d:\\d\\d)|([\\w.-]+))(.*)");
         QString remainder = QString(':')+this->value_;
      // look for parameters
         m = re.match(remainder);
@@ -63,10 +63,13 @@ namespace pbs
         } else {
             this->value_.clear();
             for( Parameters_t::const_iterator iter = this->parameters().cbegin(); iter != this->parameters().cend(); ++iter ) {
-                this->value_.append(iter->first).append('=').append(iter->second);
+                this->value_.append(iter->first).append('=').append(iter->second).append(':');
             }
             for( Features_t::const_iterator iter= this->features().cbegin(); iter != this->features().cend(); ++iter ) {
-                this->value_.append(':').append(*iter);
+                this->value_.append(*iter).append(':');
+            }
+            if( this->value_.endsWith(':') ) {
+                this->value_.chop(1);
             }
         }
         this->text_ = QString("#PBS ")

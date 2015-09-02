@@ -12,7 +12,7 @@ namespace pbs
     {
     public:
         virtual ~Text();
-        Text( QString const& txt );
+        Text( QString const& txt, Text* parent=nullptr );
         virtual void init();
         virtual void compose() = 0;
 
@@ -22,10 +22,12 @@ namespace pbs
 
         bool is_modified() const;
         void set_is_modified( bool is_modified_ = true );
+        void set_parent( Text* parent=nullptr );
     protected:
         QString text_;
         QString body_;
         QString comment_; //trailing comment in the form "# blabla"
+        Text* parent_;
     };
 //=============================================================================
 }//namespace pbs

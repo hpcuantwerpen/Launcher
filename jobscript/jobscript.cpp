@@ -63,6 +63,7 @@ namespace pbs
      // of unsaved_changes
         std::shared_ptr<ShellCommand> p_new_script_line( pbs::parse(line) );
         p_new_script_line->setHidden(hidden);
+        p_new_script_line->set_parent( this );
         types::Type new_type = p_new_script_line->type();
         switch(new_type) {
         case types::ShellCommand:
@@ -89,6 +90,8 @@ namespace pbs
     Script::
     insert_(std::shared_ptr<ShellCommand> new_line )
     {
+        new_line->set_parent( this );
+
         if( new_line->ordinate() == -1 ) {
             this->lines_.append(new_line);
         } else {
@@ -110,7 +113,8 @@ namespace pbs
     void Script::compose()
     {
         for( ScriptLines_t::iterator iter=this->lines_.begin(); iter < this->lines_.end(); ++iter ) {
-            this->text_.append( (*iter)->text() );
+            if( !(*iter)->hidden() )
+                this->text_.append( (*iter)->text() );
         }
     }
  //-----------------------------------------------------------------------------
@@ -269,19 +273,29 @@ namespace pbs
                 return (*iter)->value_;
             }
         } else {
-            std::for_each( this->lines_.begin(), this->lines_.end(),
-                [&] ( ScriptLine_t & current ) {
-                    if( current->parameters().contains(key) )
-                    {// we can't verify if the value is really changed, but
-                     // as it is the purpose of this member function we assume
-                     // it has, hence we call set_is_modified() before the
-                     // is modified
-                        current->set_is_modified();
-                        QString & val = current->parameters()[key];
-                        return val;
-                    }
+//            std::for_each( this->lines_.begin(), this->lines_.end(),
+//                [&] ( ScriptLine_t & current ) {
+//                    std::cout << "*** " << current->text().toStdString() << std::endl;
+//                    if( current->parameters().contains(key) )
+//                    {// we can't verify if the value is really changed, but
+//                     // as it is the purpose of this member function we assume
+//                     // it has, hence we call set_is_modified() before the
+//                     // is modified
+//                        current->set_is_modified();
+//                        QString & val = current->parameters()[key];
+//                        return val;
+//                    }
+//                }
+//            );
+            for( int i=0; i<this->lines_.size(); ++i ) {
+                ScriptLine_t& current = this->lines_[i];
+                std::cout << "*** " << current->text().toStdString() << std::endl;
+                if( current->parameters().contains(key) ) {
+                    current->set_is_modified();
+                    QString & val = current->parameters()[key];
+                    return val;
                 }
-            );
+            }
         }
         throw_<std::range_error>("Key '%1' was not found in script.",key);
     }

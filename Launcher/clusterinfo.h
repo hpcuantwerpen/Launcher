@@ -37,8 +37,13 @@
                  , gbTotal;
         };
 
-        NodesetInfo::Granted requestNodesAndCores ( int nNodes, int nCoresPerNode ) const;
-        NodesetInfo::Granted requestCoresAndMemory( int nCores, double gbPerCore=0. ) const;
+        void requestNodesAndCores ( int nNodes, int nCoresPerNode ) const;
+         // find the result of the request using the granted() accessor
+        void requestCoresAndMemory( int nCores, double gbPerCore=0. ) const;
+         // find the result of the request using the granted() accessor
+        Granted const& granted() const {
+            return granted_;
+        }
 
         double gbPerNodeAvailable() const {
             return gbPerNode_-gbPerNodeReserved_;
@@ -54,6 +59,9 @@
         }
         int nCoresPerNode() const {
             return nCoresPerNode_;
+        }
+        int nCoresAvailable() const {
+            return nNodes()*nCoresPerNode();
         }
         QStringList const& features() const {
             return features_;
@@ -73,6 +81,7 @@
         QStringList features_;
         QStringList scriptActions_;
         bool    isDefault_;
+        mutable Granted granted_;
     };
 
  //=============================================================================
@@ -95,9 +104,12 @@
         QString const& defaultNodeset() const {
             return defaultNodeset_;
         }
+
+        typedef QMap<QString,NodesetInfo> Nodesets_t;
+
     private:
         QString name_;
-        QMap<QString,NodesetInfo> nodesets_;
+        Nodesets_t nodesets_;
         QStringList login_nodes_;
         int walltime_limit_; //in seconds
         QString defaultNodeset_;

@@ -141,6 +141,7 @@ namespace models
       : QMainWindow(parent)
       , ui(new Ui::MainWindow)
       , ignoreSignals_(false)
+      , previousPage_(0)
     {
         ui->setupUi(this);
 
@@ -168,6 +169,8 @@ namespace models
         this->ui->wCluster->setCurrentText( cfg_value );
         cfg_value = this->launcher_.config["wNodeset"].value().toString();
         this->ui->wNodeset->setCurrentText( cfg_value );
+
+        this->ui->wAutomaticRequests->setChecked( true );
     }
  //-----------------------------------------------------------------------------
     MainWindow::~MainWindow()
@@ -193,7 +196,7 @@ namespace models
     {
         QString nodesetName = this->ui->wNodeset->currentText();
         QString clusterName = this->ui->wCluster->currentText();
-        NodesetInfo const & nodeset = this->launcher_.clusters[clusterName].nodesets()[nodesetName];
+        NodesetInfo const& nodeset = *( this->launcher_.clusters[clusterName].nodesets().find( nodesetName ) );
         return nodeset;
     }
  //-----------------------------------------------------------------------------
@@ -202,7 +205,7 @@ namespace models
         if( this->ignoreSignals_ ) {
             std::cout << "\nIgnoring signal:\n";
         } else {
-            std::cout << '\n';
+            std::cout << "\nExecuting slot:\n";
         }
         std::cout << signature << std::endl;
     }
@@ -212,8 +215,7 @@ namespace models
 //------------------------------------------------------------------------------
 void MainWindow::on_wCluster_currentIndexChanged( QString const& arg1 )
 {
-    this->print_("void MainWindow::on_wCluster_currentIndexChanged( QString const& arg1 )", arg1.toStdString() );
-    if( this->ignoreSignals_ ) return;
+    PRINT1_AND_CHECK_IGNORESIGNAL("void MainWindow::on_wCluster_currentIndexChanged( QString const& arg1 )", arg1.toStdString() )
 
     this->launcher_.config["wCluster"].set_value(arg1);
     QString text = dynamic_cast<models::NodesetModel*>( ui->wNodeset->model() )->selectCluster( arg1 );
@@ -223,10 +225,9 @@ void MainWindow::on_wCluster_currentIndexChanged( QString const& arg1 )
 
 void MainWindow::on_wNodeset_currentTextChanged(const QString &arg1)
 {
-    this->print_( "void MainWindow::on_wNodeset_currentTextChanged(const QString &arg1)", arg1.toStdString() );
-    if( this->ignoreSignals_ ) return;
+    PRINT1_AND_CHECK_IGNORESIGNAL( "void MainWindow::on_wNodeset_currentTextChanged(const QString &arg1)", arg1.toStdString() )
 
-    NodesetInfo const & nodeset = this->nodesetInfo();
+    NodesetInfo const &nodeset = this->nodesetInfo();
 
     this->launcher_.config["wNodeset"].set_value(arg1);
     this->ui->wNNodes->setRange(1,nodeset.nNodes());
@@ -248,37 +249,85 @@ void MainWindow::on_wNodeset_currentTextChanged(const QString &arg1)
 
 void MainWindow::on_wRequestNodes_clicked()
 {
-    this->print_( "void MainWindow::on_wRequestNodes_clicked()" );
-    if( this->ignoreSignals_ ) return;
+    PRINT0_AND_CHECK_IGNORESIGNAL("void MainWindow::on_wRequestNodes_clicked()")
 
-    NodesetInfo const & nodeset = this->nodesetInfo();
-    NodesetInfo::Granted granted;
+    NodesetInfo const& nodeset = this->nodesetInfo();
     try {
-        granted = nodeset.requestNodesAndCores( this->ui->wNNodes->value(), this->ui->wNCoresPerNode->value() );
+        nodeset.requestNodesAndCores( this->ui->wNNodes->value(), this->ui->wNCoresPerNode->value() );
     } catch( std::runtime_error & e ) {
         warn_( e.what() );
         return;
     }
-    this->ui->wNCores   ->setValue( granted.nCores );
-    this->ui->wGbPerCore->setValue( granted.gbPerCore );
-    this->ui->wGbTotal  ->setText ( QString().setNum( granted.gbTotal ) );
+    this->ui->wNCores   ->setValue( nodeset.granted().nCores );
+    this->ui->wGbPerCore->setValue( nodeset.granted().gbPerCore );
+    this->ui->wGbTotal  ->setText ( QString().setNum( nodeset.granted().gbTotal ) );
 }
 
 void MainWindow::on_wRequestCores_clicked()
 {
-    this->print_( "void MainWindow::on_wRequestCores_clicked()" );
-    if( this->ignoreSignals_ ) return;
-    NodesetInfo const & nodeset = this->nodesetInfo();
-    NodesetInfo::Granted granted;
+    PRINT0_AND_CHECK_IGNORESIGNAL("void MainWindow::on_wRequestCores_clicked()")
+
+    NodesetInfo const& nodeset = this->nodesetInfo();
     try {
-        granted = nodeset.requestCoresAndMemory( this->ui->wNCores->value(), this->ui->wGbPerCore->value() );
+        nodeset.requestCoresAndMemory( this->ui->wNCores->value(), this->ui->wGbPerCore->value() );
     } catch( std::runtime_error & e ) {
         warn_( e.what() );
         return;
     }
-    this->ui->wNNodes       ->setValue( granted.nNodes );
-    this->ui->wNCoresPerNode->setValue( granted.nCoresPerNode );
-    this->ui->wNCores       ->setValue( granted.nCores );
-    this->ui->wGbPerCore    ->setValue( granted.gbPerCore );
-    this->ui->wGbTotal      ->setText ( QString().setNum( granted.gbTotal ) );
+
+    this->ui->wNNodes       ->setValue( nodeset.granted().nNodes );
+    this->ui->wNCoresPerNode->setValue( nodeset.granted().nCoresPerNode );
+    this->ui->wNCores       ->setValue( nodeset.granted().nCores );
+    this->ui->wGbPerCore    ->setValue( nodeset.granted().gbPerCore );
+    this->ui->wGbTotal      ->setText ( QString().setNum( nodeset.granted().gbTotal ) );
+}
+
+void MainWindow::on_wAutomaticRequests_toggled(bool checked)
+{
+    PRINT1_AND_CHECK_IGNORESIGNAL("void on_wAutomaticRequests_toggled(bool checked)", (checked?"true":"false") )
+
+    bool manual = !checked;
+    this->ui->wRequestNodes->setEnabled(manual);
+    this->ui->wRequestCores->setEnabled(manual);
+}
+
+void MainWindow::on_wNNodes_valueChanged(int arg1)
+{
+    PRINT1_AND_CHECK_IGNORESIGNAL("void MainWindow::on_wNNodes_valueChanged(int arg1)", arg1 )
+
+    if( this->ui->wAutomaticRequests->isChecked() ) {
+        FORWARDING
+        on_wRequestNodes_clicked();
+    }
+}
+
+
+void MainWindow::on_wNCoresPerNode_valueChanged(int arg1)
+{
+    PRINT1_AND_CHECK_IGNORESIGNAL("void MainWindow::on_wNCoresPerNode_valueChanged(int arg1)", arg1 )
+
+    if( this->ui->wAutomaticRequests->isChecked() ) {
+        FORWARDING
+        on_wRequestNodes_clicked();
+    }
+}
+
+void MainWindow::on_wPages_currentChanged(int index)
+{
+    PRINT1_AND_CHECK_IGNORESIGNAL("void MainWindow::on_wPages_currentChanged(int index)", index )
+
+    std::cout << "    previous page: " << this->previousPage_ << std::endl;
+    switch (index) {
+    case 0:
+        break;
+    case 1:
+        if( this->previousPage_==0) {
+            this->launcher_.modifyScript( this->nodesetInfo() );
+            this->ui->wScript->setText( this->launcher_.script.text() );
+        }
+        break;
+    default:
+        break;
+    }
+    this->previousPage_ = index;
 }

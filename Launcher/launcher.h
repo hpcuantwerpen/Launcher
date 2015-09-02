@@ -7,6 +7,7 @@
 #include <QMap>
 
 #include <cfg.h>
+#include <jobscript.h>
 
 #include "clusterinfo.h"
 
@@ -19,10 +20,14 @@
         void readClusterInfo();
         static QString homePath( QString const& sub1 = QString() );
 
+        void modifyScript( NodesetInfo const& nodeset );
+
     public: // data
+        typedef QMap<QString,ClusterInfo> Clusters_t;
+
         cfg::Config_t config;
-        QMap<QString,ClusterInfo> clusters;
-//        bool isConstructingMainWindow;
+        Clusters_t    clusters;
+        pbs::Script   script;
     private:
     };
 

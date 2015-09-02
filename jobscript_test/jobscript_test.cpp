@@ -64,6 +64,7 @@ void Jobscript_test::testCase2()
     try {
         pbs::Script script;
         script["-M"] = "engelbert.tijskens@uantwerpen.be";
+        script["nodes"]= "2";
         QString s = script.text();
         std::cout << s.toStdString();
         script.write("testCase2.sh",false);

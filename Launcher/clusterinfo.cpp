@@ -51,7 +51,7 @@
         isDefault_ = rhs.isDefault_;
     }
  //-----------------------------------------------------------------------------
-    NodesetInfo::Granted
+    void
     NodesetInfo::
     requestNodesAndCores( int nNodesRequested, int nCoresPerNodeRequested ) const
     {
@@ -61,42 +61,42 @@
         if( nCoresPerNodeRequested > this->nCoresPerNode() ) {
             throw_<std::runtime_error>("Requesting more cores per node than physically available (%1).", this->nCoresPerNode() );
         }
-        NodesetInfo::Granted granted;
-        granted.nCores        = nNodesRequested*nCoresPerNodeRequested;
-        granted.gbPerCore     = this->gbPerNodeAvailable()/nCoresPerNodeRequested;
-        granted.gbTotal       = nNodesRequested*this->gbPerNodeAvailable();
-        granted.nCoresPerNode = nCoresPerNodeRequested;
-        granted.nNodes        = nNodesRequested;
-        return granted;
+        granted_.nCores        = nNodesRequested*nCoresPerNodeRequested;
+        granted_.gbPerCore     = this->gbPerNodeAvailable()/nCoresPerNodeRequested;
+        granted_.gbTotal       = nNodesRequested*this->gbPerNodeAvailable();
+        granted_.nCoresPerNode = nCoresPerNodeRequested;
+        granted_.nNodes        = nNodesRequested;
     }
  //-----------------------------------------------------------------------------
-    NodesetInfo::Granted
+    void
     NodesetInfo::requestCoresAndMemory( int nCoresRequested, double gbPerCoreRequested ) const
     {
         if( gbPerCoreRequested > this->gbPerNodeAvailable() ) {
             throw_<std::runtime_error>("Requesting more memory per core than physically available (%1).", this->gbPerNodeAvailable() );
         }
-        NodesetInfo::Granted granted;
+        if( nCoresRequested > this->nCoresAvailable() ) {
+            throw_<std::runtime_error>("Requesting more cores than physically available (%1).", this->nCoresAvailable() );
+        }
+
         if( gbPerCoreRequested <= this->gbPerCoreAvailable() )
         {// use all cores per node since there is sufficient memory
-            granted.nCoresPerNode = this->nCoresPerNode();
-            granted.nNodes        = (int)( ceil( nCoresRequested / (double)(this->nCoresPerNode())) );
-            if( granted.nNodes==1 )
+            granted_.nCoresPerNode = this->nCoresPerNode();
+            granted_.nNodes        = (int)( ceil( nCoresRequested / (double)(this->nCoresPerNode())) );
+            if( granted_.nNodes==1 )
             {// respect the number of cores requested instead of returning a full node
-                granted.nCoresPerNode = nCoresRequested;
+                granted_.nCoresPerNode = nCoresRequested;
             }
         } else
         {//use only so many cores per nodes that each core has at least the requested memory
-            granted.nCoresPerNode = (int)( floor( this->gbPerNodeAvailable() / gbPerCoreRequested ));
-            granted.nNodes        = (int)( ceil( nCoresRequested / (double)(granted.nCoresPerNode)));
+            granted_.nCoresPerNode = (int)( floor( this->gbPerNodeAvailable() / gbPerCoreRequested ));
+            granted_.nNodes        = (int)( ceil( nCoresRequested / (double)(granted_.nCoresPerNode)));
         }
-        granted.nCores        = granted.nNodes*granted.nCoresPerNode;
-        granted.gbPerCore     = this->gbPerNodeAvailable() / granted.nCoresPerNode;
-        granted.gbTotal       = granted.nNodes*this->gbPerNodeAvailable();
-        if( granted.nNodes > this->nNodes() ) {
+        granted_.nCores        = granted_.nNodes*granted_.nCoresPerNode;
+        granted_.gbPerCore     = this->gbPerNodeAvailable() / granted_.nCoresPerNode;
+        granted_.gbTotal       = granted_.nNodes*this->gbPerNodeAvailable();
+        if( granted_.nNodes > this->nNodes() ) {
             throw_<std::runtime_error>("Requesting more nodes than physically available (%1).", this->nNodes() );
         }
-        return granted;
     }
  //-----------------------------------------------------------------------------
  // ClusterInfoReader

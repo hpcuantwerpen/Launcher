@@ -70,7 +70,11 @@ namespace pbs
         }
 
         bool hidden() const { return this->hidden_; }
-        void setHidden( bool hidden ) { this->hidden_ = hidden; }
+        void setHidden( bool hidden ) {
+            if( this->hidden() != hidden )
+                this->set_is_modified();
+            this->hidden_ = hidden;
+        }
 
         virtual void compose();
         QString const& flag() const { return flag_; }

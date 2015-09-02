@@ -39,3 +39,13 @@
         QDir::setCurrent( pwd );
     }
  //-----------------------------------------------------------------------------
+    void Launcher::modifyScript( NodesetInfo const& nodeset )
+    {
+        if( this->script["nodes"].toInt() !=          nodeset.granted().nNodes ) {
+            this->script["nodes"] = QString().setNum( nodeset.granted().nNodes );
+        }
+        if( this->script["ppn"].toInt() !=          nodeset.granted().nCoresPerNode ) {
+            this->script["ppn"] = QString().setNum( nodeset.granted().nCoresPerNode );
+        }
+        std::cout << this->script.text().toStdString() <<std::endl;
+    }

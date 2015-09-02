@@ -25,17 +25,12 @@ public:
     NodesetInfo const& nodesetInfo() const;
 
 private:
-    template <class T>
-    void print_( std::string const& signature, T arg1) const
-    {
-        if( this->ignoreSignals_ ) {
-            std::cout << "\nIgnoring signal:\n";
-        } else {
-            std::cout << '\n';
-        }
-        std::cout << signature << "\n    arg1 = " << arg1 << std::endl;
-    }
     void print_( std::string const& signature ) const;
+    template <class T>
+    void print_( std::string const& signature, T arg1 ) const {
+        this->print_(signature);
+        std::cout << "    arg1 = " << arg1 << std::endl;
+    }
 
 private slots:
     void on_wCluster_currentIndexChanged(const QString &arg1);
@@ -46,10 +41,31 @@ private slots:
 
     void on_wRequestCores_clicked();
 
+    void on_wAutomaticRequests_toggled(bool checked);
+
+    void on_wNNodes_valueChanged(int arg1);
+
+    void on_wNCoresPerNode_valueChanged(int arg1);
+
+    void on_wPages_currentChanged(int index);
+
 private:
     Ui::MainWindow *ui;
     Launcher launcher_;
     bool ignoreSignals_;
+    int previousPage_;
 };
+
+#define PRINT0_AND_CHECK_IGNORESIGNAL( signature ) \
+    this->print_( signature ); \
+    if( this->ignoreSignals_ ) return;
+
+#define PRINT1_AND_CHECK_IGNORESIGNAL( signature, arg1 ) \
+    this->print_( signature, (arg1) ); \
+    if( this->ignoreSignals_ ) return;
+
+#define FORWARDING \
+    std::cout << "    forwarding" << std::flush;
+
 
 #endif // MAINWINDOW_H

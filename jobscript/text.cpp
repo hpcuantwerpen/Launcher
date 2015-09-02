@@ -4,8 +4,9 @@
 
 namespace pbs
 {//-----------------------------------------------------------------------------
-    Text::Text( QString const& txt)
+    Text::Text(QString const& txt, Text *parent )
       : text_(txt )
+      , parent_(parent)
     {}
  //-----------------------------------------------------------------------------
     void Text::init()
@@ -30,6 +31,11 @@ namespace pbs
         Text::staticCompose(this);
     }
  //-----------------------------------------------------------------------------
+    void Text::set_parent( Text* parent ) {
+        this->parent_ = parent;
+    }
+
+ //-----------------------------------------------------------------------------
     Text::~Text() {}
  //-----------------------------------------------------------------------------
     QString const&
@@ -50,8 +56,12 @@ namespace pbs
     void
     Text::
     set_is_modified( bool is_modified_ ) {
-        if( is_modified_ )
+        if( is_modified_ ) {
             this->text_.clear();
+            if( parent_ ) {
+                parent_->set_is_modified( is_modified_ );
+            }
+        }
     }
  //-----------------------------------------------------------------------------
     void
