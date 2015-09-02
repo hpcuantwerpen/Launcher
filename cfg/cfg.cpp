@@ -118,6 +118,18 @@ namespace cfg
        }
     }
  //-----------------------------------------------------------------------------
+    void  Item::set_choices
+      ( QStringList const& choices
+      , bool              is_range
+      )
+    {
+        Choices_t choices2;
+        for( int i=0; i<choices.size(); ++i ) {
+            choices2.append( choices[i] );
+        }
+        set_choices( choices2, is_range );
+    }
+ //-----------------------------------------------------------------------------
     void Item::set_default_value(QVariant const& default_value)
     {
         if( this->is_valid(default_value,true) ) {
@@ -181,7 +193,7 @@ namespace cfg
     void load(Config_t& config, QString const& filename)
     {
         QFile file(filename);
-        file.open(QIODevice::ReadOnly);
+        file.open( QIODevice::ReadOnly /*| QIODevice::Text*/ );
         QDataStream ds(&file);
         ds >> config;
     }
@@ -189,11 +201,10 @@ namespace cfg
     void save(Config_t const& config, QString const& filename)
     {
         QFile file(filename);
-        file.open(QIODevice::WriteOnly|QIODevice::Truncate);
+        file.open( QIODevice::WriteOnly | QIODevice::Truncate /*| QIODevice::Text*/ );
         QDataStream ds(&file);
         ds << config;
     }
- //-----------------------------------------------------------------------------
  //-----------------------------------------------------------------------------
 }// namespace cfg
 

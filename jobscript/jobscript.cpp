@@ -1,7 +1,6 @@
 #include "jobscript.h"
 #include <datetime_now.h>
 
-#include <QRegularExpression>
 #include <QFile>
 #include <QFileInfo>
 #include <QDir>

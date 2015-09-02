@@ -15,9 +15,19 @@ CONFIG   += c++11
 
 SOURCES  += main.cpp        \
             mainwindow.cpp  \
-            launcher.cpp
+            launcher.cpp \
+    clusterinfo.cpp
 
 HEADERS  += mainwindow.h   \
-            launcher.h
+            launcher.h \
+    clusterinfo.h
 
 FORMS    += mainwindow.ui
+
+arg_path = ..
+arg_lib  = cfg
+include(../depend_on_lib.pri)
+arg_lib  = jobscript
+include(../depend_on_lib.pri)
+arg_lib  = toolbox
+include(../depend_on_lib.pri)

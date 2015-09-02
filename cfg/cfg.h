@@ -43,14 +43,22 @@ namespace cfg
         QVariant const& default_value() const;
         void set_default_value(QVariant const& default_value = QVariant());
 
-    // choices
-       QList<QVariant> const& choices() const {
+     // choices
+        typedef QList<QVariant> Choices_t;
+        Choices_t const& choices() const {
            return this->choices_;
-       }
-       void set_choices
-         ( QList<QVariant> const& choices  = QList<QVariant>()
-         , bool                   is_range = false
-         );
+        }
+        void set_choices( Choices_t   const& choices = Choices_t(), bool is_range = false );
+        void set_choices( QStringList const& choices              , bool is_range = false );
+        template <class T>
+        void set_choices( QList<T>    const& choices              , bool is_range = false
+          ) {
+            Choices_t choices2;
+            for( int i=0; i<choices.size(); ++i ) {
+                choices2.append( choices[i] );
+            }
+            set_choices( choices2, is_range );
+        }
 
        bool choices_is_range() const {
            return this->choices_is_range_;
@@ -60,12 +68,12 @@ namespace cfg
        bool is_valid(QVariant const& value, bool trow = false ) const;
 
     private:
-        QString         name_;
-        QVariant        value_;
-        QVariant        default_value_;
-        QList<QVariant> choices_;
-        bool            choices_is_range_;
-        QVariant::Type  range_type_;
+        QString         name_;              // item name
+        QVariant        value_;             // item current value
+        QVariant        default_value_;     // item default value
+        QList<QVariant> choices_;           // list or range of allowed values
+        bool            choices_is_range_;  // true if choices_ represents a range, false otherwise
+        QVariant::Type  range_type_;        // the type of the range/list (int, float, string)
     };
  //=============================================================================
     QDataStream &operator<<( QDataStream& ds, Item const& item );
