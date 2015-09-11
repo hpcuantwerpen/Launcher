@@ -12,7 +12,10 @@
  //-----------------------------------------------------------------------------
     Launcher::Launcher()
     {
-
+    }
+ //-----------------------------------------------------------------------------
+    Launcher::~Launcher()
+    {
     }
  //-----------------------------------------------------------------------------
     QString Launcher::homePath( QString const& sub )
@@ -31,6 +34,9 @@
         QString pwd = QDir::currentPath();
         QDir dir( Launcher::homePath("clusters"), "*.info");
         QStringList clusters = dir.entryList();
+        if( clusters.size()==0 ) {
+            throw_<std::runtime_error>("No Clusters found.");
+        }
         QDir::setCurrent( dir.absolutePath() );
         for (int i=0; i<clusters.size(); ++i) {
             ClusterInfo cluster_i( clusters[i] );

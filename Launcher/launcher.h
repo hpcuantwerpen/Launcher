@@ -17,6 +17,7 @@
     {
     public:
         Launcher();
+        ~Launcher();
         void readClusterInfo();
         static QString homePath( QString const& sub1 = QString() );
 
@@ -25,9 +26,9 @@
     public: // data
         typedef QMap<QString,ClusterInfo> Clusters_t;
 
-        cfg::Config_t config;
-        Clusters_t    clusters;
-        pbs::Script   script;
+        cfg::Config config;
+        Clusters_t  clusters;
+        pbs::Script script;
     private:
     };
 

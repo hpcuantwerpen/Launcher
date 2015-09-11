@@ -51,6 +51,16 @@
         isDefault_ = rhs.isDefault_;
     }
  //-----------------------------------------------------------------------------
+    void NodesetInfo::storeResetValues( int nNodes, int nCoresPerNode, int nCores, double gbPerCore, double gbTotal ) const
+    {
+        this->resetValues_.nNodes        = nNodes;
+        this->resetValues_.nCoresPerNode = nCoresPerNode;
+
+        this->resetValues_.nCores        = nCores;
+        this->resetValues_.gbPerCore     = gbPerCore;
+        this->resetValues_.gbTotal       = gbTotal;
+    }
+ //-----------------------------------------------------------------------------
     void
     NodesetInfo::
     requestNodesAndCores( int nNodesRequested, int nCoresPerNodeRequested ) const
@@ -66,10 +76,11 @@
         granted_.gbTotal       = nNodesRequested*this->gbPerNodeAvailable();
         granted_.nCoresPerNode = nCoresPerNodeRequested;
         granted_.nNodes        = nNodesRequested;
+        resetValues_ = granted_;
     }
  //-----------------------------------------------------------------------------
     void
-    NodesetInfo::requestCoresAndMemory( int nCoresRequested, double gbPerCoreRequested ) const
+    NodesetInfo::requestCoresAndMemory(int nCoresRequested, double gbPerCoreRequested, IncreasePolicy increasePolicy ) const
     {
         if( gbPerCoreRequested > this->gbPerNodeAvailable() ) {
             throw_<std::runtime_error>("Requesting more memory per core than physically available (%1).", this->gbPerNodeAvailable() );
@@ -78,24 +89,53 @@
             throw_<std::runtime_error>("Requesting more cores than physically available (%1).", this->nCoresAvailable() );
         }
 
-        if( gbPerCoreRequested <= this->gbPerCoreAvailable() )
-        {// use all cores per node since there is sufficient memory
-            granted_.nCoresPerNode = this->nCoresPerNode();
-            granted_.nNodes        = (int)( ceil( nCoresRequested / (double)(this->nCoresPerNode())) );
-            if( granted_.nNodes==1 )
-            {// respect the number of cores requested instead of returning a full node
-                granted_.nCoresPerNode = nCoresRequested;
+        switch(increasePolicy) {
+        case IncreaseCores:
+        {// how many cores per node with this amount of memory?
+            granted_.nCoresPerNode = int( floor( this->gbPerNodeAvailable() / gbPerCoreRequested ) );
+         // how much memory per core, distributing the memory over the number of cores per node
+            granted_.gbPerCore     = this->gbPerNodeAvailable()/granted_.nCoresPerNode;
+         // how many nodes to have at least nCoresRequested in total
+            int n_nodes, n_cores;
+            for( n_nodes=1; n_nodes<=this->nNodes(); ++n_nodes ) {
+                n_cores = n_nodes*granted_.nCoresPerNode;
+                if( n_cores >= nCoresRequested )
+                {//success
+                    granted_.nNodes  = n_nodes;
+                    granted_.gbTotal = n_nodes*this->gbPerNodeAvailable();
+                    granted_.nCores  = n_cores;
+                    resetValues_ = granted_;
+                    return;
+                }
             }
-        } else
-        {//use only so many cores per nodes that each core has at least the requested memory
-            granted_.nCoresPerNode = (int)( floor( this->gbPerNodeAvailable() / gbPerCoreRequested ));
-            granted_.nNodes        = (int)( ceil( nCoresRequested / (double)(granted_.nCoresPerNode)));
+            throw_<std::runtime_error>("The request could not be satisfied.");
         }
-        granted_.nCores        = granted_.nNodes*granted_.nCoresPerNode;
-        granted_.gbPerCore     = this->gbPerNodeAvailable() / granted_.nCoresPerNode;
-        granted_.gbTotal       = granted_.nNodes*this->gbPerNodeAvailable();
-        if( granted_.nNodes > this->nNodes() ) {
-            throw_<std::runtime_error>("Requesting more nodes than physically available (%1).", this->nNodes() );
+        case IncreaseMemoryPerCore:
+        {
+            int n_nodes, n_cores_per_node;
+            double gb_per_core;
+            for( n_nodes=1; n_nodes<=this->nNodes(); ++n_nodes ) {
+                n_cores_per_node = nCoresRequested / n_nodes;
+                int remainder    = nCoresRequested % n_nodes;
+                if( remainder==0 )
+                {// how much memory do we have
+                    gb_per_core = this->gbPerNodeAvailable() / n_cores_per_node;
+                    if( gb_per_core >= gbPerCoreRequested )
+                    {// success!
+                        granted_.nCores        = nCoresRequested;
+                        granted_.gbPerCore     = gb_per_core;
+                        granted_.nNodes        = n_nodes;
+                        granted_.gbTotal       = n_nodes * this->gbPerNodeAvailable();
+                        granted_.nCoresPerNode = n_cores_per_node;
+                        resetValues_ = granted_;
+                        return;
+                    }
+                }
+            }
+            throw_<std::runtime_error>("The request cannot be satisfied with an equal number of cores per node on every node.");
+        }
+        default:
+            throw_<std::logic_error>("IncreasePolicy not implemented.") ;
         }
     }
  //-----------------------------------------------------------------------------
@@ -107,7 +147,7 @@
       , list_begin_ ("^(\\[)\\s*(.*)"     , QRegularExpression::DotMatchesEverythingOption )
       , list_end_   ("^\\s*(\\])\\s*(.*)" , QRegularExpression::DotMatchesEverythingOption )
       , list_sep_   ("^\\s*(,)\\s*(.*)"   , QRegularExpression::DotMatchesEverythingOption )
-      , word_       ("^([\\w*.-]+)(.*)"    , QRegularExpression::DotMatchesEverythingOption )
+      , word_       ("^([\\w*.-]+)(.*)"   , QRegularExpression::DotMatchesEverythingOption )
       , action_     ("^([+-]{[^}]*})(.*)" , QRegularExpression::DotMatchesEverythingOption )
       , number_     ("^(\\d+)(.*)"        , QRegularExpression::DotMatchesEverythingOption )
       , walltime_   ("^(\\d+[smhdw])(.*)" , QRegularExpression::DotMatchesEverythingOption )
@@ -167,25 +207,40 @@
             QString walltime_limit = list.at(0).toString();
             QChar unit = walltime_limit.right(1).at(0);
             int   num  = walltime_limit.left(walltime_limit.size()-1).toInt();
-            int s = 1;
-            if( unit=='s' ) {}
-            else
-            {   s*=60;
-                if( unit=='m' ) {}
-                else
-                {   s*=60;
-                    if( unit=='h' ) {}
-                    else
-                    {   s*=24;
-                        if( unit=='d') {}
-                        else{ s*=7; }
-                    }
-                }
-            }
+            int s = nSecondsPerUnit(unit);
             num*=s;
             this->clusterInfo_->walltime_limit_ = num;
         }
     }
+ //-----------------------------------------------------------------------------
+    int nSecondsPerUnit( QChar const unit )
+    {
+        int s = 1;
+        if( unit=='s' ) {}
+        else
+        {   s*=60;
+            if( unit=='m' ) {}
+            else
+            {   s*=60;
+                if( unit=='h' ) {}
+                else
+                {   s*=24;
+                    if( unit=='d') {}
+                    else
+                    {   s*=7;
+                        if( unit!='w' ) {
+                            throw_<std::runtime_error>("Unknown time unit : '%1'.", unit );
+                        }
+                    }
+                }
+            }
+        }
+        return s;
+    }
+    int nSecondsPerUnit( QString const& unit ) {
+        return nSecondsPerUnit( unit.at(0) );
+    }
+
  //-----------------------------------------------------------------------------
    void ClusterInfoReader::throw_invalid_format_() const {
        throw_<std::runtime_error>("Invalid file format: %1, at: \n>>>>%2/n"

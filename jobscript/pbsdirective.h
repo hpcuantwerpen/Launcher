@@ -13,7 +13,7 @@ namespace pbs
         friend T* create(QString const& line );
     public:
         virtual bool equals  ( ShellCommand const* rhs ) const;
-        virtual bool copyFrom( ShellCommand const* rhs );
+        virtual void copyFrom( ShellCommand const* rhs );
         virtual void compose();
         virtual QString const& value() const;
         virtual void setValue( QString const& value );

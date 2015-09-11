@@ -24,7 +24,7 @@ namespace pbs
  //=============================================================================
  // fwd declarations
     class ShellCommand;
-    std::shared_ptr<ShellCommand> parse( QString const & line );
+    ShellCommand* parse( QString const & line );
     template <class T> T* create( QString const& line );
     class Script;
 
@@ -39,7 +39,7 @@ namespace pbs
   */
  //=============================================================================
     {
-        friend std::shared_ptr<ShellCommand> parse( QString const & line );
+        friend ShellCommand* parse( QString const & line );
         template <class T>
         friend T* create( QString const& line );
         friend class Script;
@@ -54,7 +54,7 @@ namespace pbs
         //QString const& parm_value( QString const & key ) const;
 
         virtual bool equals( ShellCommand const* rhs) const;
-        virtual bool copyFrom( ShellCommand const* rhs );
+        virtual void copyFrom( ShellCommand const* rhs );
 
      // accessors
         Parameters_t const& parameters() const { return this->parameters_; }

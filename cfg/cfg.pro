@@ -15,3 +15,7 @@ CONFIG += staticlib
 SOURCES += cfg.cpp
 
 HEADERS += cfg.h
+
+arg_path = ..
+arg_lib  = toolbox
+include(../depend_on_lib.pri)

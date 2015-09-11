@@ -1,4 +1,5 @@
 #include "cfg.h"
+#include <throw_.h>
 
 #include <QFile>
 #include <QIODevice>
@@ -21,7 +22,11 @@ namespace cfg
         return qs;
     }
  //-----------------------------------------------------------------------------
-    Item::Item(const QString &name) : name_(name) {}
+    Item::Item(const QString &name)
+      : name_(name)
+      , choices_is_range_(false)
+      , range_type_(QVariant::Invalid)
+    {}
  //-----------------------------------------------------------------------------
     Item::Item(Item const& rhs)
       : name_            (rhs.name_            )
@@ -40,30 +45,34 @@ namespace cfg
                   && this->choices().first() <= value
                   &&                            value <= this->choices().last();
                 if( !ok && trow ) {
-                    QString qs = "Value ";
-                    qs.append( value.toString() )
-                      .append(" (")
-                      .append( value.typeName() )
-                      .append(") is not in ")
-                      .append( this->choices().first().typeName() )
-                      .append(" range ")
-                      .append( rangeToString(this->choices()) )
-                      .append(".\n")
-                      ;
-                    throw std::logic_error(qs.toStdString());
+                    throw_<std::logic_error>("Value '%1' (%2) is not in %3 range %4."
+                                            , value.toString()
+                                            , value.typeName()
+                                            , this->choices().first().typeName()
+                                            , rangeToString( this->choices() )
+                                            );
                 }
             }
         } else {
             if( !choices_.empty() ) {
                 ok = this->choices().contains(value);
                 if( !ok && trow ) {
-                    QString qs = "Value ";
-                    qs.append( value.toString() )
-                      .append(" is not a valid choice. Valid choices are: ")
-                      .append( rangeToString( this->choices() ) )
-                      .append(".\n")
-                      ;
-                    throw std::logic_error(qs.toStdString());
+                    throw_<std::logic_error>("Value '%1' is not a valid choice. Valid choices are: %2."
+                                            , value.toString()
+                                            , rangeToString( this->choices() )
+                                            );
+                }
+            } else {
+                if( range_type_!=QVariant::Invalid ) {
+                    ok = (value.type() == range_type_);
+                    if( !ok && trow ) {
+                        throw_<std::logic_error>("Value '%1' is not a valid choice. Valid choices are of type %2."
+                                                , value.toString()
+                                                , QVariant::typeToName(this->range_type_)
+                                                );
+                    }
+                } else {// no type prescribed - anything goes
+                    ok = true;
                 }
             }
         }
@@ -78,30 +87,42 @@ namespace cfg
         if( is_range )
         {// validate the range
             if( choices.size() > 2 ) {
-                QString qs = "Ranges of more than 2 elements are invalid: range is ";
-                qs.append( rangeToString( choices ) ).append(".\n");
-                throw std::logic_error(qs.toStdString());
+                throw_<std::logic_error>("Ranges of more than 2 elements are invalid: range is: %1."
+                                        , rangeToString( choices )
+                                        );
             }
             if( choices.first().typeName() != choices.last().typeName() ) {
-                QString qs = "The elements of a range must be of the same type: range is ";
-                qs.append( rangeToString( choices, true ) ).append(".\n");
-                throw std::logic_error(qs.toStdString());
+                throw_<std::logic_error>("The elements of a range must be of the same type: range is: %1."
+                                        , rangeToString( choices )
+                                        );
             }
             QVariant::Type range_type = choices.first().type();
+
             if( range_type != QVariant::Int
              && range_type != QVariant::Double ) {
-                QString qs = "The elements of a range must be of type int or double: range is ";
-                qs.append( rangeToString( choices, true ) ).append(".\n");
-                throw std::logic_error(qs.toStdString());
+                throw_<std::logic_error>("The elements of a range must be of type int or double: range is: %1."
+                                        , rangeToString( choices )
+                                        );
             }
             if( choices.first() > choices.last() ) {
-                QString qs = "Empty range (the first element is larger than the last): range is ";
-                qs.append( rangeToString( choices ) ).append(".\n");
-                throw std::logic_error(qs.toStdString());
+                throw_<std::logic_error>("Empty range (the first element is larger than the last): range is: %1."
+                                        , rangeToString( choices )
+                                        );
             }
             this->range_type_ = range_type;
         } else {
-            this->range_type_ = QVariant::Invalid;
+            if( choices.size() > 0 ) {
+                QVariant::Type range_type = choices.first().type();
+                bool choices_of_same_type = true;
+                for( int i=1; i<choices.size(); ++i ) {
+                    if( choices[i].type() != range_type )
+                        choices_of_same_type = false;
+                }
+                this->range_type_ = ( choices_of_same_type ? range_type : QVariant::Invalid );
+            } else {
+                if( this->value() != QVariant() )
+                    this->range_type_ = QVariant::Invalid;
+            }
         }
     // initialize *this
        this->choices_is_range_ = is_range;
@@ -109,13 +130,14 @@ namespace cfg
     // adjust default value
        if( (this->default_value_==QVariant()) || (!this->is_valid(this->default_value_)) )
        {// there is no current default value or it is invalid
-           this->default_value_ = choices.at(0);
+           if( choices.size() > 0 )
+               this->default_value_ = choices.at(0);
        }
     // adjust value
-       if( (this->value_==QVariant()) || (!this->is_valid(this->value_)) )
-       {// there is no current value or it is invalid
-           this->value_ = this->default_value_;
-       }
+//       if( (this->value_==QVariant()) || (!this->is_valid(this->value_)) )
+//       {// there is no current value or it is invalid
+//           this->value_ = this->default_value_;
+//       }
     }
  //-----------------------------------------------------------------------------
     void  Item::set_choices
@@ -135,11 +157,11 @@ namespace cfg
         if( this->is_valid(default_value,true) ) {
             this->default_value_ = default_value;
         }
-        if( this->value_==QVariant() ) {
-            this->value_ = this->default_value_;
-        } else if( !this->is_valid(this->value_) ) {
-            this->value_ = this->default_value_;
-        }
+//        if( this->value_==QVariant() ) {
+//            this->value_ = this->default_value_;
+//        } else if( !this->is_valid(this->value_) ) {
+//            this->value_ = this->default_value_;
+//        }
     }
  //-----------------------------------------------------------------------------
     QVariant const& Item::default_value() const {
@@ -149,7 +171,7 @@ namespace cfg
         return this->default_value_;
     }
  //-----------------------------------------------------------------------------
-   void Item::set_value(QVariant const& value)
+   void Item::set_value( QVariant const& value )
    {
        if( value==QVariant() ){
            this->value_ = this->default_value();
@@ -160,9 +182,24 @@ namespace cfg
        }
    }
  //-----------------------------------------------------------------------------
+   void Item::set_value_and_type( QVariant const& value )
+   {
+       QVariant::Type type = value.type();
+       if( this->range_type_==QVariant::Invalid )
+           this->range_type_ = type;
+       if( this->range_type_!= type ) {
+           throw_<std::logic_error>("Cannot set type to %1. Item '%2' has already a type (%3)."
+                                   , QVariant::typeToName(type)
+                                   , this->name()
+                                   , QVariant::typeToName(this->range_type_)
+                                   );
+       }
+       this->set_value( value );
+   }
+ //-----------------------------------------------------------------------------
    QVariant const& Item::value() const {
        if( this->value_==QVariant() )
-           const_cast<Item*>(this)->value_ = this->default_value();
+           return this->default_value();
        return this->value_;
    }
  //-----------------------------------------------------------------------------
@@ -188,22 +225,52 @@ namespace cfg
 
         return ds;
     }
-
  //-----------------------------------------------------------------------------
-    void load(Config_t& config, QString const& filename)
+ // Config
+ //-----------------------------------------------------------------------------
+    void Config::setFilename( QString const& filename ) const
     {
-        QFile file(filename);
-        file.open( QIODevice::ReadOnly /*| QIODevice::Text*/ );
-        QDataStream ds(&file);
-        ds >> config;
+        if( filename.isEmpty() ) {
+            if( this->filename_.isEmpty() ) {
+                throw_<std::runtime_error>("Filename missing.");
+            }
+        } else {
+            this->filename_ = filename;
+        }
     }
  //-----------------------------------------------------------------------------
-    void save(Config_t const& config, QString const& filename)
+    void Config::load( QString const& filename )
     {
-        QFile file(filename);
-        file.open( QIODevice::WriteOnly | QIODevice::Truncate /*| QIODevice::Text*/ );
+        this->setFilename( filename );
+        QFile file(this->filename_);
+        file.open( QIODevice::ReadOnly );
         QDataStream ds(&file);
-        ds << config;
+        ds >> *this;
+    }
+ //-----------------------------------------------------------------------------
+    void Config::save( QString const& filename) const
+    {
+        this->setFilename( filename );
+        QFile file(this->filename_);
+        file.open( QIODevice::WriteOnly | QIODevice::Truncate );
+        QDataStream ds(&file);
+        ds << *this;
+    }
+ //-----------------------------------------------------------------------------
+    void Config::addItem( Item const& item )
+    {
+        if( item.name().isEmpty() ) {
+            throw_<std::logic_error>("Cannot add cfg::Item object with empty name.");
+        }
+        (*this)[item.name()] = item;
+    }
+ //-----------------------------------------------------------------------------
+    Item* Config::getItem( QString const& itemName )
+    {
+        if( !this->contains( itemName ) ) {
+            this->addItem( Item(itemName) );
+        }
+        return &(*( this->find(itemName) ));
     }
  //-----------------------------------------------------------------------------
 }// namespace cfg

@@ -60,6 +60,8 @@ namespace pbs
     {
         if( this->parameters().isEmpty() )
         {// keep value_
+         // if value is empty the line is hidden
+            this->setHidden( this->value_.isEmpty() );
         } else {
             this->value_.clear();
             for( Parameters_t::const_iterator iter = this->parameters().cbegin(); iter != this->parameters().cend(); ++iter ) {
@@ -71,6 +73,9 @@ namespace pbs
             if( this->value_.endsWith(':') ) {
                 this->value_.chop(1);
             }
+        }
+        if( this->hidden_ ) {
+            return;
         }
         this->text_ = QString("#PBS ")
                 .append(this->flag_)
@@ -121,7 +126,7 @@ namespace pbs
         return false;
     }
 //-----------------------------------------------------------------------------
-    bool PbsDirective::copyFrom( ShellCommand const* rhs )
+    void PbsDirective::copyFrom( ShellCommand const* rhs )
     {
         PbsDirective const* pbs = dynamic_cast<PbsDirective const*>(rhs);
         if( this->parameters().isEmpty() ) {
@@ -147,7 +152,6 @@ namespace pbs
                 }
             }
         }
-        return this->is_modified();
     }
  //-----------------------------------------------------------------------------
 }//namespace pbs

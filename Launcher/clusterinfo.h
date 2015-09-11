@@ -1,4 +1,4 @@
-#ifndef CLUSTERINFO
+    #ifndef CLUSTERINFO
 #define CLUSTERINFO
 
 #include <QString>
@@ -37,9 +37,23 @@
                  , gbTotal;
         };
 
+        void storeResetValues
+          ( int nNodes
+          , int nCoresPerNode
+          , int nCores
+          , double gbPerCore
+          , double gbTotal
+          ) const;
+        Granted const& resetValues() const { return resetValues_; }
+
+        enum IncreasePolicy {
+            IncreaseMemoryPerCore
+          , IncreaseCores
+        };
+
         void requestNodesAndCores ( int nNodes, int nCoresPerNode ) const;
          // find the result of the request using the granted() accessor
-        void requestCoresAndMemory( int nCores, double gbPerCore=0. ) const;
+        void requestCoresAndMemory( int nCores, double gbPerCore, IncreasePolicy increasePolicy ) const;
          // find the result of the request using the granted() accessor
         Granted const& granted() const {
             return granted_;
@@ -82,6 +96,7 @@
         QStringList scriptActions_;
         bool    isDefault_;
         mutable Granted granted_;
+        mutable Granted resetValues_;
     };
 
  //=============================================================================
@@ -104,6 +119,12 @@
         QString const& defaultNodeset() const {
             return defaultNodeset_;
         }
+        int walltimeLimit() const {
+            return this->walltime_limit_;
+        }
+        QStringList const& loginNodes() const {
+            return this->login_nodes_;
+        }
 
         typedef QMap<QString,NodesetInfo> Nodesets_t;
 
@@ -114,6 +135,10 @@
         int walltime_limit_; //in seconds
         QString defaultNodeset_;
     };
+ //=============================================================================
+    int nSecondsPerUnit( QChar const unit );
+     // returns the number of seconds in unit ('s'|'m'|'h'|'d'|'w')
+    int nSecondsPerUnit( QString const& unit );
  //=============================================================================
     class ClusterInfoReader
  //=============================================================================

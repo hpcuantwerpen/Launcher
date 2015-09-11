@@ -23,8 +23,8 @@ namespace pbs
     void LauncherComment::init()
     {
         QRegularExpressionMatch m;
-        QString pattern = LauncherComment::prefix_;
-                pattern+= "(\\s+)(.+)";
+        QString pattern(LauncherComment::prefix_);
+        pattern.append( QString("(\\s+)(.+)") );
         QRegularExpression re(pattern); // line pattern
         m = re.match( this->text_ );
         if( !m.hasMatch() )
@@ -34,21 +34,28 @@ namespace pbs
         m = re.match( this->value_ );
         if( !m.hasMatch() )
             throw_<std::runtime_error>("Ill formed LauncherComment: %1",this->text_);
-        this->parameters()[m.captured(1)] = m.captured(2);
-        Text::staticCompose(this);
+        QString key = m.captured(1);
+        QString val = ( key=="generated_on" ? toolbox::now() : m.captured(2) );
+        if( this->parameters()[key] != val ) {
+            this->parameters()[key] = val;
+            this->set_is_modified();
+        }
     }
  //-----------------------------------------------------------------------------
     void LauncherComment::compose()
     {
+        if( this->hidden_ ) {
+            return;
+        }
         this->value_.clear();
         this->value_.append(this->parameters().first().first)
                     .append(" = ")
                     .append(this->parameters().first().second)
                     ;
-        this->text_ = LauncherComment::prefix_
+        this->text_ = QString(LauncherComment::prefix_)
                     .append(" ")
                     .append(this->value_)
-                    .append(this->parameters()[0].second)
+                    .append(this->comment_)
                     ;
        Text::staticCompose(this);
     }
@@ -65,7 +72,7 @@ namespace pbs
         return false;
     }
  //-----------------------------------------------------------------------------
-    bool LauncherComment::copyFrom( ShellCommand const* rhs )
+    void LauncherComment::copyFrom( ShellCommand const* rhs )
     {
         LauncherComment const* lc = dynamic_cast<LauncherComment const*>(rhs);
         for( Parameters_t::const_iterator iter = lc->parameters().cbegin(); iter != lc->parameters().cend(); ++iter)
@@ -78,7 +85,6 @@ namespace pbs
                 this->set_is_modified();
             }
         }
-        return this->is_modified();
     }
  //-----------------------------------------------------------------------------
 }//namespace pbs

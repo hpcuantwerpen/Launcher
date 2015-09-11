@@ -23,5 +23,16 @@ void throw_(char const* msg, A1 const& a1, A2 const& a2 ) {
     throw_<E>( errmsg.toStdString().c_str() );
 }
 
+template <class E, class A1, class A2, class A3>
+void throw_(char const* msg, A1 const& a1, A2 const& a2, A3 const& a3 ) {
+    QString errmsg = QString(msg).arg(a1).arg(a2).arg(a3);
+    throw_<E>( errmsg.toStdString().c_str() );
+}
+
+template <class E, class A1, class A2, class A3, class A4>
+void throw_(char const* msg, A1 const& a1, A2 const& a2, A3 const& a3, A4 const& a4 ) {
+    QString errmsg = QString(msg).arg(a1).arg(a2).arg(a3).arg(a4);
+    throw_<E>( errmsg.toStdString().c_str() );
+}
 #endif // THROW_H
 

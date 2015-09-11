@@ -25,6 +25,9 @@ namespace pbs
     ShellCommand::
     compose()
     {
+        if( this->hidden_ ) {
+            return;
+        }
         this->text_ += this->value_;
         this->text_ += this->comment_;
         Text::staticCompose(this);
@@ -38,13 +41,14 @@ namespace pbs
         return false;
     }
  //-----------------------------------------------------------------------------
-    bool
-    ShellCommand::
-    copyFrom( ShellCommand const* rhs )
+    void ShellCommand::copyFrom( ShellCommand const* rhs )
     {
-        if( this->parameters().isEmpty() )
-            this->text_ = rhs->text_;
-        return this->is_modified();
+        if( this->parameters().isEmpty() ) {
+            if( this->text_ != rhs->text_ ) {
+                this->text_ = rhs->text_;
+                this->set_is_modified();
+            }
+        }
     }
  //-----------------------------------------------------------------------------
 }//namespace pbs

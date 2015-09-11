@@ -55,7 +55,7 @@ void CfgTest::testCase1()
     QList<QVariant> choices;
     choices.append(1);
     choices.append(3);
-    std::cout << choices.first().typeName() << choices.first().type() << std::endl;
+    std::cout << choices.first().typeName() <<" : "<< choices.first().type() << std::endl;
     item.set_choices(choices);
     choices.append(4);
     item.set_choices(choices);
@@ -66,13 +66,13 @@ void CfgTest::testCase1()
         item.set_value(2);
         QVERIFY2(false, "Failure");
     } catch(logic_error &e) {
-        std::cout << "(Intentional) Error: " << e.what();
+        std::cout << "\n(Intentional) Error: " << e.what() << std::endl;
     }
     try {
         item.set_choices(choices,true);
         QVERIFY2(false, "Failure");
     } catch(logic_error &e) {
-        std::cout << "(Intentional) Error: " << e.what();
+        std::cout << "\n(Intentional) Error: " << e.what() << std::endl;
     }
     choices.removeAt(2);
     item.set_choices(choices,true);
@@ -82,7 +82,7 @@ void CfgTest::testCase1()
         item.set_value(2.5);
         QVERIFY2(false, "Failure");
     } catch(logic_error &e) {
-        std::cout << "(Intentional) Error: " << e.what();
+        std::cout << "\n(Intentional) Error: " << e.what() << std::endl;
     }
     try {
         choices.first()=4;
@@ -90,7 +90,7 @@ void CfgTest::testCase1()
         item.set_choices(choices,true);
         QVERIFY2(false, "Failure");
     } catch(logic_error &e) {
-        std::cout << "(Intentional) Error: " << e.what();
+        std::cout << "\n(Intentional) Error: " << e.what() << std::endl;
     }
 }
 
@@ -124,13 +124,14 @@ void CfgTest::testCase2()
         QVERIFY2(item.choices().first()==1, "Failure");
         QVERIFY2(item.choices().last ()==2, "Failure");
 
-        cfg::Config_t config;
-        config[item.name()] = item;
-        cfg::save(config,"config.cfg");
+        cfg::Config config;
+        //config[item.name()] = item;
+        config.addItem(item);
+        config.save("config.cfg");
     }
     {
-        cfg::Config_t config;
-        cfg::load(config, "config.cfg");
+        cfg::Config config;
+        config.load("config.cfg");
         cfg::Item & item = config["item"];
 
         QVERIFY2(item.name()=="item", "Failure");

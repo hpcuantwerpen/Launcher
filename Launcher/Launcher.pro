@@ -16,18 +16,24 @@ CONFIG   += c++11
 SOURCES  += main.cpp        \
             mainwindow.cpp  \
             launcher.cpp \
-    clusterinfo.cpp
+            clusterinfo.cpp \
+    dataconnector.cpp
 
 HEADERS  += mainwindow.h   \
             launcher.h \
-    clusterinfo.h
+            clusterinfo.h \
+    dataconnector.h
 
 FORMS    += mainwindow.ui
 
 arg_path = ..
+arg_lib  = toolbox
+include(../depend_on_lib.pri)
 arg_lib  = cfg
 include(../depend_on_lib.pri)
 arg_lib  = jobscript
 include(../depend_on_lib.pri)
-arg_lib  = toolbox
+arg_lib  = ssh2tools
 include(../depend_on_lib.pri)
+
+include(../ssh2tools/libssh2.pri)

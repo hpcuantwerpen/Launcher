@@ -14,7 +14,7 @@ namespace pbs
         virtual void compose();
     public:
         virtual bool equals( ShellCommand const* rhs) const;
-        virtual bool copyFrom( ShellCommand const* rhs );
+        virtual void copyFrom( ShellCommand const* rhs );
     protected:
         LauncherComment(QString const& line, int ordinate=1, types::Type type=types::LauncherComment);
         virtual void init();

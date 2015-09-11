@@ -2,7 +2,9 @@
 #define JOBSCRIPT_H
 
 #include <QString>
-#include <QVector>
+//#include <QVector>
+#include <QList>
+
 #include <memory>
 
 #include <cfg.h>
@@ -24,16 +26,17 @@ namespace pbs
  //      +- LauncherComment
  //      +- PbsDirective
  //=============================================================================
-    typedef std::shared_ptr<ShellCommand>  ScriptLine_t;
-    typedef QVector<ScriptLine_t>          ScriptLines_t;
+    typedef QList<ShellCommand*>          ScriptLines_t;
  //=============================================================================
     class Script : public Text
     {
     public:
-        Script(       QString const& filepath = QString()
-              ,       QString const& text    = QString()
-              , cfg::Config_t const& config   = cfg::Config_t()
+        Script(     QString const& filepath = QString()
+              ,     QString const& text     = QString()
+              , cfg::Config const& config   = cfg::Config()
               );
+        ~Script();
+
         void read ( QString const& filepath,  bool additive=false );
         void write( QString const& filepath    = QString()
                   , bool warn_before_overwrite = true
@@ -43,12 +46,12 @@ namespace pbs
         void add  ( QString const& line,bool hidden=false, bool parsing_=false );
 
         virtual void compose();
-        int index( ScriptLine_t const& line ) const;
+        int index( ShellCommand const* line ) const;
         int index( QString      const& line ) const;
         enum {not_found = -1};
-        void remove( int i );
         QString const& operator[]( QString const& key ) const;
         QString      & operator[]( QString const& key );
+         // access the value associated with key
 
         void    add_parameters( QString const& key, Parameters_t const& parms );
         void remove_parameters( QString const& key, Parameters_t const& parms );
@@ -56,10 +59,14 @@ namespace pbs
         void    add_features( QString const& key, Features_t const& features );
         void remove_features( QString const& key, Features_t const& features );
 
+        ShellCommand* find_key( QString const& key );
+         // find the script line associated with key
+
     private:
         ScriptLines_t lines_;
         QString filepath_;
-        void insert_(std::shared_ptr<ShellCommand> sc);
+        void insert_(ShellCommand* sc);
+        void remove_( int i );
     };
  //=============================================================================
 }// namespace pbs

@@ -12,32 +12,37 @@
 
 namespace pbs
 {//-----------------------------------------------------------------------------
-    std::shared_ptr<ShellCommand> parse(QString const & line) {
-        return std::shared_ptr<ShellCommand>( ShellCommand::parse(line) );
+    ShellCommand* parse(QString const & line) {
+        return ShellCommand::parse(line);
     }
  //-----------------------------------------------------------------------------
     Script::
     Script
-      (       QString const& filepath
-      ,       QString const& text
-      , cfg::Config_t const& config
+      (     QString const& filepath
+      ,     QString const& text
+      , cfg::Config const& config
       )
       : Text( QString() )
     {
         this->filepath_ = filepath;
      // create default lines. which store dummy parameters
-        this->add( Shebang::default_value);
-        this->add( QString("#LAU generated_on = %1") .arg( toolbox::now() ));
-        this->add( QString("#LAU      cluster = %1") .arg( cfg_get_str(config,"cluster","unknown") ));
-        this->add( QString("#LAU      nodeset = %1") .arg( cfg_get_str(config,"nodeset","unknown") ));
+        this->add( Shebang::default_value );
+        this->add( QString("#LAU generated_on = %1") .arg( toolbox::now() ) );
+        this->add( QString("#LAU         user = %1") .arg( cfg_get_str(config,"wUsername" ,"unknown") ) );
+        this->add( QString("#LAU      cluster = %1") .arg( cfg_get_str(config,"wCluster"  ,"unknown") ) );
+        this->add( QString("#LAU      nodeset = %1") .arg( cfg_get_str(config,"wNodeset"  ,"unknown") ) );
+        this->add( QString("#LAU      n_cores = %1") .arg( cfg_get_str(config,"wNCores"   ,"unknown") ) );
+        this->add( QString("#LAU  Gb_per_core = %1") .arg( cfg_get_str(config,"wGbPerCore","unknown") ) );
+        this->add( QString("#LAU     Gb_total = %1") .arg( cfg_get_str(config,"wGbTotal"  ,"unknown") ) );
 
-        this->add( QString("#PBS -l nodes=%1:ppn=%2").arg(cfg_get_str(config,"nodes",1) )
-                                                     .arg(cfg_get_str(config,"ppn"  ,1) ) );
 
-        this->add( QString("#PBS -l walltime=%1")    .arg(cfg_get_str(config,"walltime","1:00:00") ));
+        this->add( QString("#PBS -l nodes=%1:ppn=%2").arg(cfg_get_str(config,"wNNodes"       ,1) )
+                                                     .arg(cfg_get_str(config,"wNCoresPerNode",1) ) );
 
-        this->add( QString("#PBS -M %1")             .arg(cfg_get_str(config,"notify_M","your.email@address.here") ));
-        this->add( QString("#PBS -m %1")             .arg(cfg_get_str(config,"notify_m","e") ));
+        this->add( QString("#PBS -l walltime=%1")    .arg(cfg_get_str(config,"walltime","1:00:00") ) );
+
+        this->add( QString("#PBS -M %1")             .arg(cfg_get_str(config,"notify_M","your.email@address.here") ), true );
+        this->add( QString("#PBS -m %1")             .arg(cfg_get_str(config,"notify_m","e") ), true );
 
         this->add( QString("#PBS -W x=nmatchpolicy:exactnode"));
 
@@ -61,7 +66,7 @@ namespace pbs
      // Note that directly calling add acts like calling parse() with additive=True
      // _parsing must be true when called by self.parse(), it affects the bookkeeping
      // of unsaved_changes
-        std::shared_ptr<ShellCommand> p_new_script_line( pbs::parse(line) );
+        ShellCommand* p_new_script_line( pbs::parse(line) );
         p_new_script_line->setHidden(hidden);
         p_new_script_line->set_parent( this );
         types::Type new_type = p_new_script_line->type();
@@ -76,10 +81,8 @@ namespace pbs
             if( i==this->not_found ) {
                 this->insert_(p_new_script_line);
             } else {
-                bool was_modified = this->lines_[i]->copyFrom( p_new_script_line.get() );
-                if( was_modified) {// also mark the script as modified
-                    this->set_is_modified();
-                }
+                this->lines_[i]->copyFrom( p_new_script_line );
+                delete p_new_script_line;
             }
         }
         //            if not _parsing:
@@ -88,7 +91,7 @@ namespace pbs
  //-----------------------------------------------------------------------------
     void
     Script::
-    insert_(std::shared_ptr<ShellCommand> new_line )
+    insert_(ShellCommand * new_line )
     {
         new_line->set_parent( this );
 
@@ -97,7 +100,7 @@ namespace pbs
         } else {
             ScriptLines_t::iterator iter =
                 std::find_if( this->lines_.begin(), this->lines_.end(),
-                    [&] ( ScriptLine_t const& current ) {
+                    [&] ( ShellCommand const* current ) {
                        return current->ordinate() > new_line->ordinate();
                     }
                 );
@@ -112,10 +115,16 @@ namespace pbs
  //-----------------------------------------------------------------------------
     void Script::compose()
     {
+        QString script_text;
         for( ScriptLines_t::iterator iter=this->lines_.begin(); iter < this->lines_.end(); ++iter ) {
-            if( !(*iter)->hidden() )
-                this->text_.append( (*iter)->text() );
+            ShellCommand* line = *iter;
+            QString line_text = line->text();
+            if( !line->hidden() ) {
+                script_text.append( line_text );
+            }
+            std::cout<<"\n%%%%\n"<<this->text_.toStdString()<<std::endl;
         }
+        this->text_ = script_text;
     }
  //-----------------------------------------------------------------------------
     void
@@ -160,7 +169,8 @@ namespace pbs
         QFile f(fileinfo.filePath());
         f.open(QIODevice::Truncate|QIODevice::Text|QIODevice::WriteOnly);
         QTextStream out(&f);
-        out << this->text();
+        QString const& txt = this->text();
+        out << txt;
         const_cast<Script*>(this)->filepath_ = new_filepath;
       //self.set_unsaved_changes(False)
     }
@@ -178,14 +188,14 @@ namespace pbs
          // Hence we first remove all UserComments and ShellComands from the current script:
             for( int i=this->lines_.size()-1; i>-1; --i)
             {
-                ScriptLine_t const& sl = this->lines_[i];
+                ShellCommand const* sl = this->lines_[i];
 //                std::cout<<std::endl
 //                    <<sl->text()    .toStdString()<<std::endl
 //                    <<sl->typeName().toStdString()<<std::endl;
                 switch( sl->type() ) {
                   case types::ShellCommand:
                   case types::UserComment :
-                    this->lines_.remove(i);
+                    this->remove_(i);
 //                    std::cout<<"/tdeleted"<<std::endl;
                     break;
                 }
@@ -203,21 +213,26 @@ namespace pbs
         );
     }
  //-----------------------------------------------------------------------------
-    int Script::index( QString const& line ) const {
-        int i = index( pbs::parse(line) );
+    int Script::index( QString const& line ) const
+    {
+        ShellCommand* ptr = pbs::parse(line);
+        int i = index( ptr );
+        delete ptr;
         return i;
     }
  //-----------------------------------------------------------------------------
-    void Script::remove( int i ) {
+    void Script::remove_( int i ) {
         if( i<0 || i>= this->lines_.size() )
             throw_<std::range_error>("Out of range: Script::remove(i), i=%1",i);
-        this->lines_.remove(i);
+        ShellCommand* ptr = this->lines_[i];
+        delete ptr;
+        this->lines_.removeAt(i);
     }
  //-----------------------------------------------------------------------------
-    int Script::index( ScriptLine_t const& line ) const
+    int Script::index( ShellCommand const* line ) const
     {
         for( int i=0; i<this->lines_.size(); ++i ) {
-            bool b = ( line.get()->equals( this->lines_[i].get() ) );
+            bool b = ( line->equals( this->lines_[i] ) );
             if( b )
                 return i;
         }
@@ -228,76 +243,28 @@ namespace pbs
     Script::
     operator[]( QString const& key ) const
     {
+        ShellCommand* line = const_cast<Script*>(this)->find_key(key);
         if( key[0]=='-' ) {
-            ScriptLines_t::const_iterator iter =
-                std::find_if( this->lines_.cbegin(), this->lines_.cend(),
-                    [&] ( ScriptLine_t const& current ) {
-                        bool b = ( current->flag()==key );
-                        return b;
-                    }
-                );
-            if( iter != this->lines_.cend() ) {
-                return (*iter)->value();
-            }
+            return line->value_;
         } else {
-            std::for_each( this->lines_.cbegin(), this->lines_.cend(),
-                [&] ( ScriptLine_t const& current ) {
-                    if( current->parameters().contains(key) ) {
-                        QString const& val = current->parameters()[key];
-                        return val;
-                    }
-                }
-            );
+            line->set_is_modified();
+            QString & val = line->parameters()[key];
+            return val;
         }
-        throw_<std::range_error>("Key '%1' was not found in script.",key);
     }
  //-----------------------------------------------------------------------------
     QString &
     Script::
     operator[]( QString const& key )
     {
+        ShellCommand* line = this->find_key(key);
+        line->set_is_modified();
         if( key[0]=='-' ) {
-            ScriptLines_t::iterator iter =
-                std::find_if( this->lines_.begin(), this->lines_.end(),
-                    [&] ( ScriptLine_t & current ) {
-                        bool b = ( current->flag()==key );
-                        return b;
-                    }
-                 );
-            if( iter != this->lines_.end() )
-            {// we can't verify if the value is really changed, but
-             // as it is the purpose of this member function we assume
-             // it has, hence we call set_is_modified() before the
-             // is modified
-                (*iter)->set_is_modified();
-                return (*iter)->value_;
-            }
+            return line->value_;
         } else {
-//            std::for_each( this->lines_.begin(), this->lines_.end(),
-//                [&] ( ScriptLine_t & current ) {
-//                    std::cout << "*** " << current->text().toStdString() << std::endl;
-//                    if( current->parameters().contains(key) )
-//                    {// we can't verify if the value is really changed, but
-//                     // as it is the purpose of this member function we assume
-//                     // it has, hence we call set_is_modified() before the
-//                     // is modified
-//                        current->set_is_modified();
-//                        QString & val = current->parameters()[key];
-//                        return val;
-//                    }
-//                }
-//            );
-            for( int i=0; i<this->lines_.size(); ++i ) {
-                ScriptLine_t& current = this->lines_[i];
-                std::cout << "*** " << current->text().toStdString() << std::endl;
-                if( current->parameters().contains(key) ) {
-                    current->set_is_modified();
-                    QString & val = current->parameters()[key];
-                    return val;
-                }
-            }
+            QString & val = line->parameters()[key];
+            return val;
         }
-        throw_<std::range_error>("Key '%1' was not found in script.",key);
     }
  //-----------------------------------------------------------------------------
     void
@@ -307,13 +274,12 @@ namespace pbs
         if( key[0]=='-' ) {
             throw_<std::runtime_error>("Script line corresponding to key '%1' does not accept parameters.",key);
         } else {
-            ScriptLine_t& sl_key = this->lines_[this->index(key)];
-            switch(sl_key->type() ) {
+            ShellCommand* line = this->find_key(key);
+            switch(line->type() ) {
             case(types::LauncherComment):
             case(types::PbsDirective):
-                if( sl_key->parameters_.add( parms ) ) {
-                    sl_key->set_is_modified();
-                    this->set_is_modified();
+                if( line->parameters_.add( parms ) ) {
+                    line->set_is_modified();
                 }
                 break;
             default:
@@ -329,13 +295,12 @@ namespace pbs
         if( key[0]=='-' ) {
             throw_<std::runtime_error>("Script line corresponding to key '%1' does not accept parameters.",key);
         } else {
-            ScriptLine_t& sl_key = this->lines_[this->index(key)];
-            switch(sl_key->type() ) {
+            ShellCommand* line = this->find_key(key);
+            switch(line->type() ) {
             case(types::LauncherComment):
             case(types::PbsDirective):
-                if( sl_key->parameters_.remove( parms ) ) {
-                    sl_key->set_is_modified();
-                    this->set_is_modified();
+                if( line->parameters_.remove( parms ) ) {
+                    line->set_is_modified();
                 }
                 break;
             default:
@@ -351,13 +316,12 @@ namespace pbs
         if( key[0]=='-' ) {
             throw_<std::runtime_error>("Script line corresponding to key '%1' does not accept features.",key);
         } else {
-            ScriptLine_t& sl_key = this->lines_[this->index(key)];
-            switch(sl_key->type() ) {
+            ShellCommand* line = this->find_key(key);
+            switch(line->type() ) {
             case(types::LauncherComment):
             case(types::PbsDirective):
-                if( sl_key->features_.add( features ) ) {
-                    sl_key->set_is_modified();
-                    this->set_is_modified();
+                if( line->features_.add( features ) ) {
+                    line->set_is_modified();
                 }
                 break;
             default:
@@ -373,13 +337,12 @@ namespace pbs
         if( key[0]=='-' ) {
             throw_<std::runtime_error>("Script line corresponding to key '%1' does not accept features.",key);
         } else {
-            ScriptLine_t& sl_key = this->lines_[this->index(key)];
-            switch(sl_key->type() ) {
+            ShellCommand* line = this->find_key(key);
+            switch(line->type() ) {
             case(types::LauncherComment):
             case(types::PbsDirective):
-                if( sl_key->features_.remove( features ) ) {
-                    sl_key->set_is_modified();
-                    this->set_is_modified();
+                if( line->features_.remove( features ) ) {
+                    line->set_is_modified();
                 }
                 break;
             default:
@@ -387,5 +350,40 @@ namespace pbs
             }
         }
     }
+ //-----------------------------------------------------------------------------
+    Script::~Script()
+    {
+        for( int i=0; i<this->lines_.size(); ++i ) {
+            ShellCommand* ptr = this->lines_[i];
+            delete ptr;
+        }
+    }
+ //-----------------------------------------------------------------------------
+    ShellCommand*
+    Script::
+    find_key( QString const& key )
+    {
+        if( key[0]=='-' ) {
+            ScriptLines_t::iterator iter =
+                std::find_if( this->lines_.begin(), this->lines_.end(),
+                    [&] ( ShellCommand* current ) {
+                        bool b = ( current->flag()==key );
+                        return b;
+                    }
+                 );
+            if( iter != this->lines_.end() ) {
+                return (*iter);
+            }
+        } else {
+            for( int i=0; i<this->lines_.size(); ++i ) {
+                ShellCommand* current = this->lines_[i];
+                if( current->parameters().contains(key) ) {
+                    return current;
+                }
+            }
+        }
+        throw_<std::range_error>("Key '%1' was not found in script.",key);
+    }
+
  //-----------------------------------------------------------------------------
 }// namespace pbs

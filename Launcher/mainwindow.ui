@@ -2,14 +2,6 @@
 <ui version="4.0">
  <class>MainWindow</class>
  <widget class="QMainWindow" name="MainWindow">
-  <property name="geometry">
-   <rect>
-    <x>0</x>
-    <y>0</y>
-    <width>742</width>
-    <height>605</height>
-   </rect>
-  </property>
   <property name="sizePolicy">
    <sizepolicy hsizetype="Expanding" vsizetype="Preferred">
     <horstretch>0</horstretch>
@@ -34,7 +26,7 @@
       </property>
       <widget class="QWidget" name="wResourcesPage">
        <property name="sizePolicy">
-        <sizepolicy hsizetype="Expanding" vsizetype="Expanding">
+        <sizepolicy hsizetype="MinimumExpanding" vsizetype="MinimumExpanding">
          <horstretch>1</horstretch>
          <verstretch>1</verstretch>
         </sizepolicy>
@@ -208,7 +200,44 @@
                <property name="verticalSpacing">
                 <number>0</number>
                </property>
-               <item row="2" column="0">
+               <item row="6" column="1">
+                <widget class="QPushButton" name="wRequestCores">
+                 <property name="text">
+                  <string>make request</string>
+                 </property>
+                </widget>
+               </item>
+               <item row="2" column="1">
+                <widget class="QSpinBox" name="wNCores"/>
+               </item>
+               <item row="6" column="0">
+                <widget class="QCheckBox" name="wAutomaticRequests">
+                 <property name="text">
+                  <string>Automatic requests</string>
+                 </property>
+                 <property name="checked">
+                  <bool>false</bool>
+                 </property>
+                </widget>
+               </item>
+               <item row="4" column="1">
+                <widget class="QDoubleSpinBox" name="wGbPerCore">
+                 <property name="decimals">
+                  <number>3</number>
+                 </property>
+                 <property name="singleStep">
+                  <double>0.100000000000000</double>
+                 </property>
+                </widget>
+               </item>
+               <item row="5" column="1">
+                <widget class="QLineEdit" name="wGbTotal">
+                 <property name="enabled">
+                  <bool>false</bool>
+                 </property>
+                </widget>
+               </item>
+               <item row="5" column="0">
                 <widget class="QLabel" name="gBPerNodeLabel_2">
                  <property name="enabled">
                   <bool>false</bool>
@@ -221,60 +250,30 @@
                  </property>
                 </widget>
                </item>
-               <item row="0" column="0">
-                <widget class="QLabel" name="numberOfNodesLabel_2">
+               <item row="2" column="0">
+                <widget class="QRadioButton" name="wNCoresLabel">
+                 <property name="toolTip">
+                  <string>&lt;!DOCTYPE HTML PUBLIC &quot;-//W3C//DTD HTML 4.0//EN&quot; &quot;http://www.w3.org/TR/REC-html40/strict.dtd&quot;&gt;
+&lt;html&gt;&lt;head&gt;&lt;meta name=&quot;qrichtext&quot; content=&quot;1&quot; /&gt;&lt;style type=&quot;text/css&quot;&gt;
+p, li { white-space: pre-wrap; }
+&lt;/style&gt;&lt;/head&gt;&lt;body style=&quot; font-family:'.Helvetica Neue DeskInterface'; font-size:13pt; font-weight:400; font-style:normal;&quot;&gt;
+&lt;p style=&quot; margin-top:0px; margin-bottom:0px; margin-left:0px; margin-right:0px; -qt-block-indent:0; text-indent:0px;&quot;&gt;If this radio button is checked, Launcher will try to find a configuration with 1) &lt;span style=&quot; font-weight:600;&quot;&gt;exactly &lt;/span&gt;the specified number of cores, 2) an equal number of cores per node on every node,  and 3) at least the specified amount or memory per core. Such a configuration may not necessarily exist. In that case the request is undone. &lt;/p&gt;&lt;/body&gt;&lt;/html&gt;</string>
+                 </property>
                  <property name="text">
-                  <string>Number of cores:</string>
-                 </property>
-                 <property name="alignment">
-                  <set>Qt::AlignRight|Qt::AlignTrailing|Qt::AlignVCenter</set>
-                 </property>
-                </widget>
-               </item>
-               <item row="1" column="0">
-                <widget class="QLabel" name="numberOfCoresPerNodeLabel_2">
-                 <property name="text">
-                  <string>GB per core</string>
-                 </property>
-                 <property name="alignment">
-                  <set>Qt::AlignRight|Qt::AlignTrailing|Qt::AlignVCenter</set>
-                 </property>
-                </widget>
-               </item>
-               <item row="2" column="1">
-                <widget class="QLineEdit" name="wGbTotal">
-                 <property name="enabled">
-                  <bool>false</bool>
-                 </property>
-                </widget>
-               </item>
-               <item row="0" column="1">
-                <widget class="QSpinBox" name="wNCores"/>
-               </item>
-               <item row="3" column="0">
-                <widget class="QCheckBox" name="wAutomaticRequests">
-                 <property name="text">
-                  <string>Automatic requests</string>
+                  <string>Number of cores</string>
                  </property>
                  <property name="checked">
-                  <bool>false</bool>
+                  <bool>true</bool>
                  </property>
                 </widget>
                </item>
-               <item row="3" column="1">
-                <widget class="QPushButton" name="wRequestCores">
+               <item row="4" column="0">
+                <widget class="QRadioButton" name="wGbPerCoreLabel">
+                 <property name="toolTip">
+                  <string>&lt;html&gt;&lt;head/&gt;&lt;body&gt;&lt;p&gt;If this radio button is checked, Launcher will try to find a configuration with 1) &lt;span style=&quot; font-weight:600;&quot;&gt;at least &lt;/span&gt;the specified number of cores, 2) an equal number of cores per node on every node,  and 3) at least the specified amount or memory per core. Such a configuration may not necessarily exist. In that case the request is undone. &lt;/p&gt;&lt;/body&gt;&lt;/html&gt;</string>
+                 </property>
                  <property name="text">
-                  <string>make request</string>
-                 </property>
-                </widget>
-               </item>
-               <item row="1" column="1">
-                <widget class="QDoubleSpinBox" name="wGbPerCore">
-                 <property name="decimals">
-                  <number>3</number>
-                 </property>
-                 <property name="singleStep">
-                  <double>0.100000000000000</double>
+                  <string>GB per core</string>
                  </property>
                 </widget>
                </item>
@@ -306,7 +305,7 @@
             </property>
             <layout class="QVBoxLayout" name="verticalLayout_6">
              <property name="spacing">
-              <number>-1</number>
+              <number>0</number>
              </property>
              <property name="leftMargin">
               <number>0</number>
@@ -321,10 +320,14 @@
               <number>0</number>
              </property>
              <item>
-              <widget class="QDoubleSpinBox" name="doubleSpinBox"/>
+              <widget class="QDoubleSpinBox" name="wWalltime">
+               <property name="decimals">
+                <number>3</number>
+               </property>
+              </widget>
              </item>
              <item>
-              <widget class="QComboBox" name="comboBox"/>
+              <widget class="QComboBox" name="wWalltimeUnit"/>
              </item>
             </layout>
            </widget>
@@ -334,7 +337,7 @@
             <property name="sizePolicy">
              <sizepolicy hsizetype="Preferred" vsizetype="Preferred">
               <horstretch>3</horstretch>
-              <verstretch>0</verstretch>
+              <verstretch>1</verstretch>
              </sizepolicy>
             </property>
             <property name="title">
@@ -348,7 +351,7 @@
             </property>
             <layout class="QVBoxLayout" name="verticalLayout_7">
              <property name="spacing">
-              <number>-1</number>
+              <number>0</number>
              </property>
              <property name="leftMargin">
               <number>0</number>
@@ -368,10 +371,19 @@
              <item>
               <layout class="QHBoxLayout" name="horizontalLayout_5">
                <property name="spacing">
-                <number>0</number>
+                <number>-1</number>
                </property>
                <item>
                 <widget class="QCheckBox" name="wNotifyAbort">
+                 <property name="sizePolicy">
+                  <sizepolicy hsizetype="Preferred" vsizetype="Preferred">
+                   <horstretch>0</horstretch>
+                   <verstretch>0</verstretch>
+                  </sizepolicy>
+                 </property>
+                 <property name="layoutDirection">
+                  <enum>Qt::LeftToRight</enum>
+                 </property>
                  <property name="text">
                   <string>abort</string>
                  </property>
@@ -379,6 +391,12 @@
                </item>
                <item>
                 <widget class="QCheckBox" name="wNotifyBegin">
+                 <property name="sizePolicy">
+                  <sizepolicy hsizetype="Preferred" vsizetype="Preferred">
+                   <horstretch>0</horstretch>
+                   <verstretch>0</verstretch>
+                  </sizepolicy>
+                 </property>
                  <property name="text">
                   <string>begin</string>
                  </property>
@@ -386,6 +404,12 @@
                </item>
                <item>
                 <widget class="QCheckBox" name="wNotifyEnd">
+                 <property name="sizePolicy">
+                  <sizepolicy hsizetype="Preferred" vsizetype="Preferred">
+                   <horstretch>0</horstretch>
+                   <verstretch>0</verstretch>
+                  </sizepolicy>
+                 </property>
                  <property name="text">
                   <string>end</string>
                  </property>
@@ -404,6 +428,21 @@
            <string>Job management</string>
           </property>
           <layout class="QVBoxLayout" name="verticalLayout_8">
+           <property name="spacing">
+            <number>0</number>
+           </property>
+           <property name="leftMargin">
+            <number>0</number>
+           </property>
+           <property name="topMargin">
+            <number>0</number>
+           </property>
+           <property name="rightMargin">
+            <number>0</number>
+           </property>
+           <property name="bottomMargin">
+            <number>0</number>
+           </property>
            <item>
             <layout class="QHBoxLayout" name="horizontalLayout_6">
              <item>
@@ -414,7 +453,7 @@
               </widget>
              </item>
              <item>
-              <widget class="QLineEdit" name="lineEdit"/>
+              <widget class="QLineEdit" name="wUsername"/>
              </item>
              <item>
               <spacer name="horizontalSpacer">
@@ -430,12 +469,9 @@
               </spacer>
              </item>
              <item>
-              <widget class="QLabel" name="wSshConnected">
-               <property name="enabled">
-                <bool>false</bool>
-               </property>
+              <widget class="QPushButton" name="wAuthenticate">
                <property name="text">
-                <string>TextLabel</string>
+                <string>authenticate</string>
                </property>
               </widget>
              </item>
@@ -626,46 +662,42 @@
         <item>
          <widget class="QPushButton" name="pushButton">
           <property name="text">
-           <string>Refresh job status</string>
+           <string>Jobs submitted and not retrieved (click to refresh job status):</string>
           </property>
          </widget>
         </item>
         <item>
-         <widget class="QTextEdit" name="textEdit_2"/>
+         <widget class="QTextEdit" name="wJobsSubmitted"/>
         </item>
         <item>
-         <widget class="QLabel" name="label_6">
-          <property name="text">
-           <string>Jobs submitted and not retrieved:</string>
-          </property>
-         </widget>
-        </item>
-        <item>
-         <widget class="QTextEdit" name="textEdit_3"/>
-        </item>
-        <item>
-         <widget class="QLabel" name="label_7">
+         <widget class="QLabel" name="label_JobsRetrieved">
           <property name="text">
            <string>Jobs retrieved during this Launcher session:</string>
           </property>
+          <property name="alignment">
+           <set>Qt::AlignCenter</set>
+          </property>
          </widget>
+        </item>
+        <item>
+         <widget class="QTextEdit" name="wJobsRetrieved"/>
         </item>
         <item>
          <layout class="QGridLayout" name="gridLayout_3">
           <property name="verticalSpacing">
            <number>0</number>
           </property>
+          <item row="2" column="0">
+           <widget class="QPushButton" name="pushButton_2">
+            <property name="text">
+             <string>Retrieve results for selected job id</string>
+            </property>
+           </widget>
+          </item>
           <item row="2" column="1">
            <widget class="QPushButton" name="pushButton_3">
             <property name="text">
              <string>Delete selected job (no retrieval)</string>
-            </property>
-           </widget>
-          </item>
-          <item row="1" column="0">
-           <widget class="QCheckBox" name="checkBox_3">
-            <property name="text">
-             <string>Copy results to $VSC_DATA</string>
             </property>
            </widget>
           </item>
@@ -676,13 +708,6 @@
             </property>
            </widget>
           </item>
-          <item row="0" column="1">
-           <widget class="QCheckBox" name="checkBox_2">
-            <property name="text">
-             <string>Delete local job folder</string>
-            </property>
-           </widget>
-          </item>
           <item row="1" column="1">
            <widget class="QCheckBox" name="checkBox_4">
             <property name="text">
@@ -690,17 +715,24 @@
             </property>
            </widget>
           </item>
-          <item row="2" column="0">
-           <widget class="QPushButton" name="pushButton_2">
-            <property name="text">
-             <string>Retrieve results for selected job id</string>
-            </property>
-           </widget>
-          </item>
           <item row="3" column="0">
            <widget class="QPushButton" name="pushButton_4">
             <property name="text">
              <string>Retrieve results for all jobs</string>
+            </property>
+           </widget>
+          </item>
+          <item row="0" column="1">
+           <widget class="QCheckBox" name="checkBox_2">
+            <property name="text">
+             <string>Delete local job folder</string>
+            </property>
+           </widget>
+          </item>
+          <item row="1" column="0">
+           <widget class="QCheckBox" name="checkBox_3">
+            <property name="text">
+             <string>Copy results to $VSC_DATA</string>
             </property>
            </widget>
           </item>
@@ -717,7 +749,7 @@
     <rect>
      <x>0</x>
      <y>0</y>
-     <width>742</width>
+     <width>690</width>
      <height>22</height>
     </rect>
    </property>

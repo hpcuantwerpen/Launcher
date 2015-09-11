@@ -10,11 +10,8 @@
 
 namespace cfg
 {//=============================================================================
-    class Item;
- //=============================================================================
-    typedef QMap<QString,Item> Config_t;
- //=============================================================================
     class Item
+ //=============================================================================
     {
         Q_PROPERTY(QString         name_             READ name                                 )
         Q_PROPERTY(QVariant        value_            READ value         WRITE set_value        )
@@ -37,11 +34,12 @@ namespace cfg
 
      // value
         QVariant const& value() const;
-        void set_value(QVariant const& value = QVariant());
+        void set_value( QVariant const& value = QVariant() );
+        void set_value_and_type( QVariant const& value = QVariant() );
 
      // default_value
         QVariant const& default_value() const;
-        void set_default_value(QVariant const& default_value = QVariant());
+        void set_default_value( QVariant const& default_value = QVariant() );
 
      // choices
         typedef QList<QVariant> Choices_t;
@@ -51,8 +49,7 @@ namespace cfg
         void set_choices( Choices_t   const& choices = Choices_t(), bool is_range = false );
         void set_choices( QStringList const& choices              , bool is_range = false );
         template <class T>
-        void set_choices( QList<T>    const& choices              , bool is_range = false
-          ) {
+        void set_choices( QList<T>    const& choices              , bool is_range = false ) {
             Choices_t choices2;
             for( int i=0; i<choices.size(); ++i ) {
                 choices2.append( choices[i] );
@@ -62,6 +59,9 @@ namespace cfg
 
        bool choices_is_range() const {
            return this->choices_is_range_;
+       }
+       QVariant::Type type() const {
+           return this->range_type_;
        }
 
     // test validity of a value
@@ -79,15 +79,28 @@ namespace cfg
     QDataStream &operator<<( QDataStream& ds, Item const& item );
     QDataStream &operator>>( QDataStream& ds, Item      & item );
  //=============================================================================
-    void load( Config_t      & config, QString const& filename );
-    void save( Config_t const& config, QString const& filename );
+    class Config : public QMap<QString,Item>
+ //=============================================================================
+    {
+    public:
+        Config() {}
+        virtual ~Config() {}
+        void setFilename( QString const & filename ) const;
+        void addItem( Item const& item );
+        Item* getItem( QString const& itemName );
+         // creates the item if it does not exist
+        void load( QString const& filename );
+        void save( QString const& filename=QString() ) const;
+    private:
+        mutable QString filename_;
+    };
  //=============================================================================
     template <class T>
     QVariant
     cfg_get
-      ( Config_t const& config
-      , QString  const& key
-      , T        const& default_value )
+      ( Config  const& config
+      , QString const& key
+      , T       const& default_value )
     {
         if (config.contains(key) ) {
             return config[key].value();
@@ -100,9 +113,10 @@ namespace cfg
     template <class T>
     QString
     cfg_get_str
-      ( Config_t const& config
-      , QString  const& key
-      , T        const& default_value )
+      ( Config  const& config
+      , QString const& key
+      , T       const& default_value
+      )
     {
         return cfg_get(config,key,default_value).toString();
     }
