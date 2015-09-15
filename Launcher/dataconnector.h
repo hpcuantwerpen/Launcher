@@ -7,11 +7,12 @@
 #include <QSpinBox>
 #include <QDoubleSpinBox>
 #include <QLineEdit>
+#include <QCheckBox>
 
 #include <cfg.h>
 #include <jobscript.h>
 
-namespace dc2
+namespace dc
 {
     class DataConnectorBase
     {
@@ -32,6 +33,10 @@ namespace dc2
         virtual void config_to_script()=0;
         virtual void script_to_config()=0;
 
+        QString const& name() {
+            return configItemName__;
+        }
+
         static cfg::Config* config;
         static pbs::Script* script;
     protected:
@@ -43,83 +48,145 @@ namespace dc2
         QString scriptFlag__;
     };
 
-    template <class W>
-    struct WidgetAccessor
-    {};
+
+ // generic version, specialisations for V = QString, double, int, bool
+    template <class V>
+    V toValue( QVariant const& qv ) {
+        throw_<std::logic_error>("Not Implemented toValue<V>.");
+    }
+    template <> QString toValue( QVariant const& qv );
+    template <> double  toValue( QVariant const& qv );
+    template <> int     toValue( QVariant const& qv );
+    template <> bool    toValue( QVariant const& qv );
+
+    typedef QList<QVariant> Choices_t;
+
+    // generic version, specialisations for W = QComboBox, QSpinBox, QDoubleSpinBox, QLineEdit, QCheckBox, QWidget
+    template <class W> struct WidgetAccessor {};
 
     template<> struct WidgetAccessor<QComboBox>
     {
-        typedef QComboBox Widget_t;
-        typedef QString   Value_t;
-        typedef QStringList Choices_t;
+        typedef QComboBox       Widget_t;
+        typedef QString         Value_t;
 
-        static   Value_t get_value  ( Widget_t* w );
-        static      void set_value  ( Widget_t* w, Value_t  const & value );
-        static Choices_t get_choices( Widget_t* w );
-        static      void set_choices( Widget_t* w, Choices_t const& list  );
-
-        static Value_t toValue( QVariant const& qv ) { return qv.toString(); }
+        static Value_t get_value( Widget_t const* w ) {
+            return w->currentText();
+        }
+        static void set_value( Widget_t* w, Value_t const& value ) {
+            return w->setCurrentText( value );
+        }
+        static Choices_t get_choices( Widget_t* w ) {
+            Choices_t choices;
+            for( int i=0; i<w->count(); ++i ) {
+                choices.append( w->itemText(i) );
+            }
+            return choices;
+        }
+        static void set_choices( Widget_t* w, Choices_t const& choices )  {
+            w->clear();
+            for( Choices_t::const_iterator iter=choices.cbegin(); iter!=choices.cend(); ++iter )
+                w->addItem( iter->toString() );
+        }
     };
     template<> struct WidgetAccessor<QSpinBox>
     {
-        typedef QSpinBox                Widget_t;
-        typedef int                     Value_t;
-        typedef std::tuple<int,int,int> Choices_t;
+        typedef QSpinBox   Widget_t;
+        typedef int        Value_t;
 
-        static   Value_t get_value  ( Widget_t* w );
-        static      void set_value  ( Widget_t* w, Value_t  const & value );
-        static Choices_t get_choices( Widget_t* w );
-        static      void set_choices( Widget_t* w, Choices_t const& list  );
-
-        static Value_t toValue( QVariant const& qv ) { return qv.toInt(); }
+        static Value_t get_value( Widget_t const* w ) {
+            return w->value();
+        }
+        static void set_value( Widget_t* w, Value_t value ) {
+             w->setValue( value );
+        }
+        static Choices_t get_choices( Widget_t* w )
+        {
+            Choices_t choices;
+            choices.append( w->minimum()    );
+            choices.append( w->maximum()    );
+            choices.append( w->singleStep() );
+            return choices;
+        }
+        static void set_choices( Widget_t* w, Choices_t const& choices ) {
+            w->setRange( toValue<Value_t>( choices.at(0) ), toValue<Value_t>( choices.at(1) ) );
+            if( choices.size()==3 ) {
+                w->setSingleStep( toValue<Value_t>( choices.at(2) ) );
+            }
+        }
     };
     template<> struct WidgetAccessor<QDoubleSpinBox>
     {
-        typedef QDoubleSpinBox                   Widget_t;
-        typedef double                           Value_t;
-        typedef std::tuple<double,double,double> Choices_t;
+        typedef QDoubleSpinBox Widget_t;
+        typedef double         Value_t;
 
-        static   Value_t get_value  ( Widget_t* w );
-        static      void set_value  ( Widget_t* w, Value_t  const & value );
-        static Choices_t get_choices( Widget_t* w );
-        static      void set_choices( Widget_t* w, Choices_t const& list  );
-
-        static Value_t toValue( QVariant const& qv ) { return qv.toDouble(); }
+        static Value_t get_value( Widget_t const* w ) {
+            return w->value();
+        }
+        static void set_value( Widget_t* w, Value_t value ) {
+             w->setValue( value );
+        }
+        static Choices_t get_choices( Widget_t* w )
+        {
+            Choices_t choices;
+            choices.append( w->minimum()    );
+            choices.append( w->maximum()    );
+            choices.append( w->singleStep() );
+            return choices;
+        }
+        static void set_choices( Widget_t* w, Choices_t const& choices ) {
+            w->setRange( toValue<Value_t>( choices.at(0) ), toValue<Value_t>( choices.at(1) ) );
+            if( choices.size()==3 ) {
+                w->setSingleStep( toValue<Value_t>( choices.at(2) ) );
+            }
+        }
     };
     template<> struct WidgetAccessor<QLineEdit>
     {
-        typedef QLineEdit            Widget_t;
-        typedef QString              Value_t;
-        typedef cfg::Item::Choices_t Choices_t;
+        typedef QLineEdit Widget_t;
+        typedef QString   Value_t;
 
-        static   Value_t get_value  ( Widget_t* w );
-        static      void set_value  ( Widget_t* w, Value_t  const & value );
-        static Choices_t get_choices( Widget_t* w )                         { return Choices_t(); }
-        static      void set_choices( Widget_t* w, Choices_t const& list  ) {}
-
-        static Value_t toValue( QVariant const& qv ) { return qv.toString(); }
+        static Value_t get_value ( Widget_t* w ) {
+            return w->text();
+        }
+        static void set_value( Widget_t* w, Value_t const & value ) {
+            w->setText( value );
+        }
+        static Choices_t get_choices( Widget_t* w ) {
+            return Choices_t();
+        }
+        static void set_choices( Widget_t* w, Choices_t const& /*dummy*/  )
+        {// nothing to do
+        }
     };
+    template<> struct WidgetAccessor<QCheckBox>
+    {
+        typedef QCheckBox Widget_t;
+        typedef bool      Value_t;
+
+        static Value_t get_value( Widget_t* w ) {
+            return w->isChecked();
+        }
+        static void set_value( Widget_t* w, Value_t value ) {
+            w->setChecked(value);
+        }
+        static Choices_t get_choices( Widget_t* w ){
+            return Choices_t();
+        }
+        static void set_choices( Widget_t* w, Choices_t const& /*dummy*/  )
+        {// nothing to do
+        }
+    };
+ // dummies for no widget. theses are not actually called. their only purpose is to satisfy the compiler..
     template<> struct WidgetAccessor<QWidget>
     {
-        typedef QWidget              Widget_t;
-        typedef QString              Value_t;
-        typedef cfg::Item::Choices_t Choices_t;
+        typedef QWidget Widget_t;
+        typedef int     Value_t; // dummy
 
-        static   Value_t get_value  ( Widget_t* w )                         { return Value_t(); }
-        static      void set_value  ( Widget_t* w, Value_t  const & value ) {}
-        static Choices_t get_choices( Widget_t* w )                         { return Choices_t(); }
-        static      void set_choices( Widget_t* w, Choices_t const& list  ) {}
-
-        static Value_t toValue( QVariant const& qv ) { return Value_t(); }
+        static Value_t get_value( Widget_t* w )                         { return 0; }
+        static void set_value( Widget_t* w, Value_t const& /*dummy*/ )  {/*nothing to do*/}
+        static Choices_t get_choices( Widget_t* w )                     { return Choices_t(); }
+        static void set_choices( Widget_t* w, Choices_t const& list  )  {/*nothing to do*/}
     };
-
-
-           // dummies for no widget. theses are not actually called. their only purpose is to satisfy the compiler..
-    QString get_value( QWidget* w );
-       void set_value( QWidget* w, QString const & value );
-
-    QStringList get_choices( QWidget* w );
-           void set_choices( QWidget* w, QStringList const& list );
 
     template<class W>
     class DataConnector : public DataConnectorBase
@@ -138,8 +205,6 @@ namespace dc2
         virtual void script_to_config();
     };
 
-    //QStringList makeStringList( cfg::Item::Choices_t const & choices ) { return QStringList(); }
-
     template <class W>
     void
     DataConnector<W>::
@@ -149,8 +214,8 @@ namespace dc2
 
         cfg::Item* config_item = this->configItem();
         wa::set_choices( this->widget(), config_item->choices() );
-        typename wa::Value_t v = wa::toValue( config_item->value() );
-        wa::set_value  ( this->widget(), v );
+        typename wa::Value_t v = toValue<typename wa::Value_t>( config_item->value() );
+        wa::set_value( this->widget(), v );
     }
 
     template <class W>
@@ -161,22 +226,33 @@ namespace dc2
         if( !this->qw_ || !this->configItemName_ ) return;
 
         cfg::Item* config_item = this->configItem();
-        typename wa::Choices_t c = wa::get_choices( this->widget() );
-        typename wa::Value_t   v = wa::get_value  ( this->widget() );
-        config_item->set_choices( c );
+        Choices_t c = wa::get_choices( this->widget() );
+        typename wa::Value_t v = wa::get_value( this->widget() );
+        config_item->set_choices( c, config_item->choices_is_range() );
         config_item->set_value  ( v );
     }
+
+    QString toString( QVariant const& qv);
 
     template <class W>
     void
     DataConnector<W>::
     config_to_script()
     {
-        if( !this->qw_ || !this->scriptFlag_ ) return;
+        if( !this->scriptFlag_ ) return;
 
         cfg::Item* config_item = this->configItem();
-        typename wa::Value_t v = wa::get_value( this->widget() );
-        (*this->script)[*this->scriptFlag_] = v;
+        QString v = toString( config_item->value() );
+        if( v=="bool(true)" ) {
+            this->script->find_key( *this->scriptFlag_ )->setHidden(true);
+        } else if( v=="bool(true)" ) {
+            this->script->find_key( *this->scriptFlag_ )->setHidden(false);
+        } else if( this->scriptFlag_->startsWith("-") ) {
+            this->script->find_key( *this->scriptFlag_ )->setHidden( v.isEmpty() );
+            (*this->script)[*this->scriptFlag_] = v;
+        } else {
+            (*this->script)[*this->scriptFlag_] = v;
+        }
     }
 
     template <class W>
@@ -188,20 +264,18 @@ namespace dc2
     }
 
 
-
     template <class W>
     DataConnectorBase* newDataConnector( W* qw, QString const& configItemName, QString const& scriptFlag )
     {
-        return new DataConnector<W>( qw, configItemName, scriptFlag );
+        DataConnectorBase* dataConnector = new DataConnector<W>( qw, configItemName, scriptFlag );
+        dataConnector->config_to_widget();
+        dataConnector->config_to_script();
+        return dataConnector;
     }
 
-    DataConnectorBase* newDataConnector( QString const& configItemName, QString const& scriptFlag )
-    {
-        return new DataConnector<QWidget>( nullptr, configItemName, scriptFlag );
-    }
+    DataConnectorBase* newDataConnector( QString const& configItemName, QString const& scriptFlag );
 
-
-}// namespace dc2
+}// namespace dc
 
 #endif // DATACONNECTOR
 

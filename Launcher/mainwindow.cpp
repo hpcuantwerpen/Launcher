@@ -10,228 +10,6 @@
 #include <warn_.h>
 #include <ssh2tools.h>
 
-namespace dc
-{//-----------------------------------------------------------------------------
- // DataConnector::
- //-----------------------------------------------------------------------------
-    DataConnector::DataConnector
-      ( QWidget      * widget
-      , QString const& itemName
-      , cfg::Config  * config
-      , pbs::Script  * script
-      , QString const& key
-      )
-      : widget_   (widget)
-      , itemName_ (itemName)
-      , config_   (config)
-      , script_   (script)
-      , scriptKey_(key)
-    {// create the item if it does not already exist
-        if( !this->itemName_.isEmpty() ) {
-            cfg::Item* item = config->getItem( itemName );
-        }
-    }
- //-----------------------------------------------------------------------------
-    DataConnector::~DataConnector() {}
- //-----------------------------------------------------------------------------
-    cfg::Item* DataConnector::item() {
-        return &(*( this->config_->find( this->itemName_ ) ));
-    }
- //-----------------------------------------------------------------------------
-    void DataConnector::setScriptFromConfig()
-    {
-        if( this->script_ )
-        {
-            cfg::Item* item = this->item();
-            if( item->type()==QVariant::Bool ) {
-                this->script_->find_key(this->scriptKey_)->setHidden (item->value().toBool() );
-            } else {
-//                QString value = item->value().toString();
-                QString value = this->formattedItemValue();
-                (*this->script_)[this->scriptKey_] = value;
-            }
-        }
-    }
- //-----------------------------------------------------------------------------
- // NoWidgetDataConnector::
- //-----------------------------------------------------------------------------
-    NoWidgetDataConnector::
-    NoWidgetDataConnector
-        ( QString const& itemName
-        , cfg::Config  * config
-        , pbs::Script  * script
-        , QString const& key
-        )
-        : DataConnector( nullptr, itemName, config, script, key )
-    {
-        this->setWidgetFromConfig();
-    }
- //-----------------------------------------------------------------------------
- // QComboBoxDataConnector::
- //-----------------------------------------------------------------------------
-    QComboBoxDataConnector::
-    QComboBoxDataConnector
-        ( QWidget      * widget
-        , QString const& itemName
-        , cfg::Config  * config
-        , pbs::Script  * script
-        , QString const& key
-        )
-        : DataConnector( widget, itemName, config, script, key )
-    {
-        this->setWidgetFromConfig();
-    }
- //-----------------------------------------------------------------------------
-    void QComboBoxDataConnector::setWidgetFromConfig()
-    {
-        Widget_t* w = this->widget();
-        w->clear();
-        cfg::Item* item = this->config_->getItem(this->itemName_);
-
-        for( int i=0; i<item->choices().size(); ++i ) {
-            w->addItem( item->choices()[i].toString() );
-        }
-        w->setCurrentText( item->value().toString() );
-    }
- //-----------------------------------------------------------------------------
-    void QComboBoxDataConnector::setConfigFromWidget() {
-        this->config_->getItem(this->itemName_)->set_value( this->widget()->currentText() );
-    }
- //-----------------------------------------------------------------------------
- // QDoubleSpinBoxDataConnector::
- //-----------------------------------------------------------------------------
-    QDoubleSpinBoxDataConnector::
-    QDoubleSpinBoxDataConnector
-        ( QWidget      * widget
-        , QString const& itemName
-        , cfg::Config  * config
-        , pbs::Script  * script
-        , QString const& key
-        )
-        : DataConnector( widget, itemName, config, script, key )
-    {
-        this->setWidgetFromConfig();
-    }
- //-----------------------------------------------------------------------------
-    void QDoubleSpinBoxDataConnector::setWidgetFromConfig()
-    {
-        cfg::Item* item = this->config_->getItem(this->itemName_);
-
-        if( item->choices().size() ) {
-            QDoubleSpinBox* w = this->widget();
-            w->setRange (item->choices().first().toDouble(), item->choices().last().toDouble() );
-            w->setValue( item->value().toDouble() );
-            w->setSingleStep(0.5);
-        }
-    }
- //-----------------------------------------------------------------------------
-    void QDoubleSpinBoxDataConnector::setConfigFromWidget() {
-        this->config_->getItem(this->itemName_)->set_value( this->widget()->value() );
-    }
- //-----------------------------------------------------------------------------
-    QString QDoubleSpinBoxDataConnector::formattedItemValue() {
-        double v = this->item()->value().toDouble();
-        QString formatted;
-        formatted.setNum(v,'g', this->widget()->decimals() );
-        return formatted;
-    }
- //----------------------------------------------------------------------------
- // QSpinBoxDataConnector::
- //-----------------------------------------------------------------------------
-    QSpinBoxDataConnector::
-    QSpinBoxDataConnector
-        ( QWidget      * widget
-        , QString const& itemName
-        , cfg::Config  * config
-        , pbs::Script  * script
-        , QString const& key
-        )
-        : DataConnector( widget, itemName, config, script, key )
-    {
-        this->setWidgetFromConfig();
-    }
- //-----------------------------------------------------------------------------
-    void QSpinBoxDataConnector::setWidgetFromConfig()
-    {
-        cfg::Item* item = this->config_->getItem(this->itemName_);
-
-        if( item->choices().size() ) {
-            QSpinBox* w = this->widget();
-            w->setRange (item->choices().first().toInt(), item->choices().last().toInt() );
-            w->setValue( item->value().toInt() );
-        }
-    }
- //-----------------------------------------------------------------------------
-    void QSpinBoxDataConnector::setConfigFromWidget() {
-        this->config_->getItem(this->itemName_)->set_value( this->widget()->value());
-    }
-
- //-----------------------------------------------------------------------------
- // QLineEditDataConnector::
- //-----------------------------------------------------------------------------
-    QLineEditDataConnector::
-    QLineEditDataConnector
-        ( QWidget      * widget
-        , QString const& itemName
-        , cfg::Config  * config
-        , pbs::Script  * script
-        , QString const& key
-        )
-        : DataConnector( widget, itemName, config, script, key )
-    {
-        this->setWidgetFromConfig();
-    }
- //-----------------------------------------------------------------------------
-    void QLineEditDataConnector::setWidgetFromConfig()
-    {
-        cfg::Item* item = this->config_->getItem(this->itemName_);
-        Widget_t* w = this->widget();
-        w->setText( item->value().toString() );
-    }
- //-----------------------------------------------------------------------------
-    void QLineEditDataConnector::setConfigFromWidget() {
-        this->config_->getItem(this->itemName_)->set_value( this->widget()->text() );
-    }
-
- //-----------------------------------------------------------------------------
- // QCheckBoxDataConnector::
- //-----------------------------------------------------------------------------
-    QCheckBoxDataConnector::
-    QCheckBoxDataConnector
-        ( QWidget      * widget
-        , QString const& itemName
-        , cfg::Config  * config
-        , pbs::Script  * script
-        , QString const& key
-        )
-        : DataConnector( widget, itemName, config, script, key )
-    {
-        this->setWidgetFromConfig();
-    }
- //-----------------------------------------------------------------------------
-    void QCheckBoxDataConnector::setWidgetFromConfig()
-    {
-        cfg::Item* item = this->config_->getItem(this->itemName_);
-        Widget_t* w = this->widget();
-        w->setChecked( item->value().toBool() );
-    }
- //-----------------------------------------------------------------------------
-    void QCheckBoxDataConnector::setConfigFromWidget() {
-        this->config_->getItem(this->itemName_)->set_value( this->widget()->isChecked() );
-    }
-
- //-----------------------------------------------------------------------------
- //-----------------------------------------------------------------------------
-    DataConnector*
-    getDataConnector( QList<DataConnector*> list, QString const& widgetName )
-    {
-        for( QList<DataConnector*>::iterator iter=list.begin(); iter!=list.end(); ++iter ) {
-            if( (*iter)->name() == widgetName ) {
-                return (*iter);
-            }
-        }
-        throw_<std::logic_error>("Widget '%1' not found in QList<DataConnector*>.", widgetName );
-    }
  //-----------------------------------------------------------------------------
     QString validateEmailAddress( QString const & address )
     {
@@ -257,7 +35,6 @@ namespace dc
         return result;
     }
  //-----------------------------------------------------------------------------
-}// namespace dc
 
 
 
@@ -271,7 +48,8 @@ namespace dc
       , previousPage_(0)
     {
         ui->setupUi(this);
-
+     // read the cfg::Config object from file
+     // (or create an empty one if there is no config file yet)
         QString launcher_cfg( Launcher::homePath("Launcher.cfg") );
         if( QFileInfo(launcher_cfg).exists() ) {
             this->launcher_.config.load(launcher_cfg);
@@ -284,54 +62,87 @@ namespace dc
         }
 
      // initialize gui items
+     /* Every QWidget in the gui (almost) has a cfg::Item that has to be
+      * initialized first (either by constructing it or by reading it
+      * from the config file). Both are conneced by a DataConnector<W>
+      * object. For all widgets with such DataConnector, the policy is
+      * to fist modify the corresponding cfg::Item, and then percolate
+      * the change to the widget by calling the virtual DataConnectorBase::
+      * config_to_widget() member function.
+      * Hence, we first create and initialize the cfg::Items, next we
+      * create the corresponding DataConnector<W> objects.
+      */
         this->setIgnoreSignals();
-        cfg::Item* item = nullptr;
+        cfg::Item* ci = nullptr;
      // wWalltimeUnit
-        item = this->launcher_.config.getItem("wWalltimeUnit");
-        if( item->choices().size()==0 ) {
+        ci = this->getConfigItem("wWalltimeUnit");
+        if( !ci->isInitialized() ) {
             QStringList units;
             units.append("seconds");
             units.append("minutes");
             units.append("hours");
             units.append("days");
             units.append("weeks");
-            item->set_choices(units);
-//            item->set_default_value("hours");
-            item->set_value        ("hours");
-//            this->walltimeUnitSeconds_ = nSecondsPerUnit( item->value().toString() );
+            ci->set_choices(units);
+            ci->set_value("hours");
         }
-        item = this->launcher_.config.getItem(("wWalltime"));
-        this->data_.append( new dc::     QComboBoxDataConnector( this->ui->wWalltimeUnit, "wWalltimeUnit"  , &this->launcher_.config ) );
-        this->data_.append( new dc::QDoubleSpinBoxDataConnector( this->ui->wWalltime    , "wWalltime"      , &this->launcher_.config ) );
-        this->data_.append( new dc::      NoWidgetDataConnector(                          "walltimeSeconds", &this->launcher_.config, &this->launcher_.script, "walltime" ) );
 
-     // this->ui->wNotifyAddress
-        item = this->launcher_.config.getItem("notifyWhen");
-        this->data_.append( new dc::QLineEditDataConnector( this->ui->wNotifyAddress, "wNotifyAddress", &this->launcher_.config, &this->launcher_.script, "-M" ) );
-        this->data_.append( new dc:: NoWidgetDataConnector(                           "notifyWhen"    , &this->launcher_.config, &this->launcher_.script, "-m" ) );
-        this->data_.append( new dc::QCheckBoxDataConnector( this->ui->wNotifyAbort  , "wNotifyAbort"  , &this->launcher_.config ) );
-        this->data_.append( new dc::QCheckBoxDataConnector( this->ui->wNotifyEnd    , "wNotifyEnd"    , &this->launcher_.config ) );
-        this->data_.append( new dc::QCheckBoxDataConnector( this->ui->wNotifyBegin  , "wNotifyBegin"  , &this->launcher_.config ) );
+        ci = this->getConfigItem("walltimeSeconds");
+        if( !ci->isInitialized() ) {
+            ci->set_value("1:00:00");
+        }
+        ci = this->getConfigItem("wNotifyAddress");
+        if( !ci->isInitialized() ) {
+            ci->set_value("");
+        }
+        ci = this->getConfigItem("notifyWhen");
+        if( !ci->isInitialized() ) {
+            ci->set_value("");
+            this->getConfigItem("wNotifyAbort")->set_value(false);
+            this->getConfigItem("wNotifyBegin")->set_value(false);
+            this->getConfigItem("wNotifyEnd"  )->set_value(false);
+        }
+        ci = this->getConfigItem("wJobname");
+        if( !ci->isInitialized() ) {
+            ci->set_value("");
+        }
+
+        dc::DataConnectorBase::config = &(this->launcher_.config);
+        dc::DataConnectorBase::script = &(this->launcher_.script);
+        this->data_.append( dc::newDataConnector( this->ui->wWalltimeUnit , "wWalltimeUnit"  , QString() ) );
+        this->data_.append( dc::newDataConnector(                           "walltimeSeconds", "walltime" ) );
+        this->data_.append( dc::newDataConnector( this->ui->wNotifyAddress, "wNotifyAddress" , "-M") );
+        this->data_.append( dc::newDataConnector(                           "notifyWhen"     , "-m") );
+        this->data_.append( dc::newDataConnector( this->ui->wNotifyAbort  , "wNotifyAbort"   , ""  ) );
+        this->data_.append( dc::newDataConnector( this->ui->wNotifyEnd    , "wNotifyEnd"     , ""  ) );
+        this->data_.append( dc::newDataConnector( this->ui->wNotifyBegin  , "wNotifyBegin"   , ""  ) );
 
      // this->ui->wCluster
         this->launcher_.readClusterInfo(); // this throws if there are no clusters/*.info files
-        item = this->launcher_.config.getItem("wCluster");
-        item->set_choices( this->launcher_.clusters.keys() );
+        ci = this->getConfigItem("wCluster");
+        try {
+            ci->set_choices( this->launcher_.clusters.keys() );
+        } catch( cfg::InvalidConfigItemValue & e) {
+            ci->set_value( ci->default_value() );
+        }
+        if( !ci->isInitialized() )
+            ci->set_value( ci->default_value() );
+        this->clusterDependencies_(false);
 
-        this->data_.append( new dc::     QComboBoxDataConnector( this->ui->wCluster       , "wCluster"       , &this->launcher_.config, &this->launcher_.script, "cluster"    ) );
-        this->data_.append( new dc::     QComboBoxDataConnector( this->ui->wNodeset       , "wNodeset"       , &this->launcher_.config, &this->launcher_.script, "nodeset"    ) );
-        this->data_.append( new dc::      QSpinBoxDataConnector( this->ui->wNNodes        , "wNNodes"        , &this->launcher_.config, &this->launcher_.script, "nodes"      ) );
-        this->data_.append( new dc::      QSpinBoxDataConnector( this->ui->wNCoresPerNode , "wNCoresPerNode" , &this->launcher_.config, &this->launcher_.script, "ppn"        ) );
-        this->data_.append( new dc::      QSpinBoxDataConnector( this->ui->wNCores        , "wNCores"        , &this->launcher_.config, &this->launcher_.script, "n_cores"      ) );
-        this->data_.append( new dc::QDoubleSpinBoxDataConnector( this->ui->wGbPerCore     , "wGbPerCore"     , &this->launcher_.config, &this->launcher_.script, "Gb_per_core") );
-        this->data_.append( new dc::     QLineEditDataConnector( this->ui->wGbTotal       , "wGbTotal"       , &this->launcher_.config, &this->launcher_.script, "Gb_total"   ) );
+        this->data_.append( dc::newDataConnector( this->ui->wCluster       , "wCluster"       , "cluster"    ) );
+        this->data_.append( dc::newDataConnector( this->ui->wNodeset       , "wNodeset"       , "nodeset"    ) );
+        this->data_.append( dc::newDataConnector( this->ui->wNNodes        , "wNNodes"        , "nodes"      ) );
+        this->data_.append( dc::newDataConnector( this->ui->wNCoresPerNode , "wNCoresPerNode" , "ppn"        ) );
+        this->data_.append( dc::newDataConnector( this->ui->wNCores        , "wNCores"        , "n_cores"    ) );
+        this->data_.append( dc::newDataConnector( this->ui->wGbPerCore     , "wGbPerCore"     , "Gb_per_core") );
+        this->data_.append( dc::newDataConnector( this->ui->wGbTotal       , "wGbTotal"       , "Gb_total"   ) );
+        this->data_.append( dc::newDataConnector( this->ui->wWalltime      , "wWalltime"      , QString() ) );
 
-        dc::getDataConnector(this->data_,"wCluster")->setWidgetFromConfig();
-        this->clusterDependencies_();
+        this->getDataConnector("wCluster")->config_to_widget();
         this->storeResetValues_();
 
-        this->data_.append( new dc::QLineEditDataConnector( this->ui->wUsername, "wUsername" , &this->launcher_.config, &this->launcher_.script, "user" ) );
-        bool can_authenticate = !this->launcher_.config.getItem("wUsername" )->value().toString().isEmpty();
+        this->data_.append( dc::newDataConnector( this->ui->wUsername, "wUsername", "user" ) );
+        bool can_authenticate = !this->getConfigItem("wUsername")->value().toString().isEmpty();
         this->ui->wAuthenticate->setEnabled( can_authenticate );
 
         this->setIgnoreSignals(false);
@@ -355,14 +166,14 @@ namespace dc
  //-----------------------------------------------------------------------------
     MainWindow::~MainWindow()
     {
-        for( QList<dc::DataConnector*>::iterator iter = this->data_.begin(); iter!=this->data_.end(); ++iter ) {
-            (*iter)->setConfigFromWidget();
+        for( QList<dc::DataConnectorBase*>::iterator iter = this->data_.begin(); iter!=this->data_.end(); ++iter ) {
+            (*iter)->widget_to_config();
             delete (*iter);
         }
 
         QSize windowSize = this->size();
-        this->launcher_.config.getItem("windowWidth" )->set_value( windowSize.width () );
-        this->launcher_.config.getItem("windowHeight")->set_value( windowSize.height() );
+        this->getConfigItem("windowWidth" )->set_value( windowSize.width () );
+        this->getConfigItem("windowHeight")->set_value( windowSize.height() );
 
         this->launcher_.config.save();
 
@@ -399,10 +210,28 @@ namespace dc
         MainWindow* mainWindow_;
     };
  //-----------------------------------------------------------------------------
+    dc::DataConnectorBase*
+    MainWindow::
+    getDataConnector( QString const& widgetName )
+    {
+        for( QList<dc::DataConnectorBase*>::iterator iter=this->data_.begin(); iter!=this->data_.end(); ++iter ) {
+            if( (*iter)->name()== widgetName ) {
+                return (*iter);
+            }
+        }
+        throw_<std::logic_error>("Widget '%1' not found in QList<DataConnector*>.", widgetName );
+    }
+ //-----------------------------------------------------------------------------
+    cfg::Item*
+    MainWindow::
+    getConfigItem( QString const& name ) {
+        return this->launcher_.config.getItem(name);
+    }
+ //-----------------------------------------------------------------------------
     ClusterInfo const&
     MainWindow::clusterInfo() const
     {
-        QString            clusterName = this->ui->wCluster->currentText();
+        QString            clusterName = const_cast<MainWindow*>(this)->launcher_.config.getItem("wCluster")->value().toString();
         ClusterInfo const& clusterInfo = *( this->launcher_.clusters.find( clusterName ) );
         return clusterInfo;
     }
@@ -410,8 +239,9 @@ namespace dc
     NodesetInfo const&
     MainWindow::nodesetInfo() const
     {
-        QString nodesetName = this->ui->wNodeset->currentText();
-        QString clusterName = this->ui->wCluster->currentText();
+        MainWindow* non_const_this = const_cast<MainWindow*>(this);
+        QString nodesetName = non_const_this->getConfigItem("wNodeset")->value().toString();
+        QString clusterName = non_const_this->getConfigItem("wCluster")->value().toString();
         NodesetInfo const& nodesetInfo = *( this->launcher_.clusters[clusterName].nodesets().find( nodesetName ) );
         return nodesetInfo;
     }
@@ -426,63 +256,75 @@ namespace dc
         std::cout << signature << std::endl;
     }
  //------------------------------------------------------------------------------
-    void MainWindow::clusterDependencies_()
-    {
+    void MainWindow::clusterDependencies_( bool updateWidgets )
+    {// act on config items only...
+
         IgnoreSignals ignoreSignals( this );
 
-        QString cluster = this->ui->wCluster->currentText();
+        QString cluster = this->getConfigItem("wCluster")->value().toString();
         ClusterInfo& clusterInfo = *(this->launcher_.clusters.find( cluster ) );
      // Initialize Config items that depend on the cluster
-        cfg::Item* item = this->launcher_.config.getItem("wNodeset");
-        item->set_choices      ( clusterInfo.nodesets().keys() );
-//        item->set_default_value( clusterInfo.defaultNodeset() );
-        item->set_value        ( clusterInfo.defaultNodeset() );
-        dc::getDataConnector( this->data_, "wNodeset")->setWidgetFromConfig();
+        cfg::Item* ci = this->getConfigItem("wNodeset");
+        try {
+            ci->set_choices( clusterInfo.nodesets().keys() );
+        } catch( cfg::InvalidConfigItemValue& e ) {
+            ci->set_default_value( clusterInfo.defaultNodeset() );
+            ci->set_value        ( clusterInfo.defaultNodeset() );
+        }
 
-        this->nodesetDependencies_();
+        if( updateWidgets ) {
+            this->getDataConnector("wNodeset")->config_to_widget();
+        }
 
-        this->walltimeUnitDependencies_();
+        this->nodesetDependencies_     (updateWidgets);
+        this->walltimeUnitDependencies_(updateWidgets);
+
         this->sshSession_.setLoginNode( clusterInfo.loginNodes()[0] );
     }
  //-----------------------------------------------------------------------------
-    void MainWindow::nodesetDependencies_()
+    void MainWindow::nodesetDependencies_( bool updateWidgets )
     {
-        IgnoreSignals ignoreSignals( this );
-
         NodesetInfo const& nodesetInfo = this->nodesetInfo();
-
-        cfg::Item* item = this->launcher_.config.getItem("wNNodes");
+        cfg::Item* ci = this->getConfigItem("wNNodes");
         QList<QVariant> range;
         range.append( 1 );
         range.append( nodesetInfo.nNodes() );
-        item->set_choices( range, true );
-        dc::getDataConnector( this->data_, "wNNodes")->setWidgetFromConfig();
+        ci->set_choices( range, true );
+        ci->set_value( 1 );
 
-        item = this->launcher_.config.getItem("wNCoresPerNode");
+        ci = this->getConfigItem("wNCoresPerNode");
         range.last() = nodesetInfo.nCoresPerNode();
-        item->set_choices( range, true );
-        item->set_value( range.last() );
-        dc::getDataConnector( this->data_, "wNCoresPerNode")->setWidgetFromConfig();
+        ci->set_choices( range, true );
+        ci->set_value( range.last() );
 
         this->ui->wGbPerNode->setText( QString().setNum( nodesetInfo.gbPerNodeAvailable(),'g',3) );
+         // This on has no slots connected - no need to ignore signals
+         // It is also not connected to an cfg::Item by a DataConnector, hence
+         // we do update it even if updateWidgets is false.
 
-        item = this->launcher_.config.getItem("wNCores");
+        ci = this->getConfigItem("wNCores");
         range.last() = nodesetInfo.nCoresAvailable();
-        item->set_choices( range, true );
-        item->set_value( nodesetInfo.nCoresPerNode() );
-        dc::getDataConnector( this->data_, "wNCores")->setWidgetFromConfig();
+        ci->set_choices( range, true );
+        ci->set_value( nodesetInfo.nCoresPerNode() );
 
-        item = this->launcher_.config.getItem("wGbPerCore");
+        ci = this->getConfigItem("wGbPerCore");
         range.clear();
         range.append( nodesetInfo.gbPerCoreAvailable() );
         range.append( nodesetInfo.gbPerNodeAvailable() );
-        item->set_choices( range, true );
-        item->set_value( nodesetInfo.gbPerCoreAvailable() );
-        dc::getDataConnector( this->data_, "wGbPerCore")->setWidgetFromConfig();
+        ci->set_choices( range, true );
+        ci->set_value( nodesetInfo.gbPerCoreAvailable() );
 
-        double gbTotal = this->ui->wGbPerNode->text().toDouble();
-        gbTotal *= this->ui->wNNodes->value();
-        this->ui->wGbTotal->setText( QString().setNum( gbTotal,'g',3) );
+        if( updateWidgets ) {
+            IgnoreSignals ignoreSignals( this );
+            this->getDataConnector("wNNodes"       )->config_to_widget();
+            this->getDataConnector("wNCoresPerNode")->config_to_widget();
+            this->getDataConnector("wNCores"       )->config_to_widget();
+            this->getDataConnector("wGbPerCore"    )->config_to_widget();
+
+            double gbTotal = this->ui->wGbPerNode->text().toDouble();
+            gbTotal *= this->ui->wNNodes->value();
+            this->ui->wGbTotal->setText( QString().setNum( gbTotal,'g',3) );
+        }
     }
   //-----------------------------------------------------------------------------
     QString formatWalltimeSeconds( int seconds )
@@ -512,33 +354,33 @@ namespace dc
         return s;
     }
  //-----------------------------------------------------------------------------
-    void MainWindow::walltimeUnitDependencies_()
+    void MainWindow::walltimeUnitDependencies_( bool updateWidgets )
     {
-        IgnoreSignals ignoreSignals( this );
-
-        this->walltimeUnitSeconds_ = nSecondsPerUnit( this->ui->wWalltimeUnit->currentText() );
-
-        double walltime_limit = (double) this->clusterInfo().walltimeLimit() / this->walltimeUnitSeconds_;
+        QString unit = this->getConfigItem("wWalltimeUnit")->value().toString();
+        this->walltimeUnitSeconds_ = nSecondsPerUnit(unit);
+        double step = ( unit=="weeks" ? 1.0/7.0 :
+                      ( unit=="days"  ? 0.25    :
+                      ( unit=="hours" ? 0.25    : 10.0 )));
+        double walltime_limit = (double) this->clusterInfo().walltimeLimit();
+        walltime_limit /= this->walltimeUnitSeconds_;
         QList<QVariant> range;
         range.append( 0. );
         range.append( walltime_limit );
-        cfg::Item*  item = this->launcher_.config.getItem("wWalltime");
-        item->set_choices(range,true);
-        if( item->value().toDouble() == 0.0 ) {
-            item->set_value( 1.0 );
-            this->launcher_.config.getItem("walltimeSeconds")
-                    ->set_value( formatWalltimeSeconds( this->walltimeUnitSeconds_) );
-        } else {
-            item->set_value( (double)
-                unformatWalltimeSeconds( this->launcher_.config.getItem("walltimeSeconds")->value().toString() )
-                 / this->walltimeUnitSeconds_
-                           );
+        range.append( step );
+
+        cfg::Item* ci_wWalltime = this->getConfigItem("wWalltime");
+        double current = ci_wWalltime->value().toDouble();
+        try {
+            ci_wWalltime->set_choices(range,true);
+        } catch( cfg::InvalidConfigItemValue& e) {}
+        double w = (double) unformatWalltimeSeconds( this->getConfigItem("walltimeSeconds")->value().toString() );
+        w /= this->walltimeUnitSeconds_;
+        ci_wWalltime->set_value(w);
+
+        if( updateWidgets ) {
+            IgnoreSignals ignoreSignals( this );
+            this->getDataConnector("wWalltime")->config_to_widget();
         }
-        dc::getDataConnector( this->data_, "wWalltime")->setWidgetFromConfig();
-    }
- //-----------------------------------------------------------------------------
-    dc::DataConnector* MainWindow::getData_( QString const& itemName ) {
-        return dc::getDataConnector( this->data_, itemName );
     }
  //-----------------------------------------------------------------------------
 
@@ -550,26 +392,27 @@ void MainWindow::on_wCluster_currentIndexChanged( QString const& arg1 )
     PRINT1_AND_CHECK_IGNORESIGNAL("void MainWindow::on_wCluster_currentIndexChanged( QString const& arg1 )", arg1.toStdString() )
 
     this->launcher_.config["wCluster"].set_value(arg1);
-    this->clusterDependencies_();
- // todo effects on script
+    this->clusterDependencies_(true);
 }
 
 void MainWindow::on_wNodeset_currentTextChanged(const QString &arg1)
 {
     PRINT1_AND_CHECK_IGNORESIGNAL( "void MainWindow::on_wNodeset_currentTextChanged(const QString &arg1)", arg1.toStdString() )
 
-    this->launcher_.config.getItem("wNodeset")->set_value(arg1);
-    this->nodesetDependencies_();
+    this->getConfigItem("wNodeset")->set_value(arg1);
+    this->nodesetDependencies_(true);
 }
 
 void MainWindow::updateResourceItems_()
 {
+    IgnoreSignals ignoreSignals(this);
+
     QStringList itemList({"wNNodes", "wNCoresPerNode", "wNCores", "wGbPerCore", "wGbTotal"});
     for( QStringList::const_iterator iter=itemList.cbegin(); iter!=itemList.cend(); ++iter )
     {
-        dc::DataConnector* link = dc::getDataConnector( this->data_, *iter );
-        link->setConfigFromWidget();
-        link->setScriptFromConfig();
+        dc::DataConnectorBase* dataConnector = this->getDataConnector(*iter);
+        dataConnector->config_to_widget();
+        dataConnector->config_to_script();
     }
 }
 
@@ -585,10 +428,11 @@ void MainWindow::on_wRequestNodes_clicked()
         this->statusBar()->showMessage(e.what());
         return;
     }
-    IgnoreSignals ignoreSignals(this);// will be reset at end of scope
-    this->ui->wNCores   ->setValue( nodeset.granted().nCores );
-    this->ui->wGbPerCore->setValue( nodeset.granted().gbPerCore );
-    this->ui->wGbTotal  ->setText ( QString().setNum( nodeset.granted().gbTotal ) );
+    this->getConfigItem("wNNodes"       )->set_value( nodeset.granted().nNodes );
+    this->getConfigItem("wNCoresPerNode")->set_value( nodeset.granted().nCoresPerNode );
+    this->getConfigItem("wNCores"       )->set_value( nodeset.granted().nCores );
+    this->getConfigItem("wGbPerCore"    )->set_value( nodeset.granted().gbPerCore );
+    this->getConfigItem("wGbTotal"      )->set_value( nodeset.granted().gbTotal );
     this->updateResourceItems_();
 }
 
@@ -654,12 +498,11 @@ void MainWindow::on_wRequestCores_clicked()
         this->statusBar()->showMessage(e.what());
         return;
     }
-    IgnoreSignals ignoreSignals(this);// will be reset at end of scope
-    this->ui->wNNodes       ->setValue( nodeset.granted().nNodes );
-    this->ui->wNCoresPerNode->setValue( nodeset.granted().nCoresPerNode );
-    this->ui->wNCores       ->setValue( nodeset.granted().nCores );
-    this->ui->wGbPerCore    ->setValue( nodeset.granted().gbPerCore );
-    this->ui->wGbTotal      ->setText ( QString().setNum( nodeset.granted().gbTotal ) );
+    this->getConfigItem("wNNodes"       )->set_value( nodeset.granted().nNodes );
+    this->getConfigItem("wNCoresPerNode")->set_value( nodeset.granted().nCoresPerNode );
+    this->getConfigItem("wNCores"       )->set_value( nodeset.granted().nCores );
+    this->getConfigItem("wGbPerCore"    )->set_value( nodeset.granted().gbPerCore );
+    this->getConfigItem("wGbTotal"      )->set_value( nodeset.granted().gbTotal );
     this->updateResourceItems_();
 }
 
@@ -673,12 +516,10 @@ void MainWindow::on_wPages_currentChanged(int index)
         break;
     case 1:
         if( this->previousPage_==0) {
-//            this->launcher_.modifyScript( this->nodesetInfo() );
-            for( QList<dc::DataConnector*>::const_iterator iter=this->data_.cbegin(); iter!=this->data_.cend(); ++iter )
+            for( QList<dc::DataConnectorBase*>::iterator iter=this->data_.begin(); iter!=this->data_.end(); ++iter )
             {
-                dc::DataConnector* link = *iter;
-                link->setConfigFromWidget();
-                link->setScriptFromConfig();
+                (*iter)->widget_to_config();
+                (*iter)->config_to_script();
             }
             this->ui->wScript->setText( this->launcher_.script.text() );
         }
@@ -701,19 +542,20 @@ void MainWindow::on_wWalltimeUnit_currentTextChanged(const QString &arg1)
 {
     PRINT1_AND_CHECK_IGNORESIGNAL("void MainWindow::on_wWalltimeUnit_currentTextChanged(const QString &arg1)", arg1.toStdString() );
 
-    this->walltimeUnitDependencies_();
-
-    //        item = this->launcher_.config.getItem("wWalltime");
-
+    this->getDataConnector("wWalltimeUnit")->widget_to_config();
+    this->walltimeUnitDependencies_(true);
 }
 
 void MainWindow::on_wWalltime_valueChanged(double arg1)
 {
     PRINT1_AND_CHECK_IGNORESIGNAL("void MainWindow::on_wWalltime_valueChanged(double arg1)", arg1 );
 
-    cfg::Item* walltimeSeconds = this->launcher_.config.getItem("walltimeSeconds");
+    IgnoreSignals ignoreSignals(this);
+
+    cfg::Item* walltimeSeconds = this->getConfigItem("walltimeSeconds");
     double seconds = arg1*this->walltimeUnitSeconds_;
     walltimeSeconds->set_value( formatWalltimeSeconds( seconds ) );
+    this->getDataConnector("walltimeSeconds")->config_to_script();
     std::cout <<"    walltime set to: " << seconds << "s." << std::endl;
 }
 
@@ -721,41 +563,39 @@ void MainWindow::on_wNotifyAddress_editingFinished()
 {
     PRINT0_AND_CHECK_IGNORESIGNAL("void MainWindow::on_wNotifyAddress_editingFinished()" );
 
-    IgnoreSignals ignoreSignals(this);
 
-    QString validated = dc::validateEmailAddress( this->ui->wNotifyAddress->text() );
+    QString validated = validateEmailAddress( this->ui->wNotifyAddress->text() );
     if( validated.isEmpty() )
     {// not a valid address
         IgnoreSignals ignoreSignals(this);
         this->ui->wNotifyAddress->setPalette(*this->paletteRedForground_);
         this->statusBar()->showMessage("Invalid email address.");
     } else {
-        this->ui->wNotifyAddress->setText( validated );
         this->ui->wNotifyAddress->setPalette( QApplication::palette(this->ui->wNotifyAddress) );
-        this->launcher_.config.getItem("wNotifyAddress")->set_value(validated);
         this->statusBar()->clearMessage();
+        this->getConfigItem("wNotifyAddress")->set_value(validated);
 
-        dc::DataConnector* link = dc::getDataConnector( this->data_, "wNotifyAddress");
-        link->setConfigFromWidget();
-        link->setScriptFromConfig();
+        IgnoreSignals ignoreSignals(this);
+        dc::DataConnectorBase* link = this->getDataConnector("wNotifyAddress");
+        link->config_to_widget();
+        link->config_to_script();
     }
 }
 
 void MainWindow::update_abe_( QChar c, bool checked )
 {
-    cfg::Item* notify_abe = this->launcher_.config.getItem("notifyWhen");
-    QString abe = notify_abe->value().toString();
+    cfg::Item* ci_notifyWhen = this->getConfigItem("notifyWhen");
+    QString abe = ci_notifyWhen->value().toString();
     if( checked && !abe.contains(c) ) {
         abe.append(c);
     } else if( !checked && abe.contains(c) ) {
         int i = abe.indexOf(c);
         abe.remove(i,1);
     }
-    notify_abe->set_value( abe );
+    ci_notifyWhen->set_value( abe );
     std::cout << "    abe set to: '" << abe.toStdString() << "'." << std::endl;
 
-    dc::DataConnector* link = dc::getDataConnector( this->data_, "notifyWhen");
-    link->setScriptFromConfig();
+    this->getDataConnector("notifyWhen")->config_to_script();
 }
 
 void MainWindow::on_wNotifyAbort_toggled(bool checked)
@@ -780,7 +620,7 @@ void MainWindow::on_wNotifyEnd_toggled(bool checked)
 
 bool MainWindow::getPrivatePublicKeyPair_()
 {
-    QString private_key = QFileDialog::getOpenFileName( nullptr, "Select PRIVATE key file:", this->launcher_.homePath() );
+    QString private_key = QFileDialog::getOpenFileName( this, "Select PRIVATE key file:", this->launcher_.homePath() );
     if( !QFileInfo( private_key ).exists() ) {
         this->statusBar()->showMessage( QString( "Private key '%1' not found.").arg(private_key) );
         return false;
@@ -790,7 +630,7 @@ bool MainWindow::getPrivatePublicKeyPair_()
     public_key.append(".pub"); // make an educated guess...
     if( !QFileInfo( public_key ).exists() )
     {
-        public_key = QFileDialog::getOpenFileName( nullptr, "Select PUBLIC key file:", this->launcher_.homePath() );
+        public_key = QFileDialog::getOpenFileName( this, "Select PUBLIC key file:", this->launcher_.homePath() );
         if( public_key.isEmpty() || !QFileInfo(public_key).exists() )
         {// not provided or inexisting
             this->statusBar()->showMessage(QString("Public key '%1' not found or not provided.").arg(public_key) );
@@ -806,7 +646,7 @@ void MainWindow::on_wUsername_editingFinished()
 {
     PRINT0_AND_CHECK_IGNORESIGNAL("void MainWindow::on_wUsername_editingFinished()" );
 
-    QString username = dc::validateUsername( this->ui->wUsername->text() );
+    QString username = validateUsername( this->ui->wUsername->text() );
 
     if( username.isEmpty() )
     {// not a valid username
@@ -820,14 +660,14 @@ void MainWindow::on_wUsername_editingFinished()
     } else
     {// valid username
         this->ui->wUsername->setPalette( QApplication::palette(this->ui->wUsername) );
-        cfg::Item* user = this->launcher_.config.getItem("wUsername");
+        cfg::Item* user = this->getConfigItem("wUsername");
         if( user->value().toString() != username )
         {// this is a new username, different from current config value
          // store in config
             user->set_value(username);
          // clear config values for private/public key pair
-            this->launcher_.config.getItem("privateKey")->set_value( QString() );
-            this->launcher_.config.getItem("publicKey" )->set_value( QString() );
+            this->getConfigItem("privateKey")->set_value( QString() );
+            this->getConfigItem("publicKey" )->set_value( QString() );
          // set the username for the ssh session
             this->sshSession_.setUsername(username);
          // activate the authenticate button
@@ -838,8 +678,8 @@ void MainWindow::on_wUsername_editingFinished()
             this->sshSession_.setUsername(username);
          // set private/public key pair from config
             this->sshSession_.setPrivatePublicKeyPair
-                    ( this->launcher_.config.getItem("privateKey")->value().toString()
-                    , this->launcher_.config.getItem("publicKey" )->value().toString()
+                    ( this->getConfigItem("privateKey")->value().toString()
+                    , this->getConfigItem("publicKey" )->value().toString()
                     , false
                     );
          // activate the authenticate button
@@ -886,7 +726,7 @@ void MainWindow::on_wAuthenticate_clicked()
             this->sshSession_.open();
         }
         catch( ssh2::MissingUsername& e ) {
-            QString username = dc::validateUsername( this->ui->wUsername->text() );
+            QString username = /*dc::*/validateUsername( this->ui->wUsername->text() );
             if( username.isEmpty() ) {
                 this->statusBar()->showMessage("Invalid username");
              // deactivate the authenticate button
@@ -895,10 +735,10 @@ void MainWindow::on_wAuthenticate_clicked()
                 break;
             }
             this->sshSession_.setUsername( username );
-            if( this->launcher_.config.getItem("wUsername")->value().toString() == username ) {
+            if( this->getConfigItem("wUsername")->value().toString() == username ) {
                 this->sshSession_.setPrivatePublicKeyPair
-                        ( this->launcher_.config.getItem("privateKey")->value().toString()
-                        , this->launcher_.config.getItem("publicKey" )->value().toString()
+                        ( this->getConfigItem("privateKey")->value().toString()
+                        , this->getConfigItem("publicKey" )->value().toString()
                         , false
                         );
             }
@@ -936,17 +776,17 @@ void MainWindow::on_wAuthenticate_clicked()
             this->statusBar()->showMessage(msg);
             std::cerr << msg.toStdString() << std::endl;
          // remove keys from ssh session and from config
-            this->sshSession_.setUsername( this->launcher_.config.getItem("wUsername")->value().toString() );
-            this->launcher_.config.getItem("privateKey")->set_value( QString() );
-            this->launcher_.config.getItem("publicKey" )->set_value( QString() );
+            this->sshSession_.setUsername( this->getConfigItem("wUsername")->value().toString() );
+            this->getConfigItem("privateKey")->set_value( QString() );
+            this->getConfigItem("publicKey" )->set_value( QString() );
             break;
         }
      // success
         this->ui->wAuthenticate->setText("Authenticated");
         this->ui->wAuthenticate->setEnabled(false);
         this->statusBar()->showMessage("Authentication succeeded.");
-        this->launcher_.config.getItem("privateKey")->set_value( this->sshSession_.privateKey() );
-        this->launcher_.config.getItem("publicKey" )->set_value( this->sshSession_. publicKey() );
+        this->getConfigItem("privateKey")->set_value( this->sshSession_.privateKey() );
+        this->getConfigItem("publicKey" )->set_value( this->sshSession_. publicKey() );
 #ifdef QT_DEBUG
         this->sshSession_.print();
 #endif
@@ -954,9 +794,9 @@ void MainWindow::on_wAuthenticate_clicked()
     }
     if( attempts==0 )
     {// remove the keys from the config and the session - maybe they were wrong
-        this->sshSession_.setUsername( this->launcher_.config.getItem("wUsername")->value().toString() );
-        this->launcher_.config.getItem("privateKey")->set_value( QString() );
-        this->launcher_.config.getItem("publicKey" )->set_value( QString() );
+        this->sshSession_.setUsername( this->getConfigItem("wUsername")->value().toString() );
+        this->getConfigItem("privateKey")->set_value( QString() );
+        this->getConfigItem("publicKey" )->set_value( QString() );
         this->statusBar()->showMessage( QString("Authentication failed: %1 failed attempts to provide passphrase.").arg(max_attempts) );
     }
     this->setIgnoreSignals(false);

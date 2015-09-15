@@ -92,6 +92,36 @@ void CfgTest::testCase1()
     } catch(logic_error &e) {
         std::cout << "\n(Intentional) Error: " << e.what() << std::endl;
     }
+    {
+        cfg::Item item;
+        choices.clear();
+        choices.append( 0);
+        choices.append(10);
+        choices.append( 2);
+        item.set_choices(choices,true);
+        item.set_value(4);
+        try {
+            item.set_value(3);
+            QVERIFY2(false, "Failure");
+        } catch(logic_error &e) {
+            std::cout << "\n(Intentional) Error: " << e.what() << std::endl;
+        }
+    }
+    {
+        cfg::Item item;
+        choices.clear();
+        choices.append( 0.0);
+        choices.append(10.0);
+        choices.append(  .5);
+        item.set_choices(choices,true);
+        item.set_value(4.);
+        try {
+            item.set_value(3.1);
+            QVERIFY2(false, "Failure");
+        } catch(logic_error &e) {
+            std::cout << "\n(Intentional) Error: " << e.what() << std::endl;
+        }
+    }
 }
 
 void CfgTest::testCase2()

@@ -5,6 +5,8 @@
 #include <QIODevice>
 #include <QDataStream>
 
+#include <cmath>
+
 namespace cfg
 {//-----------------------------------------------------------------------------
     QString rangeToString( QList<QVariant> const& range, bool add_type = false )
@@ -40,12 +42,29 @@ namespace cfg
     {
         bool ok = true;
         if( this->choices_is_range_ ) {
-            if( !choices_.empty() ) {
+            if( !choices_.empty() )
+            {
                 ok = value.type()==this->range_type_
                   && this->choices().first() <= value
-                  &&                            value <= this->choices().last();
+                  &&                            value <= this->choices().at(1);
+//                if( this->choices().size()==3 ) {
+//                    switch( this->range_type_ ) {
+//                      case QVariant::Int: {
+//                        int delta = value.toInt() - this->choices().first().toInt();
+//                        ok &= (delta % this->choices().at(2).toInt() ) == 0;
+//                      } break;
+//                      case QVariant::Double: {
+//                        double delta = value.toDouble() - this->choices().first().toDouble();
+//                        double step = this->choices().at(2).toDouble();
+//                        double remainder = fmod( delta, step );
+//                        ok &= ( remainder <= 1e-6*step );
+//                      } break;
+//                      default:
+//                        throw_<InvalidConfigItemValue>("not implemented.");
+//                    }
+//                }
                 if( !ok && trow ) {
-                    throw_<std::logic_error>("Value '%1' (%2) is not in %3 range %4."
+                    throw_<InvalidConfigItemValue>("Value '%1' (%2) is not in %3 range %4."
                                             , value.toString()
                                             , value.typeName()
                                             , this->choices().first().typeName()
@@ -57,7 +76,7 @@ namespace cfg
             if( !choices_.empty() ) {
                 ok = this->choices().contains(value);
                 if( !ok && trow ) {
-                    throw_<std::logic_error>("Value '%1' is not a valid choice. Valid choices are: %2."
+                    throw_<InvalidConfigItemValue>("Value '%1' is not a valid choice. Valid choices are: %2."
                                             , value.toString()
                                             , rangeToString( this->choices() )
                                             );
@@ -66,7 +85,7 @@ namespace cfg
                 if( range_type_!=QVariant::Invalid ) {
                     ok = (value.type() == range_type_);
                     if( !ok && trow ) {
-                        throw_<std::logic_error>("Value '%1' is not a valid choice. Valid choices are of type %2."
+                        throw_<InvalidConfigItemValue>("Value '%1' is not a valid choice. Valid choices are of type %2."
                                                 , value.toString()
                                                 , QVariant::typeToName(this->range_type_)
                                                 );
@@ -86,13 +105,13 @@ namespace cfg
     {
         if( is_range )
         {// validate the range
-            if( choices.size() > 2 ) {
-                throw_<std::logic_error>("Ranges of more than 2 elements are invalid: range is: %1."
+            if( choices.size() > 3 ) {
+                throw_<std::runtime_error>("Ranges of more than 3 elements are invalid: range is: %1."
                                         , rangeToString( choices )
                                         );
             }
             if( choices.first().typeName() != choices.last().typeName() ) {
-                throw_<std::logic_error>("The elements of a range must be of the same type: range is: %1."
+                throw_<std::runtime_error>("The elements of a range must be of the same type: range is: %1."
                                         , rangeToString( choices )
                                         );
             }
@@ -100,12 +119,12 @@ namespace cfg
 
             if( range_type != QVariant::Int
              && range_type != QVariant::Double ) {
-                throw_<std::logic_error>("The elements of a range must be of type int or double: range is: %1."
+                throw_<std::runtime_error>("The elements of a range must be of type int or double: range is: %1."
                                         , rangeToString( choices )
                                         );
             }
-            if( choices.first() > choices.last() ) {
-                throw_<std::logic_error>("Empty range (the first element is larger than the last): range is: %1."
+            if( choices.first() > choices.at(1) ) {
+                throw_<std::runtime_error>("Empty range (the first element is larger than the last): range is: %1."
                                         , rangeToString( choices )
                                         );
             }
@@ -133,11 +152,10 @@ namespace cfg
            if( choices.size() > 0 )
                this->default_value_ = choices.at(0);
        }
-    // adjust value
-//       if( (this->value_==QVariant()) || (!this->is_valid(this->value_)) )
-//       {// there is no current value or it is invalid
-//           this->value_ = this->default_value_;
-//       }
+    // verify value if present
+       if( this->value_!=QVariant() ) {
+           this->is_valid( this->value_, true ) ;
+       }
     }
  //-----------------------------------------------------------------------------
     void  Item::set_choices
@@ -188,7 +206,7 @@ namespace cfg
        if( this->range_type_==QVariant::Invalid )
            this->range_type_ = type;
        if( this->range_type_!= type ) {
-           throw_<std::logic_error>("Cannot set type to %1. Item '%2' has already a type (%3)."
+           throw_<std::runtime_error>("Cannot set type to %1. Item '%2' has already a type (%3)."
                                    , QVariant::typeToName(type)
                                    , this->name()
                                    , QVariant::typeToName(this->range_type_)
@@ -260,7 +278,7 @@ namespace cfg
     void Config::addItem( Item const& item )
     {
         if( item.name().isEmpty() ) {
-            throw_<std::logic_error>("Cannot add cfg::Item object with empty name.");
+            throw_<std::runtime_error>("Cannot add cfg::Item object with empty name.");
         }
         (*this)[item.name()] = item;
     }

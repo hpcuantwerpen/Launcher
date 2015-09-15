@@ -31,6 +31,9 @@ namespace cfg
         void set_name(QString const& name) {
             this->name_ = name;
         }
+        bool isInitialized() const {
+            return value_.type() != QVariant::Invalid;
+        }
 
      // value
         QVariant const& value() const;
@@ -120,6 +123,15 @@ namespace cfg
     {
         return cfg_get(config,key,default_value).toString();
     }
+
+
+#define SUBCLASS_EXCEPTION(DERIVED,BASE)                \
+    struct DERIVED : public BASE {                      \
+        DERIVED( char const* what ) : BASE( what ) {}   \
+    };
+
+    SUBCLASS_EXCEPTION( InvalidConfigItemValue , std::runtime_error )
+
  //=============================================================================
 }// namespace cfg
 

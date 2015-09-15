@@ -83,6 +83,8 @@ namespace ssh2
                   , public_key_
                   ;
     };
+ //=============================================================================
+
 #define SUBCLASS_EXCEPTION(DERIVED,BASE)                \
     struct DERIVED : public BASE {                      \
         DERIVED( char const* what ) : BASE( what ) {}   \
