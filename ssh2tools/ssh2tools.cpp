@@ -1,4 +1,5 @@
 #include "ssh2tools.h"
+#include <libssh2_sftp.h>
 
 #ifdef Q_OS_WIN
     #include <windows.h>
@@ -16,8 +17,7 @@
 #include <cstring>
 #include <stdexcept>
 
-#include <throw_.h>
-#include <warn_.h>
+#include <QDir>
 #include <QFileInfo>
 
 static int waitsocket(int socket_fd, LIBSSH2_SESSION *session)
@@ -54,8 +54,8 @@ static int waitsocket(int socket_fd, LIBSSH2_SESSION *session)
 namespace ssh2
 {//-----------------------------------------------------------------------------
     Session::Session()
-      : session_(nullptr)
-      , sock_(-1)
+      : sock_(-1)
+      , session_(nullptr)
     {}
  //-----------------------------------------------------------------------------
     bool Session::isInitializedLibssh_ = false;
@@ -121,6 +121,7 @@ namespace ssh2
             else             { return false; }
         }
         this->passphrase_ = passphrase.toStdString();
+        return true;
     }
 
  //-----------------------------------------------------------------------------
@@ -128,6 +129,9 @@ namespace ssh2
     {
         if( this->isOpen() ) {
             return;
+        }
+        if( this->login_node_.empty() ) {
+            throw_<MissingLoginNode>("Authentication error: Missing login node.");
         }
         if( this->username_.empty() ) {
             throw_<MissingUsername>("Authentication error: Missing username.");
@@ -250,7 +254,7 @@ namespace ssh2
                             , this->username_   .c_str()
                             , this->public_key_ .c_str()
                             , this->private_key_.c_str()
-                            , this->passphrase_   .c_str()
+                            , this->passphrase_ .c_str()
                             )
                     ) == LIBSSH2_ERROR_EAGAIN
                  );
@@ -276,19 +280,23 @@ namespace ssh2
  //-----------------------------------------------------------------------------
     bool Session::autoOpen = false;
     bool Session::autoClose= false;
+    int  Session::verbose =
+#ifdef QT_DEBUG
+                            1;
+#else
+                            0;
+#endif
  //-----------------------------------------------------------------------------
-    void
-    Session::
-    exec( QString const & command_line, QString* qout, QString* qerr )
+    void Session::exec_( QString const & command_line, QString* qout, QString* qerr )
     {
         if( !this->isOpen() && Session::autoOpen ) {
             this->open();
         }
 
         int rv=0;
-        char const* cmd = command_line.toStdString().c_str();
+        std::string cmd = command_line.toStdString();
 
-     // Exec non-blocking on the remove host
+     // Exec non-blocking on the remote host
         LIBSSH2_CHANNEL *channel;
         while( (channel = libssh2_channel_open_session(this->session_)) == NULL
             && libssh2_session_last_error(this->session_,NULL,NULL,0) == LIBSSH2_ERROR_EAGAIN
@@ -298,16 +306,16 @@ namespace ssh2
         if( channel == NULL )
             throw_<std::runtime_error>("Error on libssh2_channel_open_session");
 
-        while( (rv = libssh2_channel_exec(channel, cmd)) == LIBSSH2_ERROR_EAGAIN )
+        while( (rv = libssh2_channel_exec( channel, cmd.c_str() )) == LIBSSH2_ERROR_EAGAIN )
             waitsocket(this->sock_, this->session_);
 
         if( rv != 0 )
            throw_<std::runtime_error>("Error onlibssh2_channel_exec");
      //----
-        int bytecount[2] = {0,0};
         QString* qxxx[2];
         qxxx[0]=qout;
         qxxx[1]=qerr;
+        std::string name[2] = {"stdout","stderr"};
 
         if( qout )
             qout->clear();
@@ -316,6 +324,7 @@ namespace ssh2
         char buffer[0x4000];
         for( int iq=0;iq<2;++iq )
         {
+            this->bytecount_[iq] = 0;
             if( !qxxx[iq] )
                 continue;
             for( ;; )
@@ -327,51 +336,492 @@ namespace ssh2
                          );
                     if( rv > 0 )
                     {
-                        bytecount[iq] += rv;
-                        warn_("We read:");
-                        for( int i=0; i < rv; ++i )
-                            fputc( buffer[i], stderr);
-                        warn_("");
-                     //?buffer[rv] ='\0';
+                        this->bytecount_[iq] += rv;
+                        if( Session::verbose > 1 ) {
+                            std::cerr << '\n' << name[iq] << " buffer<<<" << std::flush;
+                            for( int i=0; i < rv; ++i ) fputc( buffer[i], stderr);
+                            std::cerr << ">>>" << std::flush;
+                        }
+                        buffer[rv] ='\0';
                         qxxx[iq]->append(buffer);
                     } else {
                         if( rv != LIBSSH2_ERROR_EAGAIN )
                         {// no need to output this for the EAGAIN case
-                            warn_("libssh2_channel_read returned %1\n", rv);
+//                            warn_("libssh2_channel_read returned %1\n", rv);
                         }
                     }
                 } while( rv > 0 );
 
              // this is due to blocking that would occur otherwise so we loop on this condition
-                if( rv == LIBSSH2_ERROR_EAGAIN )
+                if( rv == LIBSSH2_ERROR_EAGAIN ) {
                     waitsocket(this->sock_, this->session_);
-                else
+                } else {
                     break;
+                }
             }
         }
-        int exitcode = 127;
         while( (rv = libssh2_channel_close(channel)) == LIBSSH2_ERROR_EAGAIN )
             waitsocket(this->sock_, this->session_);
 
-        char *exitsignal=(char *)"none";
+        this->cmd_exit_code_ = 127;
+        this->cmd_exit_signal_ = nullptr;
         if( rv == 0 ) {
-            exitcode = libssh2_channel_get_exit_status( channel );
-            libssh2_channel_get_exit_signal(channel, &exitsignal,NULL, NULL, NULL, NULL, NULL);
+            this->cmd_exit_code_ = libssh2_channel_get_exit_status( channel );
+            libssh2_channel_get_exit_signal(channel, &this->cmd_exit_signal_,NULL, NULL, NULL, NULL, NULL);
+        } else {
+            throw_<RemoteExecutionFailed>("Remote execution failed:\n    cmd: '%1'\n    rv :%2"
+                                         ,command_line, rv );
         }
 
-        if( exitsignal )
-            warn_("Got signal: %1\n", exitsignal);
-        else
-            warn_("EXIT: %1, bytecount[stdout]: %2, bytecount[stderr]: %3"
-                 , exitcode, bytecount[0], bytecount[1]
-                    );
-
         libssh2_channel_free(channel);
-        channel = NULL;
+        channel = nullptr;
 
         if( Session::autoClose ) {
             this->close();
         }
+     }
+ //-----------------------------------------------------------------------------
+    int Session::execute( QString const& cmd )
+    {
+        try {
+            if( Session::verbose )
+                std::cout << "\nRemote execution of \n    command  : '" << cmd.toStdString() << "'" << std::endl;
+
+            this->exec_( cmd, &this->qout_, &this->qerr_ );
+
+            if( Session::verbose || this->cmd_exit_code_ ) {
+                std::cout <<   "    exit code: " << this->cmd_exit_code_   << std::flush;
+                if( this->cmd_exit_signal_ )
+                std::cout << "\n    exit signal: " << this->cmd_exit_signal_ << std::flush;
+                if( !this->qout().isEmpty() ) {
+                    std::cout << "\n    stdout   :"
+                              << "\n----------------\n"
+                              << this->qout().toStdString()
+                              << "\n----------------" << std::flush;
+                }
+                if( !this->qerr().isEmpty() ) {
+                    std::cout << "\n    stderr   :"
+                              << "\n----------------\n"
+                              << this->qerr().toStdString()
+                              << "\n----------------" << std::flush;
+                }
+                std::cout <<'\n';
+            }
+        } catch( std::runtime_error& e ) {
+            std::cerr << e.what() << std::endl;
+        }
+        return this->cmd_exit_code_;
+    }
+ //-----------------------------------------------------------------------------
+#if defined SCP
+    void
+    Session::
+    scp_put_file
+      ( QString const&  q_local_filepath
+      , QString const & q_remote_filepath )
+    {
+        std::string  local_filepath =  q_local_filepath.toStdString();
+        std::string remote_filepath = q_remote_filepath.toStdString();
+        char const*  p_local_filepath =  local_filepath.c_str();
+        char const* p_remote_filepath = remote_filepath.c_str();
+        if( Session::verbose ) {
+            std::cout << "\nFile transfer : local >> remote"
+                      << "\n    local : '" << local_filepath << "'"
+                      << "\n    remote: '" << remote_filepath << "'" << std::endl;
+        }
+
+        if( !this->isOpen() && Session::autoOpen ) {
+            this->open();
+        }
+     // adapted from http://www.libssh2.org/examples/scp_write_nonblock.html
+        struct stat local_fileinfo;
+        FILE *fh_local = fopen(p_local_filepath, "rb");
+        if( !fh_local ) {
+            throw_<FileOpenError>("Cannot open file '%1'.", q_remote_filepath );
+        }
+
+        stat(p_local_filepath, &local_fileinfo);
+
+        LIBSSH2_CHANNEL *channel;
+     // Send a file via scp. The mode parameter must only have permissions!
+        do {
+            channel = libssh2_scp_send( this->session_, p_remote_filepath, local_fileinfo.st_mode & 0777, (unsigned long)local_fileinfo.st_size );
+            if( (!channel) && (libssh2_session_last_errno(this->session_) != LIBSSH2_ERROR_EAGAIN) ) {
+                char *err_msg;
+                libssh2_session_last_error( this->session_, &err_msg, NULL, 0);
+                throw_<std::runtime_error>("p_local_filepath failed.\n    error: %1", err_msg );
+            }
+        } while( !channel );
+
+        if( Session::verbose > 1 ) {
+            fprintf(stderr, "SCP session waiting to send file\n");
+        }
+//        time_t start = time(NULL);
+        size_t nread, prev;
+        char mem[1024*100];
+        char *ptr;
+        long total = 0;
+        int rc;
+//        int duration;
+        do {
+            nread = fread( mem, 1, sizeof(mem), fh_local );
+            if (nread <= 0) {// end of file
+                break;
+            }
+            ptr = mem;
+            total += nread;
+            prev = 0;
+            do {
+                while( (rc = libssh2_channel_write(channel, ptr, nread)) == LIBSSH2_ERROR_EAGAIN ) {
+                    waitsocket(this->sock_, this->session_);
+                    prev = 0;
+                }
+                if (rc < 0) {
+                    fprintf( stderr, "ERROR %d total %ld / %d prev %d\n", rc, total, (int)nread, (int)prev );
+                    break;
+                } else {
+                    prev = nread;
+                 // rc indicates how many bytes were written this time
+                    nread -= rc;
+                    ptr += rc;
+                }
+            } while( nread );
+        } while( !nread ); /* only continue if nread was drained */
+
+//        duration = (int)( time(NULL)-start );
+//        fprintf(stderr, "%ld bytes in %d seconds makes %.1f bytes/sec\n", total, duration, total/(double)duration);
+        if( Session::verbose > 1 ) {
+            fprintf(stderr, "Sending EOF\n");
+        }
+        while (libssh2_channel_send_eof(channel) == LIBSSH2_ERROR_EAGAIN);
+        if( Session::verbose > 1 ) {
+            fprintf(stderr, "Waiting for EOF\n");
+        }
+        while (libssh2_channel_wait_eof(channel) == LIBSSH2_ERROR_EAGAIN);
+        if( Session::verbose > 1 ) {
+            fprintf(stderr, "Waiting for channel to close\n");
+        }
+        while (libssh2_channel_wait_closed(channel) == LIBSSH2_ERROR_EAGAIN);
+
+        libssh2_channel_free(channel);
+        channel = nullptr;
+
+        if( Session::verbose ) {
+            std::cout << "\n    copied: " << (unsigned long)local_fileinfo.st_size << " bytes" << std::endl;
+        }
+    }
+#endif//#ifdef SCP
+ //-----------------------------------------------------------------------------
+    void
+    Session::
+    sftp_put_file
+      ( QString const&  q_local_filepath
+      , QString const& q_remote_filepath )
+    {
+        std::string  local_filepath =  q_local_filepath.toStdString();
+        std::string remote_filepath = q_remote_filepath.toStdString();
+        if( Session::verbose ) {
+            std::cout << "\nFile transfer : local >> remote"
+                      << "\n    local : '" <<  local_filepath << "'"
+                      << "\n    remote: '" << remote_filepath << "'"
+                      << std::endl;
+        }
+
+        if( !this->isOpen() && Session::autoOpen ) {
+            this->open();
+        }
+
+        int rc;
+        LIBSSH2_SFTP *sftp_session;
+        LIBSSH2_SFTP_HANDLE *sftp_handle;
+        FILE *fh_local;
+        char mem[1000];
+        struct timeval timeout;
+        fd_set fd;
+
+        fh_local = fopen( local_filepath.c_str(), "rb");
+        if( !fh_local ) {
+            throw_<FileOpenError>("Cannot open local file for reading: '%1'.", local_filepath.c_str() );
+        }
+
+        do {
+            sftp_session = libssh2_sftp_init(this->session_);
+            if( !sftp_session )
+            {
+                if( libssh2_session_last_errno(this->session_) == LIBSSH2_ERROR_EAGAIN ) {
+                 // fprintf(stderr, "non-blocking init\n");
+                    waitsocket( this->sock_, this->session_); /* now we wait */
+                } else {
+                    throw_<std::runtime_error>("Unable to init SFTP session.");
+                }
+            }
+        } while( !sftp_session );
+
+        do {
+            sftp_handle = libssh2_sftp_open
+                    ( sftp_session, remote_filepath.c_str()
+                    , LIBSSH2_FXF_WRITE | LIBSSH2_FXF_CREAT | LIBSSH2_FXF_TRUNC
+                    , LIBSSH2_SFTP_S_IRUSR | LIBSSH2_SFTP_S_IWUSR | LIBSSH2_SFTP_S_IRGRP | LIBSSH2_SFTP_S_IROTH
+                    );
+            if( !sftp_handle )
+            {
+                if( libssh2_session_last_errno(this->session_) == LIBSSH2_ERROR_EAGAIN ) {
+                 // fprintf(stderr, "non-blocking init\n");
+                    waitsocket( this->sock_, this->session_); /* now we wait */
+                } else {
+                    char *err_msg;
+                    int err = libssh2_session_last_error( this->session_, &err_msg, NULL, 0);
+                    throw_<FileOpenError>("SFTP failed to open file for writing: '%1'.\n(%2): %3."
+                                         , remote_filepath.c_str(), err, err_msg );
+                }
+            }
+        } while( !sftp_handle );
+
+        size_t nread;
+        char *ptr;
+        do {
+            nread = fread(mem, 1, sizeof(mem), fh_local);
+            if(nread <= 0) {// end of file
+                break;
+            }
+            ptr = mem;
+            do {// write data in a loop until we block
+                rc = libssh2_sftp_write( sftp_handle, ptr, nread );
+                ptr += rc;
+                nread -= nread;
+            } while( rc >= 0 );
+
+            if( rc != LIBSSH2_ERROR_EAGAIN ) {// error or end of file
+                break;
+            }
+
+            timeout.tv_sec = 10;
+            timeout.tv_usec = 0;
+
+            FD_ZERO(&fd);
+            FD_SET(this->sock_, &fd);
+
+         // wait for readable or writeable
+            rc = select(this->sock_+1, &fd, &fd, NULL, &timeout);
+            if( rc <= 0 ) {// negative is error, 0 is timeout
+                throw_<std::runtime_error>("SFTP upload timed out: &1", rc );
+            }
+        } while( 1 );
+
+        if( Session::verbose > 1 )
+            fprintf(stderr, "SFTP upload done!\n");
+
+        libssh2_sftp_shutdown(sftp_session);
+
+        if(Session::autoClose) {
+            this->close();
+        }
+    }
+ //-----------------------------------------------------------------------------
+    void
+    Session::
+    sftp_get_file
+      ( QString const&  q_local_filepath
+      , QString const& q_remote_filepath )
+    {
+        std::string  local_filepath =  q_local_filepath.toStdString();
+        std::string remote_filepath = q_remote_filepath.toStdString();
+        if( Session::verbose ) {
+            std::cout << "\nFile transfer : remote >> local"
+                      << "\n    remote: '" << remote_filepath << "'"
+                      << "\n    local : '" <<  local_filepath << "'"
+                      << std::flush;
+        }
+
+        if( !this->isOpen() && Session::autoOpen ) {
+            this->open();
+        }
+
+        int rc;
+        LIBSSH2_SFTP       * sftp_session;
+        LIBSSH2_SFTP_HANDLE* sftp_handle;
+        FILE *fh_local;
+        char mem[1000];
+        struct timeval timeout;
+        fd_set fd;
+
+        fh_local = fopen( local_filepath.c_str(), "wb");
+        if(!fh_local) {
+            throw_<FileOpenError>("Cannot open local file for writing: '%1'.", local_filepath.c_str() );
+        }
+
+        do {
+            sftp_session = libssh2_sftp_init(this->session_);
+            if( !sftp_session )
+            {
+                if( libssh2_session_last_errno(this->session_) == LIBSSH2_ERROR_EAGAIN ) {
+                 // fprintf(stderr, "non-blocking init\n");
+                    waitsocket( this->sock_, this->session_); /* now we wait */
+                } else {
+                    throw_<std::runtime_error>("Unable to init SFTP session.");
+                }
+            }
+        } while( !sftp_session );
+
+     // Request a file via SFTP */
+        do {
+            sftp_handle = libssh2_sftp_open( sftp_session, remote_filepath.c_str(), LIBSSH2_FXF_READ, 0);
+            if (!sftp_handle) {
+                if (libssh2_session_last_errno(this->session_) != LIBSSH2_ERROR_EAGAIN ) {
+                    throw_<FileOpenError>("Unable to open file with SFTP: '%1'", remote_filepath.c_str() );
+                } else
+                {// fprintf(stderr, "non-blocking open\n");
+                    waitsocket( this->sock_, this->session_ ); /* now we wait */
+                }
+            }
+        } while( !sftp_handle);
+
+        if( Session::verbose > 1 ) {
+            fprintf(stderr, "libssh2_sftp_open() is done, now receive data!\n");
+        }
+        do {
+            do
+            {// read in a loop until we block
+                rc = libssh2_sftp_read( sftp_handle, mem, sizeof(mem) );
+//                fprintf(stderr, "libssh2_sftp_read returned %d\n", rc);
+                if( rc > 0 )
+                {// write to stderr
+                 // write(2, mem, rc);
+                 // write to temporary storage area
+                    fwrite( mem, rc, 1, fh_local );
+                }
+            } while( rc > 0 );
+
+            if( rc != LIBSSH2_ERROR_EAGAIN ) {
+                break; // error or end of file
+            }
+
+            timeout.tv_sec = 10;
+            timeout.tv_usec = 0;
+
+            FD_ZERO( &fd );
+            FD_SET( this->sock_, &fd );
+
+         // wait for readable or writeable
+            rc = select( this->sock_+1, &fd, &fd, NULL, &timeout );
+            if( rc <= 0 ) {// negative is error, 0 is timeout
+                throw_<std::runtime_error>("SFTP download timed out: %1", rc );
+            }
+        } while (1);
+
+        libssh2_sftp_close(sftp_handle);
+
+        fclose(fh_local);
+
+        libssh2_sftp_shutdown(sftp_session);
+    }
+ //-----------------------------------------------------------------------------
+    bool
+    Session::
+    sftp_put_dir
+      ( QString const&  local_dirpath
+      , QString const& remote_dirpath
+      , bool recurse
+      , bool must_throw
+      )
+    {
+        QString parent = QString(local_dirpath).append("/");
+        QDir qDirLocal( local_dirpath );
+        if( !qDirLocal.exists() ) {
+            if( must_throw ) {
+                throw_<FileOpenError>("Local directory does not exist: '%1'",local_dirpath);
+            } else {
+                return false;
+            }
+        }
+        QFileInfoList qFileInfoListLocal = qDirLocal.entryInfoList( QStringList() );
+        if( qFileInfoListLocal.isEmpty() ) {
+            if( must_throw ) {
+                throw_<FileOpenError>("Local directory is empty: '%1'",local_dirpath);
+            } else {
+                return false;
+            }
+        }
+
+        QString cmd = QString("mkdir -p ").append(remote_dirpath);
+        this->execute(cmd);
+
+        for ( QFileInfoList::const_iterator iter=qFileInfoListLocal.cbegin()
+            ; iter!=qFileInfoListLocal.cend(); ++iter )
+        {
+            QFileInfo const& qFileInfo = *iter;
+            QString local_iter = qFileInfo.absoluteFilePath();
+            QString remote_iter= QString(remote_dirpath).append("/").append(qFileInfo.fileName());
+
+            if( qFileInfo.isFile() ) {
+                if( !local_iter.startsWith("~") )
+                {// old versions of files are not copied
+                    sftp_put_file( local_iter, remote_iter );
+                }
+            } else if( recurse && qFileInfo.isDir() ) {
+                if( local_iter.startsWith(parent) ) {
+                    this->sftp_put_dir( local_iter, remote_iter, true, false);
+                }
+            }
+        }
+        return true;
+    }
+ //-----------------------------------------------------------------------------
+    bool
+    Session::
+    sftp_get_dir
+      ( QString const&  local_dirpath // = target
+      , QString const& remote_dirpath // = source
+      , bool recurse
+      , bool must_throw
+      )
+    {
+        QDir().mkpath( local_dirpath );
+        QString  local_parent =  local_dirpath;
+        QString remote_parent = remote_dirpath;
+        if( ! local_parent.endsWith('/') )  local_parent.append('/');
+        if( !remote_parent.endsWith('/') ) remote_parent.append('/');
+
+     // get list of remote files:
+        QString cmd = QString("cd ")
+                      .append(remote_dirpath)
+                      .append(" && ls -1F");
+                         // ls -1F : -1 puts every item on a new line,
+                         //          -F adds a trailing / to directories
+        int rc = this->execute(cmd);
+        if( rc ) {
+            if( must_throw ) {
+                throw_<FileOpenError>("Remote directory does not exist: '%1'.",remote_dirpath);
+            } else {
+                return false;
+            }
+        }
+
+        QStringList entries = this->qout().split('\n', QString::SkipEmptyParts );
+        if( entries.isEmpty() ) {
+            if( must_throw ) {
+                throw_<FileOpenError>("Remote directory is empty: '%1'.",remote_dirpath);
+            } else {
+                return false;
+            }
+        }
+
+     // copy all files
+        for ( QStringList::const_iterator iter = entries.cbegin()
+            ; iter!=entries.cend(); ++iter )
+        {
+            QString const& entry = *iter;
+            QString  local_child = QString( local_parent).append(entry);
+            QString remote_child = QString(remote_parent).append(entry);
+            if( entry.endsWith('/') )
+            {// it's a directory
+                if( recurse )
+                    this->sftp_get_dir ( local_child, remote_child, recurse, false );
+            } else {
+                    this->sftp_get_file( local_child, remote_child );
+            }
+        }
+        return true;
     }
  //-----------------------------------------------------------------------------
     void Session::
@@ -419,7 +869,7 @@ namespace ssh2
     std::string scramble( std::string in )
     {
         QString out;
-        for( int i=0; i<in.size(); ++i )
+        for( std::size_t i=0; i<in.size(); ++i )
             out.append('*');
         return out.toStdString();
     }
@@ -427,6 +877,7 @@ namespace ssh2
     void Session::print( std::ostream& ostrm ) const
     {
         ostrm << "\nssh2 Session"
+              << "\n    login node  : "<< this->login_node_
               << "\n    username    : "<< this->username_
               << "\n    private key : "<< this->private_key_
               << "\n    public  key : "<< this->public_key_

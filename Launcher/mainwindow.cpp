@@ -6,9 +6,11 @@
 #include <QFileDialog>
 #include <QInputDialog>
 #include <QTextStream>
+#include <QMessageBox>
 
 #include <warn_.h>
 #include <ssh2tools.h>
+#include <cmath>
 
  //-----------------------------------------------------------------------------
     QString validateEmailAddress( QString const & address )
@@ -36,6 +38,7 @@
     }
  //-----------------------------------------------------------------------------
 
+#include <time.h>       /* time */
 
 
  //-----------------------------------------------------------------------------
@@ -48,6 +51,9 @@
       , previousPage_(0)
     {
         ui->setupUi(this);
+
+        qsrand( time(nullptr) );
+
      // read the cfg::Config object from file
      // (or create an empty one if there is no config file yet)
         QString launcher_cfg( Launcher::homePath("Launcher.cfg") );
@@ -109,13 +115,13 @@
 
         dc::DataConnectorBase::config = &(this->launcher_.config);
         dc::DataConnectorBase::script = &(this->launcher_.script);
-        this->data_.append( dc::newDataConnector( this->ui->wWalltimeUnit , "wWalltimeUnit"  , QString() ) );
+        this->data_.append( dc::newDataConnector( this->ui->wWalltimeUnit , "wWalltimeUnit"  , ""         ) );
         this->data_.append( dc::newDataConnector(                           "walltimeSeconds", "walltime" ) );
-        this->data_.append( dc::newDataConnector( this->ui->wNotifyAddress, "wNotifyAddress" , "-M") );
-        this->data_.append( dc::newDataConnector(                           "notifyWhen"     , "-m") );
-        this->data_.append( dc::newDataConnector( this->ui->wNotifyAbort  , "wNotifyAbort"   , ""  ) );
-        this->data_.append( dc::newDataConnector( this->ui->wNotifyEnd    , "wNotifyEnd"     , ""  ) );
-        this->data_.append( dc::newDataConnector( this->ui->wNotifyBegin  , "wNotifyBegin"   , ""  ) );
+        this->data_.append( dc::newDataConnector( this->ui->wNotifyAddress, "wNotifyAddress" , "-M"       ) );
+        this->data_.append( dc::newDataConnector(                           "notifyWhen"     , "-m"       ) );
+        this->data_.append( dc::newDataConnector( this->ui->wNotifyAbort  , "wNotifyAbort"   , ""         ) );
+        this->data_.append( dc::newDataConnector( this->ui->wNotifyEnd    , "wNotifyEnd"     , ""         ) );
+        this->data_.append( dc::newDataConnector( this->ui->wNotifyBegin  , "wNotifyBegin"   , ""         ) );
 
      // this->ui->wCluster
         this->launcher_.readClusterInfo(); // this throws if there are no clusters/*.info files
@@ -136,22 +142,141 @@
         this->data_.append( dc::newDataConnector( this->ui->wNCores        , "wNCores"        , "n_cores"    ) );
         this->data_.append( dc::newDataConnector( this->ui->wGbPerCore     , "wGbPerCore"     , "Gb_per_core") );
         this->data_.append( dc::newDataConnector( this->ui->wGbTotal       , "wGbTotal"       , "Gb_total"   ) );
-        this->data_.append( dc::newDataConnector( this->ui->wWalltime      , "wWalltime"      , QString() ) );
+        this->data_.append( dc::newDataConnector( this->ui->wWalltime      , "wWalltime"      , ""           ) );
 
-        this->getDataConnector("wCluster")->config_to_widget();
+//        this->getDataConnector("wCluster")->config_to_widget();
         this->storeResetValues_();
 
         this->data_.append( dc::newDataConnector( this->ui->wUsername, "wUsername", "user" ) );
         bool can_authenticate = !this->getConfigItem("wUsername")->value().toString().isEmpty();
         this->ui->wAuthenticate->setEnabled( can_authenticate );
 
+        ci = this->getConfigItem("wRemote");
+        if( !ci->isInitialized() ) {
+            ci->set_choices( QStringList({"$VSC_SCRATCH","$VSC_DATA"}) );
+            ci->set_value("$VSC_SCRATCH");
+        }
+        this->data_.append( dc::newDataConnector( this->ui->wRemote, "wRemote", "") );
+
+        ci = this->getConfigItem("wLocal");
+        if( !ci->isInitialized() ) {
+            this->getConfigItem("wJobname"  )->set_value_and_type("");
+            this->getConfigItem("wSubFolder")->set_value_and_type("");
+            ci                               ->set_value_and_type("");
+        }
+     // verify existence of local file location (if present) and set tooltips
+        QString local_subfolder_jobname = this->local_subfolder_jobname();
+        this->ui->wSubfolder ->setToolTip( this-> local_subfolder() );
+        this->ui->wSubfolder2->setToolTip( this->remote_subfolder() );
+        this->ui->wJobname   ->setToolTip(        local_subfolder_jobname   );
+        this->ui->wJobname2  ->setToolTip( this->remote_subfolder_jobname() );
+
+        this->data_.append( dc::newDataConnector( this->ui->wJobname  , "wJobname"    , "-N" ) );
+        this->data_.append( dc::newDataConnector( this->ui->wSubfolder, "wSubfolder"  , ""   ) );
+        this->data_.append( dc::newDataConnector( this->ui->wLocal    , "wLocal"      , ""   ) );
+        this->data_.append( dc::newDataConnector(                       "localFolder" , "local_folder" ) );
+        this->data_.append( dc::newDataConnector(                       "remoteFolder", "remote_folder") );
+
+        QString qs;
+        qs = this->getConfigItem("wSubfolder")->value().toString();
+        this->ui->wSubfolder ->setText(qs);
+        this->ui->wSubfolder2->setText(qs);
+
+        qs = this->getConfigItem("wJobname")->value().toString();
+        this->ui->wJobname ->setText(qs);
+        this->ui->wJobname2->setText(qs);
+
         this->setIgnoreSignals(false);
 
         this->ui->wAutomaticRequests->setChecked( true );
 
-        this->paletteRedForground_ = new QPalette();
-        this->paletteRedForground_->setColor(QPalette::Text,Qt::red);
+        this->paletteRedForeground_ = new QPalette();
+        this->paletteRedForeground_->setColor(QPalette::Text,Qt::red);
+
+        if( !this->getConfigItem("wJobname")->value().toString().isEmpty() ) {
+            this->lookForJobscript( local_subfolder_jobname );
+        }
+        this->on_wAuthenticate_clicked();
     }
+
+    QString
+    MainWindow::
+    local_subfolder()
+    {
+        cfg::Item* ci = this->getConfigItem("wLocal");
+        QString path = ci->value().toString();
+        if( path.isEmpty() || !QFile::exists(path) ) {
+            if( !path.isEmpty() )
+                this->statusBar()->showMessage( QString("Local file location '%1' was not found").arg(path) );
+            QString empty;
+            ci->set_value(empty);
+            this->getConfigItem("wSubfolder")->set_value(empty);
+            this->getConfigItem("wJobname"  )->set_value(empty);
+            return empty;
+        }
+        ci = this->getConfigItem("wSubfolder");
+        QString s = ci->value().toString();
+        path.append("/").append(s);
+        if( s.isEmpty() || !QFile::exists(path) ) {
+            if( !s.isEmpty() )
+                this->statusBar()->showMessage( QString("Local file location '%1' was not found").arg(path) );
+            QString empty;
+            ci->set_value(empty);
+            this->getConfigItem("wJobname"  )->set_value(empty);
+            return empty;
+        }
+        return path;
+    }
+
+    QString
+    MainWindow::
+    local_subfolder_jobname()
+    {
+        QString path = this->local_subfolder();
+        if( path.isEmpty() ) {
+            return path;
+        }
+        cfg::Item* ci = this->getConfigItem("wJobname");
+        QString s = ci->value().toString();
+        path.append("/").append(s);
+        if( s.isEmpty() || !QFile::exists(path) ) {
+            if( !s.isEmpty() )
+                this->statusBar()->showMessage( QString("Local file location '%1' was not found").arg(path) );
+            QString empty;
+            ci->set_value(empty);
+            return empty;
+        }
+        return path;
+    }
+
+    QString
+    MainWindow::
+    remote_subfolder()
+    {
+        QString path = this->getConfigItem("wRemote")->value().toString();
+        if( this->remote_env_vars_.contains(path) )
+            path = this->remote_env_vars_[path];
+        QString s = this->getConfigItem("wSubfolder")->value().toString();
+        if( s.isEmpty() )
+            return s;
+        path.append("/").append(s);
+        return path;
+    }
+
+    QString
+    MainWindow::
+    remote_subfolder_jobname()
+    {
+        QString path = this->remote_subfolder();
+        if( path.isEmpty() )
+            return path;
+        QString s = this->getConfigItem("wJobname")->value().toString();
+        if( s.isEmpty() )
+            return s;
+        path.append("/").append(s);
+        return path;
+    }
+
  //-----------------------------------------------------------------------------
     void MainWindow::storeResetValues_()
     {
@@ -167,7 +292,7 @@
     MainWindow::~MainWindow()
     {
         for( QList<dc::DataConnectorBase*>::iterator iter = this->data_.begin(); iter!=this->data_.end(); ++iter ) {
-            (*iter)->widget_to_config();
+            (*iter)->value_widget_to_config();
             delete (*iter);
         }
 
@@ -179,6 +304,8 @@
 
         delete ui;
         ssh2::Session::cleanup();
+
+        delete this->paletteRedForeground_;
     }
  //-----------------------------------------------------------------------------
     void MainWindow::setIgnoreSignals( bool ignore )
@@ -259,27 +386,40 @@
     void MainWindow::clusterDependencies_( bool updateWidgets )
     {// act on config items only...
 
-        IgnoreSignals ignoreSignals( this );
-
-        QString cluster = this->getConfigItem("wCluster")->value().toString();
-        ClusterInfo& clusterInfo = *(this->launcher_.clusters.find( cluster ) );
-     // Initialize Config items that depend on the cluster
-        cfg::Item* ci = this->getConfigItem("wNodeset");
-        try {
-            ci->set_choices( clusterInfo.nodesets().keys() );
-        } catch( cfg::InvalidConfigItemValue& e ) {
+        {
+            IgnoreSignals ignoreSignals( this );
+            QString cluster = this->getConfigItem("wCluster")->value().toString();
+            ClusterInfo& clusterInfo = *(this->launcher_.clusters.find( cluster ) );
+         // Initialize Config items that depend on the cluster
+            cfg::Item* ci = this->getConfigItem("wNodeset");
+            ci->set_choices      ( clusterInfo.nodesets().keys() );
             ci->set_default_value( clusterInfo.defaultNodeset() );
             ci->set_value        ( clusterInfo.defaultNodeset() );
+
+            if( updateWidgets ) {
+                this->getDataConnector("wNodeset")->choices_config_to_widget();
+                this->getDataConnector("wNodeset")->  value_config_to_widget();
+            }
+
+            this->nodesetDependencies_     (updateWidgets);
+            this->walltimeUnitDependencies_(updateWidgets);
+
+            this->sshSession_.setLoginNode( clusterInfo.loginNodes()[0] );
         }
-
-        if( updateWidgets ) {
-            this->getDataConnector("wNodeset")->config_to_widget();
+     // try to authenticate to refresh the list available modules
+        this->on_wAuthenticate_clicked();
+    }
+ //-----------------------------------------------------------------------------
+    double round( double x, int decimals )
+    {
+        for( int i=0; i<decimals; ++i ) {
+            x*=10.;
         }
-
-        this->nodesetDependencies_     (updateWidgets);
-        this->walltimeUnitDependencies_(updateWidgets);
-
-        this->sshSession_.setLoginNode( clusterInfo.loginNodes()[0] );
+        x = round(x);
+        for( int i=0; i<decimals; ++i ) {
+            x/=10.;
+        }
+        return x;
     }
  //-----------------------------------------------------------------------------
     void MainWindow::nodesetDependencies_( bool updateWidgets )
@@ -298,7 +438,7 @@
         ci->set_value( range.last() );
 
         this->ui->wGbPerNode->setText( QString().setNum( nodesetInfo.gbPerNodeAvailable(),'g',3) );
-         // This on has no slots connected - no need to ignore signals
+         // This one has no slots connected - no need to ignore signals
          // It is also not connected to an cfg::Item by a DataConnector, hence
          // we do update it even if updateWidgets is false.
 
@@ -309,21 +449,26 @@
 
         ci = this->getConfigItem("wGbPerCore");
         range.clear();
-        range.append( nodesetInfo.gbPerCoreAvailable() );
-        range.append( nodesetInfo.gbPerNodeAvailable() );
+        range.append( round(nodesetInfo.gbPerCoreAvailable(),3) );
+        range.append( round(nodesetInfo.gbPerNodeAvailable(),3) );
         ci->set_choices( range, true );
         ci->set_value( nodesetInfo.gbPerCoreAvailable() );
 
+        double gbTotal  = this->ui->wGbPerNode->text().toDouble();
+               gbTotal *= this->getConfigItem("wNNodes")->value().toInt();
+        this->getConfigItem("wGbTotal")->set_value( QString().setNum( gbTotal, 'g', 3 ) );
+
         if( updateWidgets ) {
             IgnoreSignals ignoreSignals( this );
-            this->getDataConnector("wNNodes"       )->config_to_widget();
-            this->getDataConnector("wNCoresPerNode")->config_to_widget();
-            this->getDataConnector("wNCores"       )->config_to_widget();
-            this->getDataConnector("wGbPerCore"    )->config_to_widget();
-
-            double gbTotal = this->ui->wGbPerNode->text().toDouble();
-            gbTotal *= this->ui->wNNodes->value();
-            this->ui->wGbTotal->setText( QString().setNum( gbTotal,'g',3) );
+            this->getDataConnector("wNNodes"       )->choices_config_to_widget();
+            this->getDataConnector("wNNodes"       )->  value_config_to_widget();
+            this->getDataConnector("wNCoresPerNode")->choices_config_to_widget();
+            this->getDataConnector("wNCoresPerNode")->  value_config_to_widget();
+            this->getDataConnector("wNCores"       )->choices_config_to_widget();
+            this->getDataConnector("wNCores"       )->  value_config_to_widget();
+            this->getDataConnector("wGbPerCore"    )->choices_config_to_widget();
+            this->getDataConnector("wGbPerCore"    )->  value_config_to_widget();
+            this->getDataConnector("wGbTotal"      )->  value_config_to_widget();
         }
     }
   //-----------------------------------------------------------------------------
@@ -379,7 +524,22 @@
 
         if( updateWidgets ) {
             IgnoreSignals ignoreSignals( this );
-            this->getDataConnector("wWalltime")->config_to_widget();
+            this->getDataConnector("wWalltime")->choices_config_to_widget();
+            this->getDataConnector("wWalltime")->  value_config_to_widget();
+        }
+    }
+ //-----------------------------------------------------------------------------
+    void MainWindow::check_script_unsaved_changes()
+    {
+        std::cout << "\nChecking unsaved changes : ";
+        if( this->launcher_.script.has_unsaved_changes() ) {
+            std::cout << "true." << std::endl;
+            this->ui->wSave->setText("*** Save ***");
+            this->ui->wSave->setToolTip("Save the current script locally (there are unsaved changes).");
+        } else {
+            std::cout << "false." << std::endl;
+            this->ui->wSave->setText("Save");
+            this->ui->wSave->setToolTip("Save the current script locally.");
         }
     }
  //-----------------------------------------------------------------------------
@@ -387,6 +547,9 @@
  //-----------------------------------------------------------------------------
  // SLOTS
  //-----------------------------------------------------------------------------
+
+#define IGNORE_SIGNALS_UNTIL_END_OF_SCOPE; IgnoreSignals ignoreSignals(this)
+
 void MainWindow::on_wCluster_currentIndexChanged( QString const& arg1 )
 {
     PRINT1_AND_CHECK_IGNORESIGNAL("void MainWindow::on_wCluster_currentIndexChanged( QString const& arg1 )", arg1.toStdString() )
@@ -405,15 +568,16 @@ void MainWindow::on_wNodeset_currentTextChanged(const QString &arg1)
 
 void MainWindow::updateResourceItems_()
 {
-    IgnoreSignals ignoreSignals(this);
+    IGNORE_SIGNALS_UNTIL_END_OF_SCOPE;;
 
     QStringList itemList({"wNNodes", "wNCoresPerNode", "wNCores", "wGbPerCore", "wGbTotal"});
     for( QStringList::const_iterator iter=itemList.cbegin(); iter!=itemList.cend(); ++iter )
     {
         dc::DataConnectorBase* dataConnector = this->getDataConnector(*iter);
-        dataConnector->config_to_widget();
-        dataConnector->config_to_script();
+        dataConnector->value_config_to_widget();
+        dataConnector->value_config_to_script();
     }
+    this->check_script_unsaved_changes();
 }
 
 void MainWindow::on_wRequestNodes_clicked()
@@ -513,15 +677,35 @@ void MainWindow::on_wPages_currentChanged(int index)
     std::cout << "    previous page: " << this->previousPage_ << std::endl;
     switch (index) {
     case 0:
+        if( this->previousPage_==1 )
+        {// read the script from wScript
+            QString text = this->ui->wScript->toPlainText();
+#ifdef QT_DEBUG
+            std::cout<<text.toStdString()<<std::endl;
+#endif
+            this->launcher_.script.parse( text, false );
+#ifdef QT_DEBUG
+            this->launcher_.script.print(std::cout,1);
+#endif
+        }
         break;
     case 1:
-        if( this->previousPage_==0) {
+        if( this->previousPage_==0)
+        {
             for( QList<dc::DataConnectorBase*>::iterator iter=this->data_.begin(); iter!=this->data_.end(); ++iter )
             {
-                (*iter)->widget_to_config();
-                (*iter)->config_to_script();
+                if( (*iter)->value_widget_to_config() ) {
+                    (*iter)->value_config_to_script();
+                }
             }
-            this->ui->wScript->setText( this->launcher_.script.text() );
+            QString text = this->launcher_.script.text();
+#ifdef QT_DEBUG
+            std::cout<<text.toStdString()<<std::endl;
+#endif
+            this->ui->wScript->setText(text);
+#ifdef QT_DEBUG
+            this->launcher_.script.print(std::cout,1);
+#endif
         }
         break;
     default:
@@ -542,7 +726,7 @@ void MainWindow::on_wWalltimeUnit_currentTextChanged(const QString &arg1)
 {
     PRINT1_AND_CHECK_IGNORESIGNAL("void MainWindow::on_wWalltimeUnit_currentTextChanged(const QString &arg1)", arg1.toStdString() );
 
-    this->getDataConnector("wWalltimeUnit")->widget_to_config();
+    this->getDataConnector("wWalltimeUnit")->value_widget_to_config();
     this->walltimeUnitDependencies_(true);
 }
 
@@ -550,12 +734,12 @@ void MainWindow::on_wWalltime_valueChanged(double arg1)
 {
     PRINT1_AND_CHECK_IGNORESIGNAL("void MainWindow::on_wWalltime_valueChanged(double arg1)", arg1 );
 
-    IgnoreSignals ignoreSignals(this);
+    IGNORE_SIGNALS_UNTIL_END_OF_SCOPE;;
 
     cfg::Item* walltimeSeconds = this->getConfigItem("walltimeSeconds");
     double seconds = arg1*this->walltimeUnitSeconds_;
     walltimeSeconds->set_value( formatWalltimeSeconds( seconds ) );
-    this->getDataConnector("walltimeSeconds")->config_to_script();
+    this->getDataConnector("walltimeSeconds")->value_config_to_script();
     std::cout <<"    walltime set to: " << seconds << "s." << std::endl;
 }
 
@@ -567,18 +751,19 @@ void MainWindow::on_wNotifyAddress_editingFinished()
     QString validated = validateEmailAddress( this->ui->wNotifyAddress->text() );
     if( validated.isEmpty() )
     {// not a valid address
-        IgnoreSignals ignoreSignals(this);
-        this->ui->wNotifyAddress->setPalette(*this->paletteRedForground_);
+        IGNORE_SIGNALS_UNTIL_END_OF_SCOPE;;
+        this->ui->wNotifyAddress->setPalette(*this->paletteRedForeground_);
         this->statusBar()->showMessage("Invalid email address.");
     } else {
         this->ui->wNotifyAddress->setPalette( QApplication::palette(this->ui->wNotifyAddress) );
         this->statusBar()->clearMessage();
         this->getConfigItem("wNotifyAddress")->set_value(validated);
 
-        IgnoreSignals ignoreSignals(this);
+        IGNORE_SIGNALS_UNTIL_END_OF_SCOPE;;
         dc::DataConnectorBase* link = this->getDataConnector("wNotifyAddress");
-        link->config_to_widget();
-        link->config_to_script();
+        if( link->value_config_to_widget() ) {
+            link->value_config_to_script();
+        }
     }
 }
 
@@ -595,7 +780,7 @@ void MainWindow::update_abe_( QChar c, bool checked )
     ci_notifyWhen->set_value( abe );
     std::cout << "    abe set to: '" << abe.toStdString() << "'." << std::endl;
 
-    this->getDataConnector("notifyWhen")->config_to_script();
+    this->getDataConnector("notifyWhen")->value_config_to_script();
 }
 
 void MainWindow::on_wNotifyAbort_toggled(bool checked)
@@ -650,7 +835,7 @@ void MainWindow::on_wUsername_editingFinished()
 
     if( username.isEmpty() )
     {// not a valid username
-        this->ui->wUsername->setPalette(*this->paletteRedForground_);
+        this->ui->wUsername->setPalette(*this->paletteRedForeground_);
         this->statusBar()->showMessage("Invalid username");
      // reset the ssh session
         this->sshSession_.reset();
@@ -690,27 +875,9 @@ void MainWindow::on_wUsername_editingFinished()
     }
 }
 
-bool
-MainWindow::
-isUserAuthenticated_() const
+bool MainWindow::isUserAuthenticated_() const
 {
     return this->ui->wAuthenticate->text() == "authenticated";
-}
-
-void
-MainWindow::
-remoteExecute_( QString const& command_line, QString* qout, QString* qerr )
-{
-    if( !this->isUserAuthenticated_() ) {
-        this->statusBar()->showMessage("You must authenticate first. (Press the authenticae button on the Resources page.) ");
-    }
-//    this->sshSession_.open();
-//    if( !command_line.isEmpty() ) {
-//        this->sshSession_.exec( command_line, qout, qerr );
-//    }
-//    if( close ) {
-//        this->sshSession_.close();
-//    }
 }
 
 void MainWindow::on_wAuthenticate_clicked()
@@ -782,11 +949,26 @@ void MainWindow::on_wAuthenticate_clicked()
             break;
         }
      // success
-        this->ui->wAuthenticate->setText("Authenticated");
+        this->ui->wAuthenticate->setText("authenticated");
         this->ui->wAuthenticate->setEnabled(false);
         this->statusBar()->showMessage("Authentication succeeded.");
         this->getConfigItem("privateKey")->set_value( this->sshSession_.privateKey() );
         this->getConfigItem("publicKey" )->set_value( this->sshSession_. publicKey() );
+
+        this->resolveRemoteFileLocations_();
+
+        QString qs = this->ui->wRemote->currentText();
+        if( this->remote_env_vars_.contains(qs) ) {
+            this->ui->wRemote->setToolTip( this->remote_env_vars_[qs] );
+        }
+        this->sshSession_.execute( QString("module avail -t") );
+        QStringList modules = this->sshSession_.qerr().split("\n");
+        this->ui->wSelectModule->clear();
+        this->ui->wSelectModule->addItems(modules);
+
+        QString modules_cluster = QString("modules_").append(this->getConfigItem("wCluster")->value().toString() );
+        this->getConfigItem(modules_cluster)->set_choices(modules);
+
 #ifdef QT_DEBUG
         this->sshSession_.print();
 #endif
@@ -799,5 +981,313 @@ void MainWindow::on_wAuthenticate_clicked()
         this->getConfigItem("publicKey" )->set_value( QString() );
         this->statusBar()->showMessage( QString("Authentication failed: %1 failed attempts to provide passphrase.").arg(max_attempts) );
     }
+    if( !this->isUserAuthenticated_() ) {
+        QString modules_cluster = QString("modules_").append(this->getConfigItem("wCluster")->value().toString() );
+        QStringList modules = this->getConfigItem(modules_cluster)->choices_as_QStringList();
+        if( modules.isEmpty() ) {
+            this->statusBar()->showMessage("List of modules not available for current cluster ");
+        } else {
+            this->ui->wSelectModule->clear();
+            this->ui->wSelectModule->addItems(modules);
+            this->statusBar()->showMessage("Using List of modules from a previous session. Authenticate to update it.");
+        }
+    }
     this->setIgnoreSignals(false);
+}
+
+void MainWindow::resolveRemoteFileLocations_()
+{
+   for( int i=0; i<this->ui->wRemote->count(); ++i ) {
+       QString qs = this->ui->wRemote->itemText(i);
+       QString cmd = QString("echo ").append( qs );
+       try {
+           this->sshSession_.execute(cmd);
+           this->remote_env_vars_[qs] = this->sshSession_.qout().trimmed();
+       } catch(std::runtime_error &e ) {
+
+       }
+   }
+}
+
+void MainWindow::on_wLocalFileLocationButton_clicked()
+{
+    PRINT0_AND_CHECK_IGNORESIGNAL("void MainWindow::on_wLocalFileLocationButton_clicked()" );
+
+    QString directory = QFileDialog::getExistingDirectory( this, "Select local file location:", this->launcher_.homePath() );
+    if( directory.isEmpty() ) return;
+
+    this->getConfigItem("wLocal")->set_value(directory);
+
+    this->getDataConnector("wLocal")->value_config_to_widget();
+
+    this->getConfigItem   ("wSubfolder")->set_value("");
+    this->getDataConnector("wSubfolder")->value_config_to_widget();
+
+    this->ui->wSubfolder ->setToolTip("");
+    this->ui->wSubfolder2->setToolTip("");
+}
+
+void MainWindow::on_wSubfolderButton_clicked()
+{
+    PRINT0_AND_CHECK_IGNORESIGNAL("void MainWindow::on_wSubfolderButton_clicked()" );
+
+    if( this->ui->wLocal->text().isEmpty() ) {
+        QMessageBox::warning( this, "Warning", "You must select a local file location first.");
+        return;
+    }
+
+    QString parent = this->ui->wLocal->text();
+    QString folder = QFileDialog::getExistingDirectory( this, "Select subfolder:", parent );
+    if( folder.isEmpty() ) {
+        QMessageBox::warning( this, "Warning", "No directory selected.");
+        return;
+    }
+    if( !folder.startsWith(parent) ) {
+        QMessageBox::critical( this, "Error", QString("The selected directory is not inside '%1.").arg(parent) );
+        return;
+    }
+    this->statusBar()->clearMessage();
+    parent.append("/");
+    QString relative = folder;
+            relative.remove(parent);
+
+    this->getConfigItem   ("wSubfolder")->set_value( relative );
+    this->getDataConnector("wSubfolder")->value_config_to_widget(); // also triggers wSubfolder2
+
+    this->ui->wSubfolder ->setToolTip(this-> local_subfolder() );
+    this->ui->wSubfolder2->setToolTip(this->remote_subfolder() );
+    this->ui->wJobname   ->setToolTip("");
+    this->ui->wJobname2  ->setToolTip("");
+
+}
+
+void MainWindow::on_wJobnameButton_clicked()
+{
+    PRINT0_AND_CHECK_IGNORESIGNAL("void MainWindow::on_wJobnameButton_clicked()" );
+
+    if( this->ui->wLocal->text().isEmpty() ) {
+        QMessageBox::warning( this, "Warning", "You must select a local file location first.");
+        return;
+    }
+    if( this->ui->wSubfolder->text().isEmpty() ) {
+        QMessageBox::warning( this, "Warning", "You must select a subfolder first.");
+        return;
+    }
+
+    QString parent = this->local_subfolder();
+    QString selected = QFileDialog::getExistingDirectory( this, "Select subfolder:", parent );
+    if( selected.isEmpty() ) {
+        QMessageBox::warning( this, "Warning", "No directory selected.");
+        return;
+    }
+    if( !selected.startsWith(parent) ) {
+        QMessageBox::critical( this, "Error", QString("The selected directory is not inside '%1.").arg(parent) );
+        return;
+    }
+    this->statusBar()->clearMessage();
+    parent.append("/");
+    QString selected_leaf = selected;
+    selected_leaf.remove(parent);
+    this->getConfigItem   ("wJobname")->set_value(selected_leaf);
+    this->getDataConnector("wJobname")->value_config_to_widget(); // also triggers wJobname2
+
+    this->ui->wJobname ->setToolTip(selected);
+    QString remote_folder = this->remote_subfolder_jobname();
+    this->ui->wJobname2->setToolTip(remote_folder);
+
+    this->getConfigItem( "localFolder")->set_value(selected);
+    this->getConfigItem("remoteFolder")->set_value(remote_folder);
+    this->getDataConnector( "localFolder")->value_config_to_script();
+    this->getDataConnector("remoteFolder")->value_config_to_script();
+
+    this->lookForJobscript( selected );
+}
+
+void MainWindow::lookForJobscript( QString const& job_folder)
+{
+    QString script_file = QString(job_folder).append("/pbs.sh");
+    if( QFile::exists(script_file) ) {
+        QMessageBox::StandardButton answer =
+            QMessageBox::question(this, "Job script found ..."
+                                 , QString("The local job directory '%1' already contains a job script 'pbs.sh'.\nDo you want to load it?")
+                                      .arg( job_folder )
+                                 );
+        if( answer == QMessageBox::Yes ) {
+            this->loadJobscript(script_file);
+            this->statusBar()->showMessage( QString("Job script '%1' loaded.").arg(script_file) );
+        } else {
+            QMessageBox::warning( this, "Warning"
+                                , QString("The job script '%1' was not loaded. It will be overwritten if you save the current job script under this jobname.")
+                                     .arg( script_file )
+                                );
+        }
+    }
+}
+
+bool MainWindow::loadJobscript( QString const& filepath )
+{
+    this->launcher_.script.read(filepath);
+ // the order is important!
+    QStringList first({"wCluster","wNodeset","wNNodes", "wNCoresPerNode"}) ;
+    try
+    {
+        for(QStringList::const_iterator iter = first.cbegin(); iter!=first.cend(); ++iter ) {
+            dc::DataConnectorBase* dataConnector = this->getDataConnector(*iter);
+            if( dataConnector->value_script_to_config() ) {
+                dataConnector->value_config_to_widget();
+            }
+        }
+     // do the same for all other DataConnectors, for which the order does not matter.
+     // the items in first are visited twice, but the second time has no effect.
+        for( QList<dc::DataConnectorBase*>::Iterator iter = this->data_.begin(); iter!=this->data_.end(); ++iter ) {
+            if( (*iter)->value_script_to_config() ) {
+                (*iter)->value_config_to_widget();
+            }
+        }
+     // a few special cases:
+        QString abe = this->getConfigItem("notifyWhen")->value().toString();
+        this->getConfigItem   ("wNotifyAbort")->set_value( abe.contains('a') );
+        this->getConfigItem   ("wNotifyBegin")->set_value( abe.contains('b') );
+        this->getConfigItem   ("wNotifyEnd"  )->set_value( abe.contains('e') );
+        this->getDataConnector("wNotifyAbort")->value_config_to_widget();
+        this->getDataConnector("wNotifyBegin")->value_config_to_widget();
+        this->getDataConnector("wNotifyEnd"  )->value_config_to_widget();
+    }
+    catch( std::runtime_error& e )
+    {
+        std::cerr << QString("ERROR: in 'void MainWindow:: loadJobscript( QString const& filepath /*=%1*/)'\n")
+                        .arg(filepath)
+                        .toStdString()
+                  << e.what()
+                  << std::endl;
+        return false;
+    }
+ // read from file, hence no unsaved changes sofar
+    this->launcher_.script.set_has_unsaved_changes(false);
+    return true;
+}
+
+bool MainWindow::saveJobscript( QString const& filepath )
+{
+    std::cout << "    writing script '" << filepath.toStdString() << "' ... "<< std::flush;
+    try {
+        this->launcher_.script.write( filepath );
+        std::cout << "done."<< std::endl;
+    } catch( pbs::WarnBeforeOverwrite &e ) {
+        QMessageBox::StandardButton answer =
+                QMessageBox::question( this, "Ok to overwrite?"
+                                     , QString("Ok to overwrite existing job script '%1'?\n(a backup will be made).")
+                                          .arg(filepath)
+                                     );
+        if( answer == QMessageBox::Yes )
+        {// make a back up
+            QFile qFile(filepath);
+            QString backup = QString( this->local_subfolder_jobname() ).append("/~pbs.sh.").append( QString().setNum( qrand() ) );
+            qFile.copy(backup);
+         // and save
+            this->launcher_.script.write( filepath, false );
+            std::cout << "done (overwritten, but made backup '"<<backup.toStdString()<<"')."<< std::endl;
+        } else {
+            std::cout << "aborted."<< std::endl;
+            this->statusBar()->showMessage( QString("Job script NOT SAVED: '%1'").arg(filepath) );
+            return false;
+        }
+    }
+    this->statusBar()->showMessage( QString("Job script saved: '%1'").arg(filepath) );
+ // just saved, hence no unsaved changes yet.
+    this->launcher_.script.set_has_unsaved_changes(false);
+    this->check_script_unsaved_changes();
+    return true;
+}
+
+void MainWindow::on_wSubfolder_textChanged(const QString &arg1)
+{
+    PRINT1_AND_CHECK_IGNORESIGNAL("void MainWindow::on_wSubfolder_textChanged(const QString &arg1)", arg1.toStdString() );
+
+    this->ui->wSubfolder2->setText(arg1);
+
+    this->getConfigItem   ("wJobname" )->set_value("");
+    this->getDataConnector("wJobname" )->value_config_to_widget();
+}
+
+void MainWindow::on_wJobname_textChanged(const QString &arg1)
+{
+    PRINT1_AND_CHECK_IGNORESIGNAL("void MainWindow::on_wJobname_textChanged(const QString &arg1)", arg1.toStdString() );
+
+    this->ui->wJobname2->setText(arg1);
+
+    this->getConfigItem("wJobname" )->set_value( arg1 );
+}
+
+
+void MainWindow::on_wRemote_currentIndexChanged(const QString &arg1)
+{
+    PRINT1_AND_CHECK_IGNORESIGNAL("void MainWindow::on_wRemote_currentIndexChanged(const QString &arg1)", arg1.toStdString() );
+
+    this->getConfigItem("wRemote")->set_value(arg1);
+    this->remote_ = arg1;
+    if( this->isUserAuthenticated_() ) {
+        QString qout;
+        QString cmd = QString("echo ").append(this->remote_);
+        this->sshSession_.execute( cmd );
+        std::cout << "\n" << cmd.toStdString()
+                  << "\n''" << this->sshSession_.qout().toStdString() <<"''" <<std::endl;
+    }
+
+    if( !this->remote_env_vars_.contains(arg1) && this->isUserAuthenticated_() ) {
+        this->resolveRemoteFileLocations_();
+    }
+    QString tooltip = arg1;
+    if( this->remote_env_vars_.contains(arg1) ) {
+        tooltip = this->remote_env_vars_[arg1];
+    }
+    this->ui->wRemote    ->setToolTip( tooltip );
+    this->ui->wSubfolder2->setToolTip( this->remote_subfolder() );
+    this->ui->wJobname2  ->setToolTip( this->remote_subfolder_jobname() );
+}
+
+void MainWindow::on_wSave_clicked()
+{
+    PRINT0_AND_CHECK_IGNORESIGNAL("void MainWindow::on_wSave_clicked()");
+
+    QString filepath = QString( this->local_subfolder_jobname() ).append("/pbs.sh");
+    this->saveJobscript( filepath );
+}
+
+void MainWindow::on_wReload_clicked()
+{
+    PRINT0_AND_CHECK_IGNORESIGNAL("void MainWindow::on_wReload_clicked()");
+
+    QString script_file = QString( this->local_subfolder_jobname() ).append("/pbs.sh");
+    QDir qDir(script_file);
+    if( !qDir.exists() ) {
+        this->statusBar()->showMessage("No job script found, hence not loaded.");
+    } else {
+        QMessageBox::StandardButton answer = QMessageBox::question( this, "Reload job script?", "Unsaved changes to the current job script will be lost. Continue?");
+        if( answer==QMessageBox::Yes ) {
+            this->loadJobscript(script_file);
+            this->statusBar()->showMessage("job script reloaded.");
+        }
+    }
+}
+
+void MainWindow::on_wSubmit_clicked()
+{
+    PRINT0_AND_CHECK_IGNORESIGNAL("void MainWindow::on_wSubmit_clicked()");
+
+    QString filepath = QString( this->local_subfolder_jobname() ).append("/pbs.sh");
+    if( this->launcher_.script.has_unsaved_changes() ) {
+        if( !this->saveJobscript(filepath) ) {
+            return;
+        }
+    }
+    if( !this->isUserAuthenticated_() ) {
+        QMessageBox::critical( this, "Error", "You must authenticate first...");
+    }
+    this->sshSession_.sftp_put_dir( this->local_subfolder_jobname(), this->remote_subfolder_jobname(), true );
+
+    QString cmd = QString("cd ")
+                  .append( this->remote_subfolder_jobname() )
+                  .append(" && qsub pbs.sh");
+    this->sshSession_.execute(cmd);
 }

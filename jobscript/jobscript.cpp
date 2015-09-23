@@ -27,14 +27,15 @@ namespace pbs
         this->filepath_ = filepath;
      // create default lines. which store dummy parameters
         this->add( Shebang::default_value );
-        this->add( QString("#LAU generated_on = %1") .arg( toolbox::now() ) );
-        this->add( QString("#LAU         user = %1") .arg( cfg_get_str(config,"wUsername" ,"unknown") ) );
-        this->add( QString("#LAU      cluster = %1") .arg( cfg_get_str(config,"wCluster"  ,"unknown") ) );
-        this->add( QString("#LAU      nodeset = %1") .arg( cfg_get_str(config,"wNodeset"  ,"unknown") ) );
-        this->add( QString("#LAU      n_cores = %1") .arg( cfg_get_str(config,"wNCores"   ,"unknown") ) );
-        this->add( QString("#LAU  Gb_per_core = %1") .arg( cfg_get_str(config,"wGbPerCore","unknown") ) );
-        this->add( QString("#LAU     Gb_total = %1") .arg( cfg_get_str(config,"wGbTotal"  ,"unknown") ) );
-
+        this->add( QString("#LAU  generated_on = %1").arg( toolbox::now() ) );
+        this->add( QString("#LAU          user = %1").arg( cfg_get_str(config,"wUsername"   ,"unknown") ) );
+        this->add( QString("#LAU       cluster = %1").arg( cfg_get_str(config,"wCluster"    ,"unknown") ) );
+        this->add( QString("#LAU       nodeset = %1").arg( cfg_get_str(config,"wNodeset"    ,"unknown") ) );
+        this->add( QString("#LAU       n_cores = %1").arg( cfg_get_str(config,"wNCores"     ,"unknown") ) );
+        this->add( QString("#LAU   Gb_per_core = %1").arg( cfg_get_str(config,"wGbPerCore"  ,"unknown") ) );
+        this->add( QString("#LAU      Gb_total = %1").arg( cfg_get_str(config,"wGbTotal"    ,"unknown") ) );
+        this->add( QString("#LAU  local_folder = %1").arg( cfg_get_str(config,"localFolder" ,"unknown") ) );
+        this->add( QString("#LAU remote_folder = %1").arg( cfg_get_str(config,"remoteFolder","unknown") ) );
 
         this->add( QString("#PBS -l nodes=%1:ppn=%2").arg(cfg_get_str(config,"wNNodes"       ,1) )
                                                      .arg(cfg_get_str(config,"wNCoresPerNode",1) ) );
@@ -55,7 +56,8 @@ namespace pbs
         this->set_is_modified();
 //        this->_unsaved_changes = True:
      // parse file, then lines
-        this->read(filepath);
+        if( !filepath.isEmpty() )
+            this->read(filepath);
         this->parse(text);
     }
  //-----------------------------------------------------------------------------
@@ -122,7 +124,6 @@ namespace pbs
             if( !line->hidden() ) {
                 script_text.append( line_text );
             }
-            std::cout<<"\n%%%%\n"<<this->text_.toStdString()<<std::endl;
         }
         this->text_ = script_text;
     }
@@ -132,23 +133,19 @@ namespace pbs
     read( QString const& filepath, bool additive)
     {
         if( filepath.isEmpty() )
-            return;
+            throw_<InexistingFile>("Empty filename. \n    in 'void Script::read()'");
         QFile file(filepath);
         if( !file.open(QIODevice::ReadOnly | QIODevice::Text) )
-            return;
+            throw_<InexistingFile>("File not found.\n    filepath: '%1'\n    in 'void Script::read()'.", filepath );
         this->filepath_ = filepath;
         QTextStream in(&file);
         QString text = in.readAll();
         this->parse( text );
     }
  //-----------------------------------------------------------------------------
-    struct WarnBeforeOverwrite: public std::runtime_error {
-        WarnBeforeOverwrite( const char * what ) : std::runtime_error(what) {}
-    };
- //-----------------------------------------------------------------------------
     void
     Script::
-    write( QString const& filepath, bool warn_before_overwrite, bool create_directories) const
+    write( QString const& filepath, bool warn_before_overwrite) const
     {
         QString new_filepath( filepath.isEmpty() ? this->filepath_ : filepath );
         if( new_filepath.isEmpty() )
@@ -156,22 +153,20 @@ namespace pbs
         QFileInfo fileinfo( new_filepath );
         fileinfo.makeAbsolute();
         QDir dir( fileinfo.absolutePath() );
-        if( create_directories ) {
-            dir.mkpath("");
-        } else {
-            if( !dir.exists() ) {
-                throw_<std::runtime_error>("Script::write() : inexisting folder: '%1'",fileinfo.filePath() );
-            }
+        if( !dir.exists() ) {
+            throw_<std::runtime_error>("Script::write() : inexisting folder: '%1'",fileinfo.filePath() );
         }
         if( fileinfo.exists() && warn_before_overwrite ) {
             throw_<WarnBeforeOverwrite>("Warn before overwrite: '%1'",fileinfo.filePath() );
         }
+        Script* non_const_this = const_cast<Script*>(this);
+        (*non_const_this)["generated_on"] = toolbox::now();
         QFile f(fileinfo.filePath());
         f.open(QIODevice::Truncate|QIODevice::Text|QIODevice::WriteOnly);
         QTextStream out(&f);
         QString const& txt = this->text();
         out << txt;
-        const_cast<Script*>(this)->filepath_ = new_filepath;
+        non_const_this->filepath_ = new_filepath;
       //self.set_unsaved_changes(False)
     }
  //-----------------------------------------------------------------------------
@@ -198,6 +193,8 @@ namespace pbs
                     this->remove_(i);
 //                    std::cout<<"/tdeleted"<<std::endl;
                     break;
+                default:
+                    break;
                 }
             }
         } else
@@ -205,12 +202,13 @@ namespace pbs
          // All UserComment and ShellCommands are appended at the end, in the
          // order presented, thus allowing several occurrences of the same line.
         }
-        std::for_each( lines.cbegin(), lines.cend(),
-            [&] ( QString const& line )
-            {   if( !line.isEmpty() )
-                    this->add(line);
-            }
-        );
+        for ( QStringList::const_iterator iter = lines.cbegin()
+            ; iter != lines.cend(); ++iter )
+        {
+            QString const& line = *iter;
+            if( !line.isEmpty() )
+                this->add(line);
+        }
     }
  //-----------------------------------------------------------------------------
     int Script::index( QString const& line ) const
@@ -383,7 +381,27 @@ namespace pbs
             }
         }
         throw_<std::range_error>("Key '%1' was not found in script.",key);
+        return nullptr; //keep compiler happy
     }
-
+ //-----------------------------------------------------------------------------
+    void Script::print( std::ostream& to, int verbose, bool refresh )
+    {
+        this->Text::print(to,verbose,refresh);
+        if( verbose ) {
+            to << "\nJobSript::print"
+               << "\n->filepath_  [[" << this->filepath_.toStdString() << "]]"
+               << "\n->lines_  #  [[" << this->lines_.size()           << "]]"
+               << std::flush
+               ;
+            int il=0;
+            for ( ScriptLines_t::const_iterator iter=this->lines_.cbegin()
+                ; iter != this->lines_.cend(); ++iter )
+            {
+                to << "\n#[" << il << "]";
+                (*iter)->print(to,verbose,refresh);
+                ++il;
+            }
+        }
+    }
  //-----------------------------------------------------------------------------
 }// namespace pbs

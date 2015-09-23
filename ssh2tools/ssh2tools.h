@@ -46,31 +46,76 @@ namespace ssh2
 
         void authenticate() { this->open(); }
         void open();
-         // tries to open a ssh session with the current username, private/public
-         // key pair and passprhase. If unsuccessfull throws
-         //   . MissingUsername
-         //   . MissingKey
-         //   . PassphraseNeeded
-         //   . WrongPassphrase
-         //   . std::runtime_error
-         // If successfull, the session is left open if Session::autoClose is false,
-         // and the session is ready to execute commands. If Session::autoClose is
-         // true the session is closed.
-
+         /* tries to open a ssh session with the current username, private/public
+          * key pair and passprhase. If unsuccessfull throws
+          *   . MissingUsername
+          *   . MissingKey
+          *   . PassphraseNeeded
+          *   . WrongPassphrase
+          *   . std::runtime_error
+          * If successfull, the session is left open if Session::autoClose is false,
+          * and the session is ready to execute commands. If Session::autoClose is
+          * true the session is closed.
+          */
         bool isOpen() const;
-         // returns true if the session was successfully opened, and is ready to
-         // execute commands (exec())
-
-        void exec( QString const& command_line
-                 , QString* qout=nullptr
-                 , QString* qerr=nullptr
-                 );
+         /* returns true if the session was successfully opened, and is ready to
+          * execute commands (exec())
+          */
         void close( bool keep_libssh_init=true );
-        void reset(); // close and clear authentication members
+        void reset();
+         // close and clear authentication members
+
         static bool autoOpen;
         static bool autoClose;
+        static int  verbose;
+
         static void cleanup();
         void print( std::ostream& ostrm = std::cout ) const;
+
+        int execute( QString const& cmd );
+         /* Remotely execute the command cmd.
+          * Output (stdout and stderr) is copied to the QString s returned
+          * by qout() and qerr().
+          * Throws if sth went wrong, also if the command returned a nonzero
+          * exit code
+          */
+        QString const& qout() const {
+            return this->qout_;
+        }
+        QString const& qerr() const {
+            return this->qerr_;
+        }
+//#define SCP
+#ifdef SCP
+        void scp_put_file( QString const& local_filepath, QString const& remote_filepath );
+         /* scp file transfer of a single file, local >> remote.
+          */
+#endif
+        void sftp_put_file( QString const&  local_filepath
+                          , QString const& remote_filepath );
+        void sftp_get_file( QString const&  local_filepath
+                          , QString const& remote_filepath );
+         /* sftp file transfer of a single file,
+          *  - put implies local >> remote
+          *  - get implies remote >> local
+          */
+
+        bool sftp_put_dir( QString const&  local_filepath
+                         , QString const& remote_filepath
+                         , bool           recurse    = true
+                         , bool           must_throw = true
+                         );
+        bool sftp_get_dir( QString const&  local_filepath
+                         , QString const& remote_filepath
+                         , bool           recurse    = true
+                         , bool           must_throw = true
+                         );
+         /* sftp file transfer of a complete directory and all files contained in it,
+          *  - put implies local >> remote
+          *  - get implies remote >> local
+          * if recurse is true the function is applied recursively to all subdirectories of the
+          * source directory.
+          */
 
     private:
         int sock_;
@@ -82,19 +127,26 @@ namespace ssh2
                   , private_key_
                   , public_key_
                   ;
+     // set by Session::execute()
+        QString qout_, qerr_;
+     // set by Session::exec_
+        int   cmd_exit_code_;
+        char* cmd_exit_signal_;
+        int bytecount_[2];
+    private:
+        void exec_( QString const& command_line
+                  , QString* qout=nullptr
+                  , QString* qerr=nullptr
+                  );
     };
  //=============================================================================
-
-#define SUBCLASS_EXCEPTION(DERIVED,BASE)                \
-    struct DERIVED : public BASE {                      \
-        DERIVED( char const* what ) : BASE( what ) {}   \
-    };
-
- //=============================================================================
-    SUBCLASS_EXCEPTION( MissingUsername , std::runtime_error )
-    SUBCLASS_EXCEPTION( MissingKey      , std::runtime_error )
-    SUBCLASS_EXCEPTION( PassphraseNeeded, std::runtime_error )
-    SUBCLASS_EXCEPTION( WrongPassphrase , std::runtime_error )
+    SUBCLASS_EXCEPTION( MissingLoginNode     , std::runtime_error )
+    SUBCLASS_EXCEPTION( MissingUsername      , std::runtime_error )
+    SUBCLASS_EXCEPTION( MissingKey           , std::runtime_error )
+    SUBCLASS_EXCEPTION( PassphraseNeeded     , std::runtime_error )
+    SUBCLASS_EXCEPTION( WrongPassphrase      , std::runtime_error )
+    SUBCLASS_EXCEPTION( RemoteExecutionFailed, std::runtime_error )
+    SUBCLASS_EXCEPTION( FileOpenError        , std::runtime_error )
  //=============================================================================
 }// namespace ssh2
 

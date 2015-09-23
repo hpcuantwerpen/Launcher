@@ -40,7 +40,7 @@ namespace pbs
         void read ( QString const& filepath,  bool additive=false );
         void write( QString const& filepath    = QString()
                   , bool warn_before_overwrite = true
-                  , bool create_directories    = false ) const;
+                  ) const;
 
         void parse( QString const& text, bool additive=false );
         void add  ( QString const& line,bool hidden=false, bool parsing_=false );
@@ -62,12 +62,17 @@ namespace pbs
         ShellCommand* find_key( QString const& key );
          // find the script line associated with key
 
+        virtual void print( std::ostream& to=std::cout, int verbose=0, bool refresh=false);
+
     private:
         ScriptLines_t lines_;
         QString filepath_;
         void insert_(ShellCommand* sc);
         void remove_( int i );
     };
+ //=============================================================================
+    SUBCLASS_EXCEPTION( WarnBeforeOverwrite, std::runtime_error );
+    SUBCLASS_EXCEPTION( InexistingFile     , std::runtime_error );
  //=============================================================================
 }// namespace pbs
 

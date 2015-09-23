@@ -31,15 +31,15 @@ namespace pbs
       : ShellCommand(line,ordinate,type)
     {}
  //-----------------------------------------------------------------------------
-    void
-    UserComment::
-    compose()
-    {
-        if( this->hidden_ ) {
-            return;
-        }
-        this->text_ += this->body_;
-        Text::staticCompose(this);
-    }
+//    void
+//    UserComment::
+//    compose()
+//    {
+//        if( this->hidden_ ) {
+//            return;
+//        }
+//        this->text_ = this->body_;
+//        Text::staticCompose(this);
+//    }
  //-----------------------------------------------------------------------------
 }//namespace pbs

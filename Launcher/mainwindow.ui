@@ -2,8 +2,16 @@
 <ui version="4.0">
  <class>MainWindow</class>
  <widget class="QMainWindow" name="MainWindow">
+  <property name="geometry">
+   <rect>
+    <x>0</x>
+    <y>0</y>
+    <width>920</width>
+    <height>573</height>
+   </rect>
+  </property>
   <property name="sizePolicy">
-   <sizepolicy hsizetype="Expanding" vsizetype="Preferred">
+   <sizepolicy hsizetype="Preferred" vsizetype="Preferred">
     <horstretch>0</horstretch>
     <verstretch>0</verstretch>
    </sizepolicy>
@@ -28,7 +36,7 @@
        <property name="sizePolicy">
         <sizepolicy hsizetype="MinimumExpanding" vsizetype="MinimumExpanding">
          <horstretch>1</horstretch>
-         <verstretch>1</verstretch>
+         <verstretch>0</verstretch>
         </sizepolicy>
        </property>
        <attribute name="title">
@@ -91,7 +99,7 @@
             <property name="title">
              <string>Request nodes and cores per node</string>
             </property>
-            <layout class="QVBoxLayout" name="verticalLayout_5">
+            <layout class="QHBoxLayout" name="horizontalLayout_10">
              <property name="leftMargin">
               <number>0</number>
              </property>
@@ -114,6 +122,12 @@
                  <property name="enabled">
                   <bool>false</bool>
                  </property>
+                 <property name="sizePolicy">
+                  <sizepolicy hsizetype="Preferred" vsizetype="Fixed">
+                   <horstretch>0</horstretch>
+                   <verstretch>0</verstretch>
+                  </sizepolicy>
+                 </property>
                  <property name="text">
                   <string>GB per node:</string>
                  </property>
@@ -124,6 +138,12 @@
                </item>
                <item row="0" column="0">
                 <widget class="QLabel" name="numberOfNodesLabel">
+                 <property name="sizePolicy">
+                  <sizepolicy hsizetype="Preferred" vsizetype="Fixed">
+                   <horstretch>0</horstretch>
+                   <verstretch>0</verstretch>
+                  </sizepolicy>
+                 </property>
                  <property name="text">
                   <string>Number of nodes:</string>
                  </property>
@@ -134,6 +154,12 @@
                </item>
                <item row="1" column="0">
                 <widget class="QLabel" name="numberOfCoresPerNodeLabel">
+                 <property name="sizePolicy">
+                  <sizepolicy hsizetype="Preferred" vsizetype="Fixed">
+                   <horstretch>0</horstretch>
+                   <verstretch>0</verstretch>
+                  </sizepolicy>
+                 </property>
                  <property name="text">
                   <string>Number of cores per node:</string>
                  </property>
@@ -196,29 +222,41 @@
               <number>0</number>
              </property>
              <item>
-              <layout class="QGridLayout" name="gridLayout_2">
+              <layout class="QGridLayout" name="gridLayout_2" rowstretch="0,0,0,0,0,0,0">
                <property name="verticalSpacing">
                 <number>0</number>
                </property>
-               <item row="6" column="1">
-                <widget class="QPushButton" name="wRequestCores">
+               <item row="4" column="0">
+                <widget class="QRadioButton" name="wGbPerCoreLabel">
+                 <property name="toolTip">
+                  <string>&lt;html&gt;&lt;head/&gt;&lt;body&gt;&lt;p&gt;If this radio button is checked, Launcher will try to find a configuration with 1) &lt;span style=&quot; font-weight:600;&quot;&gt;at least &lt;/span&gt;the specified number of cores, 2) an equal number of cores per node on every node,  and 3) at least the specified amount or memory per core. Such a configuration may not necessarily exist. In that case the request is undone. &lt;/p&gt;&lt;/body&gt;&lt;/html&gt;</string>
+                 </property>
                  <property name="text">
-                  <string>make request</string>
+                  <string>GB per core</string>
+                 </property>
+                </widget>
+               </item>
+               <item row="5" column="0">
+                <widget class="QLabel" name="gbTotalLabel">
+                 <property name="enabled">
+                  <bool>false</bool>
+                 </property>
+                 <property name="sizePolicy">
+                  <sizepolicy hsizetype="Preferred" vsizetype="Fixed">
+                   <horstretch>0</horstretch>
+                   <verstretch>0</verstretch>
+                  </sizepolicy>
+                 </property>
+                 <property name="text">
+                  <string>GB in total:</string>
+                 </property>
+                 <property name="alignment">
+                  <set>Qt::AlignRight|Qt::AlignTrailing|Qt::AlignVCenter</set>
                  </property>
                 </widget>
                </item>
                <item row="2" column="1">
                 <widget class="QSpinBox" name="wNCores"/>
-               </item>
-               <item row="6" column="0">
-                <widget class="QCheckBox" name="wAutomaticRequests">
-                 <property name="text">
-                  <string>Automatic requests</string>
-                 </property>
-                 <property name="checked">
-                  <bool>false</bool>
-                 </property>
-                </widget>
                </item>
                <item row="4" column="1">
                 <widget class="QDoubleSpinBox" name="wGbPerCore">
@@ -227,26 +265,6 @@
                  </property>
                  <property name="singleStep">
                   <double>0.100000000000000</double>
-                 </property>
-                </widget>
-               </item>
-               <item row="5" column="1">
-                <widget class="QLineEdit" name="wGbTotal">
-                 <property name="enabled">
-                  <bool>false</bool>
-                 </property>
-                </widget>
-               </item>
-               <item row="5" column="0">
-                <widget class="QLabel" name="gBPerNodeLabel_2">
-                 <property name="enabled">
-                  <bool>false</bool>
-                 </property>
-                 <property name="text">
-                  <string>GB in total:</string>
-                 </property>
-                 <property name="alignment">
-                  <set>Qt::AlignRight|Qt::AlignTrailing|Qt::AlignVCenter</set>
                  </property>
                 </widget>
                </item>
@@ -267,13 +285,27 @@ p, li { white-space: pre-wrap; }
                  </property>
                 </widget>
                </item>
-               <item row="4" column="0">
-                <widget class="QRadioButton" name="wGbPerCoreLabel">
-                 <property name="toolTip">
-                  <string>&lt;html&gt;&lt;head/&gt;&lt;body&gt;&lt;p&gt;If this radio button is checked, Launcher will try to find a configuration with 1) &lt;span style=&quot; font-weight:600;&quot;&gt;at least &lt;/span&gt;the specified number of cores, 2) an equal number of cores per node on every node,  and 3) at least the specified amount or memory per core. Such a configuration may not necessarily exist. In that case the request is undone. &lt;/p&gt;&lt;/body&gt;&lt;/html&gt;</string>
+               <item row="5" column="1">
+                <widget class="QLineEdit" name="wGbTotal">
+                 <property name="enabled">
+                  <bool>false</bool>
                  </property>
+                </widget>
+               </item>
+               <item row="6" column="1">
+                <widget class="QPushButton" name="wRequestCores">
                  <property name="text">
-                  <string>GB per core</string>
+                  <string>make request</string>
+                 </property>
+                </widget>
+               </item>
+               <item row="6" column="0">
+                <widget class="QCheckBox" name="wAutomaticRequests">
+                 <property name="text">
+                  <string>Automatic requests</string>
+                 </property>
+                 <property name="checked">
+                  <bool>false</bool>
                  </property>
                 </widget>
                </item>
@@ -285,14 +317,14 @@ p, li { white-space: pre-wrap; }
          </layout>
         </item>
         <item>
-         <layout class="QHBoxLayout" name="horizontalLayout_3">
+         <layout class="QHBoxLayout" name="horizontalLayout_3" stretch="1,0">
           <property name="spacing">
-           <number>-1</number>
+           <number>0</number>
           </property>
           <property name="sizeConstraint">
            <enum>QLayout::SetDefaultConstraint</enum>
           </property>
-          <item>
+          <item alignment="Qt::AlignTop">
            <widget class="QGroupBox" name="wWalltimeGroup">
             <property name="sizePolicy">
              <sizepolicy hsizetype="Preferred" vsizetype="Preferred">
@@ -321,6 +353,12 @@ p, li { white-space: pre-wrap; }
              </property>
              <item>
               <widget class="QDoubleSpinBox" name="wWalltime">
+               <property name="sizePolicy">
+                <sizepolicy hsizetype="Minimum" vsizetype="Fixed">
+                 <horstretch>0</horstretch>
+                 <verstretch>0</verstretch>
+                </sizepolicy>
+               </property>
                <property name="decimals">
                 <number>3</number>
                </property>
@@ -335,16 +373,22 @@ p, li { white-space: pre-wrap; }
           <item>
            <widget class="QGroupBox" name="wNotifyGroup">
             <property name="sizePolicy">
-             <sizepolicy hsizetype="Preferred" vsizetype="Preferred">
+             <sizepolicy hsizetype="Preferred" vsizetype="Fixed">
               <horstretch>3</horstretch>
-              <verstretch>1</verstretch>
+              <verstretch>0</verstretch>
              </sizepolicy>
+            </property>
+            <property name="maximumSize">
+             <size>
+              <width>16777215</width>
+              <height>16777215</height>
+             </size>
             </property>
             <property name="title">
              <string>Notify</string>
             </property>
             <property name="alignment">
-             <set>Qt::AlignLeading|Qt::AlignLeft|Qt::AlignVCenter</set>
+             <set>Qt::AlignLeading|Qt::AlignLeft|Qt::AlignTop</set>
             </property>
             <property name="flat">
              <bool>false</bool>
@@ -373,10 +417,13 @@ p, li { white-space: pre-wrap; }
                <property name="spacing">
                 <number>-1</number>
                </property>
+               <property name="sizeConstraint">
+                <enum>QLayout::SetDefaultConstraint</enum>
+               </property>
                <item>
                 <widget class="QCheckBox" name="wNotifyAbort">
                  <property name="sizePolicy">
-                  <sizepolicy hsizetype="Preferred" vsizetype="Preferred">
+                  <sizepolicy hsizetype="Preferred" vsizetype="Fixed">
                    <horstretch>0</horstretch>
                    <verstretch>0</verstretch>
                   </sizepolicy>
@@ -392,7 +439,7 @@ p, li { white-space: pre-wrap; }
                <item>
                 <widget class="QCheckBox" name="wNotifyBegin">
                  <property name="sizePolicy">
-                  <sizepolicy hsizetype="Preferred" vsizetype="Preferred">
+                  <sizepolicy hsizetype="Preferred" vsizetype="Fixed">
                    <horstretch>0</horstretch>
                    <verstretch>0</verstretch>
                   </sizepolicy>
@@ -405,7 +452,7 @@ p, li { white-space: pre-wrap; }
                <item>
                 <widget class="QCheckBox" name="wNotifyEnd">
                  <property name="sizePolicy">
-                  <sizepolicy hsizetype="Preferred" vsizetype="Preferred">
+                  <sizepolicy hsizetype="Preferred" vsizetype="Fixed">
                    <horstretch>0</horstretch>
                    <verstretch>0</verstretch>
                   </sizepolicy>
@@ -536,7 +583,11 @@ p, li { white-space: pre-wrap; }
                   </widget>
                  </item>
                  <item>
-                  <widget class="QLineEdit" name="wLocal"/>
+                  <widget class="QLineEdit" name="wLocal">
+                   <property name="alignment">
+                    <set>Qt::AlignCenter</set>
+                   </property>
+                  </widget>
                  </item>
                  <item>
                   <widget class="QComboBox" name="wRemote"/>
@@ -559,10 +610,24 @@ p, li { white-space: pre-wrap; }
                   </widget>
                  </item>
                  <item>
-                  <widget class="QLineEdit" name="wSubfolder"/>
+                  <widget class="QLineEdit" name="wSubfolder">
+                   <property name="enabled">
+                    <bool>false</bool>
+                   </property>
+                   <property name="alignment">
+                    <set>Qt::AlignCenter</set>
+                   </property>
+                  </widget>
                  </item>
                  <item>
-                  <widget class="QLineEdit" name="wSubfolder2"/>
+                  <widget class="QLineEdit" name="wSubfolder2">
+                   <property name="enabled">
+                    <bool>false</bool>
+                   </property>
+                   <property name="alignment">
+                    <set>Qt::AlignCenter</set>
+                   </property>
+                  </widget>
                  </item>
                 </layout>
                </widget>
@@ -582,10 +647,24 @@ p, li { white-space: pre-wrap; }
                   </widget>
                  </item>
                  <item>
-                  <widget class="QLineEdit" name="wJobname"/>
+                  <widget class="QLineEdit" name="wJobname">
+                   <property name="enabled">
+                    <bool>false</bool>
+                   </property>
+                   <property name="alignment">
+                    <set>Qt::AlignCenter</set>
+                   </property>
+                  </widget>
                  </item>
                  <item>
-                  <widget class="QLineEdit" name="wJobname2"/>
+                  <widget class="QLineEdit" name="wJobname2">
+                   <property name="enabled">
+                    <bool>false</bool>
+                   </property>
+                   <property name="alignment">
+                    <set>Qt::AlignCenter</set>
+                   </property>
+                  </widget>
                  </item>
                 </layout>
                </widget>
@@ -604,8 +683,11 @@ p, li { white-space: pre-wrap; }
              </item>
              <item>
               <widget class="QPushButton" name="wSave">
+               <property name="toolTip">
+                <string>Save the current script locally</string>
+               </property>
                <property name="text">
-                <string>Save (to desktop)</string>
+                <string>Save</string>
                </property>
               </widget>
              </item>
@@ -629,19 +711,32 @@ p, li { white-space: pre-wrap; }
        </attribute>
        <layout class="QVBoxLayout" name="verticalLayout_14">
         <item>
-         <widget class="QTextEdit" name="wScript"/>
+         <widget class="QTextEdit" name="wScript">
+          <property name="sizePolicy">
+           <sizepolicy hsizetype="Preferred" vsizetype="Preferred">
+            <horstretch>0</horstretch>
+            <verstretch>0</verstretch>
+           </sizepolicy>
+          </property>
+         </widget>
         </item>
         <item>
          <layout class="QHBoxLayout" name="horizontalLayout_9">
           <item>
            <widget class="QLabel" name="label_5">
+            <property name="sizePolicy">
+             <sizepolicy hsizetype="Preferred" vsizetype="Fixed">
+              <horstretch>0</horstretch>
+              <verstretch>0</verstretch>
+             </sizepolicy>
+            </property>
             <property name="text">
              <string>Select module:</string>
             </property>
            </widget>
           </item>
           <item>
-           <widget class="QComboBox" name="comboBox_2">
+           <widget class="QComboBox" name="wSelectModule">
             <property name="sizePolicy">
              <sizepolicy hsizetype="Expanding" vsizetype="Fixed">
               <horstretch>0</horstretch>
@@ -667,10 +762,23 @@ p, li { white-space: pre-wrap; }
          </widget>
         </item>
         <item>
-         <widget class="QTextEdit" name="wJobsSubmitted"/>
+         <widget class="QTextEdit" name="wJobsSubmitted">
+          <property name="sizePolicy">
+           <sizepolicy hsizetype="Preferred" vsizetype="Preferred">
+            <horstretch>0</horstretch>
+            <verstretch>0</verstretch>
+           </sizepolicy>
+          </property>
+         </widget>
         </item>
         <item>
          <widget class="QLabel" name="label_JobsRetrieved">
+          <property name="sizePolicy">
+           <sizepolicy hsizetype="Preferred" vsizetype="Fixed">
+            <horstretch>0</horstretch>
+            <verstretch>0</verstretch>
+           </sizepolicy>
+          </property>
           <property name="text">
            <string>Jobs retrieved during this Launcher session:</string>
           </property>
@@ -680,7 +788,14 @@ p, li { white-space: pre-wrap; }
          </widget>
         </item>
         <item>
-         <widget class="QTextEdit" name="wJobsRetrieved"/>
+         <widget class="QTextEdit" name="wJobsRetrieved">
+          <property name="sizePolicy">
+           <sizepolicy hsizetype="Preferred" vsizetype="Preferred">
+            <horstretch>0</horstretch>
+            <verstretch>0</verstretch>
+           </sizepolicy>
+          </property>
+         </widget>
         </item>
         <item>
          <layout class="QGridLayout" name="gridLayout_3">
@@ -749,7 +864,7 @@ p, li { white-space: pre-wrap; }
     <rect>
      <x>0</x>
      <y>0</y>
-     <width>690</width>
+     <width>920</width>
      <height>22</height>
     </rect>
    </property>
@@ -761,6 +876,12 @@ p, li { white-space: pre-wrap; }
    <addaction name="menuLauncher"/>
   </widget>
   <widget class="QToolBar" name="mainToolBar">
+   <property name="sizePolicy">
+    <sizepolicy hsizetype="Preferred" vsizetype="Preferred">
+     <horstretch>0</horstretch>
+     <verstretch>0</verstretch>
+    </sizepolicy>
+   </property>
    <attribute name="toolBarArea">
     <enum>TopToolBarArea</enum>
    </attribute>

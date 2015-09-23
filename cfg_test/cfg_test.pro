@@ -21,3 +21,5 @@ DEFINES += SRCDIR=\\\"$$PWD/\\\"
 arg_path = ..
 arg_lib  = cfg
 include(../depend_on_lib.pri)
+arg_lib  = toolbox
+include(../depend_on_lib.pri)

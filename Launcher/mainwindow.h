@@ -7,6 +7,7 @@
 #include <QLineEdit>
 #include <QCheckBox>
 #include <QPalette>
+#include <QMap>
 
 #include <launcher.h>
 #include <ssh2tools.h>
@@ -49,6 +50,14 @@ private:
     }
     void storeResetValues_();
 
+//    void set_has_unsaved_changes( bool has_unsaved_changes=true ) {
+//        this->launcher_.script.set_has_unsaved_changes( has_unsaved_changes );
+//    }
+//    bool has_unsaved_changes() const {
+//        return this->launcher_.script.has_unsaved_changes();
+//    }
+    void check_script_unsaved_changes();
+
 private slots:
     void on_wCluster_currentIndexChanged(const QString &arg1);
 
@@ -88,6 +97,24 @@ private slots:
 
     void on_wAuthenticate_clicked();
 
+    void on_wLocalFileLocationButton_clicked();
+
+    void on_wSubfolder_textChanged(const QString &arg1);
+
+    void on_wJobname_textChanged(const QString &arg1);
+
+    void on_wSubfolderButton_clicked();
+
+    void on_wJobnameButton_clicked();
+
+    void on_wRemote_currentIndexChanged(const QString &arg1);
+
+    void on_wSave_clicked();
+
+    void on_wReload_clicked();
+
+    void on_wSubmit_clicked();
+
 private:
     void      clusterDependencies_( bool updateWidgets );
     void      nodesetDependencies_( bool updateWidgets );
@@ -97,6 +124,11 @@ private:
     bool getPrivatePublicKeyPair_();
     void updateResourceItems_();
     bool isUserAuthenticated_() const;
+
+    void lookForJobscript( QString const& job_folder );
+    bool loadJobscript( QString const& filepath );
+    bool saveJobscript( QString const& filepath );
+    bool remoteCopyJob();
 
     void remoteExecute_( QString const& command_line, QString* qout=nullptr, QString* qerr=nullptr );
 
@@ -109,16 +141,30 @@ private:
     dc::DataConnectorBase* getDataConnector( QString const& name );
     cfg::Item* getConfigItem( QString const& name );
     int walltimeUnitSeconds_; // #seconds in walltime unit as given by this->ui->wWalltimeUnit
-    QPalette* paletteRedForground_;
+
+    QPalette* paletteRedForeground_;
+    QPalette* paletteGreenForeground_;
+
     ssh2::Session sshSession_;
+    QString local_subfolder();
+    QString local_subfolder_jobname();
+    QString remote_subfolder();
+    QString remote_subfolder_jobname();
+    QString remote_;
+
+    void resolveRemoteFileLocations_();
+    QMap<QString,QString> remote_env_vars_;
+
 };
 
 #define PRINT0_AND_CHECK_IGNORESIGNAL( signature ) \
     this->print_( signature ); \
+    this->check_script_unsaved_changes();\
     if( this->ignoreSignals_ ) return;
 
 #define PRINT1_AND_CHECK_IGNORESIGNAL( signature, arg1 ) \
     this->print_( signature, (arg1) ); \
+    this->check_script_unsaved_changes();\
     if( this->ignoreSignals_ ) return;
 
 #define FORWARDING \

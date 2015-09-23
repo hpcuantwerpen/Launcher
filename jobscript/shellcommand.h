@@ -10,7 +10,7 @@ namespace pbs
 {//=============================================================================
     namespace types {
         enum Type
-        { ShellCommand
+        { ShellCommand = 0
         , UserComment
         , Shebang
         , LauncherComment
@@ -50,7 +50,6 @@ namespace pbs
         virtual ~ShellCommand() {}
         int            ordinate() const { return this->ordinate_; }
         types::Type    type    () const { return this->type_;     }
-        QString const& typeName() const { return this->typeName_;}
         //QString const& parm_value( QString const & key ) const;
 
         virtual bool equals( ShellCommand const* rhs) const;
@@ -79,16 +78,16 @@ namespace pbs
         virtual void compose();
         QString const& flag() const { return flag_; }
 
+        virtual void print( std::ostream& to=std::cout, int verbose=0 , bool refresh=false);
+
     private:
         static ShellCommand* parse ( QString const &line);
     private:
         int          ordinate_;
         types::Type  type_;
-        QString      typeName_;
     protected:
         QString      flag_;
         QString      value_;
-        QString      comment_;
         Parameters_t parameters_;
         Features_t   features_;
         bool         hidden_;

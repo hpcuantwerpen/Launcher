@@ -6,6 +6,12 @@
 
 #include <QString>
 
+// preprocessor macro to subclass an exception class
+#define SUBCLASS_EXCEPTION(DERIVED,BASE)                \
+    struct DERIVED : public BASE {                      \
+        DERIVED( char const* what ) : BASE( what ) {}   \
+    };
+
 template<class E> // e.g. std::runtime_error
 void throw_( char const* msg ) {
     throw E( msg );

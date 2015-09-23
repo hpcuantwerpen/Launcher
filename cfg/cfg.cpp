@@ -1,5 +1,4 @@
 #include "cfg.h"
-#include <throw_.h>
 
 #include <QFile>
 #include <QIODevice>
@@ -38,7 +37,7 @@ namespace cfg
       , choices_is_range_(rhs.choices_is_range_)
     {}
  //-----------------------------------------------------------------------------
-    bool Item::is_valid(const QVariant &value, bool trow) const
+    bool Item::is_valid(const QVariant &value, bool must_throw) const
     {
         bool ok = true;
         if( this->choices_is_range_ ) {
@@ -47,23 +46,7 @@ namespace cfg
                 ok = value.type()==this->range_type_
                   && this->choices().first() <= value
                   &&                            value <= this->choices().at(1);
-//                if( this->choices().size()==3 ) {
-//                    switch( this->range_type_ ) {
-//                      case QVariant::Int: {
-//                        int delta = value.toInt() - this->choices().first().toInt();
-//                        ok &= (delta % this->choices().at(2).toInt() ) == 0;
-//                      } break;
-//                      case QVariant::Double: {
-//                        double delta = value.toDouble() - this->choices().first().toDouble();
-//                        double step = this->choices().at(2).toDouble();
-//                        double remainder = fmod( delta, step );
-//                        ok &= ( remainder <= 1e-6*step );
-//                      } break;
-//                      default:
-//                        throw_<InvalidConfigItemValue>("not implemented.");
-//                    }
-//                }
-                if( !ok && trow ) {
+                if( !ok && must_throw ) {
                     throw_<InvalidConfigItemValue>("Value '%1' (%2) is not in %3 range %4."
                                             , value.toString()
                                             , value.typeName()
@@ -75,7 +58,7 @@ namespace cfg
         } else {
             if( !choices_.empty() ) {
                 ok = this->choices().contains(value);
-                if( !ok && trow ) {
+                if( !ok && must_throw ) {
                     throw_<InvalidConfigItemValue>("Value '%1' is not a valid choice. Valid choices are: %2."
                                             , value.toString()
                                             , rangeToString( this->choices() )
@@ -84,7 +67,7 @@ namespace cfg
             } else {
                 if( range_type_!=QVariant::Invalid ) {
                     ok = (value.type() == range_type_);
-                    if( !ok && trow ) {
+                    if( !ok && must_throw ) {
                         throw_<InvalidConfigItemValue>("Value '%1' is not a valid choice. Valid choices are of type %2."
                                                 , value.toString()
                                                 , QVariant::typeToName(this->range_type_)
@@ -153,8 +136,11 @@ namespace cfg
                this->default_value_ = choices.at(0);
        }
     // verify value if present
-       if( this->value_!=QVariant() ) {
-           this->is_valid( this->value_, true ) ;
+       if( this->value_!=QVariant() )
+       {
+           if( !this->is_valid(this->value_) ) {
+               this->value_ = QVariant();
+           }
        }
     }
  //-----------------------------------------------------------------------------
@@ -189,13 +175,22 @@ namespace cfg
         return this->default_value_;
     }
  //-----------------------------------------------------------------------------
-   void Item::set_value( QVariant const& value )
+   bool Item::set_value( QVariant const& value )
    {
        if( value==QVariant() ){
-           this->value_ = this->default_value();
+           if( this->value()==this->default_value() ) {
+               return false;
+           } else {
+               this->value_ = this->default_value();
+               return true;
+           }
        } else {
-           if( this->is_valid(value,true) ) {
-               this->value_ = value;
+           if( this->value()==value ) {
+               return false;
+           } else {
+               if( this->is_valid(value,true) ) // might throw
+                   this->value_ = value;
+               return true;
            }
        }
    }
@@ -242,6 +237,17 @@ namespace cfg
         item.set_value(value);
 
         return ds;
+    }    
+ //-----------------------------------------------------------------------------
+    QStringList Item::choices_as_QStringList() const
+    {
+        QStringList list;
+        for ( Item::Choices_t::const_iterator iter = this->choices().cbegin()
+            ; iter!=this->choices().cend(); ++iter )
+        {
+            list.append( iter->toString() );
+        }
+        return list;
     }
  //-----------------------------------------------------------------------------
  // Config

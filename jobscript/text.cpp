@@ -7,26 +7,17 @@ namespace pbs
     Text::Text(QString const& txt, Text *parent )
       : text_(txt )
       , parent_(parent)
+      , has_unsaved_changes_(true)
     {}
  //-----------------------------------------------------------------------------
     void Text::init()
     {
-        QRegularExpression re("^(#*[^#]*\\b)((\\s*)(#.*)?)$");
-        QRegularExpressionMatch m = re.match(this->text_);
-        if( m.hasMatch() ) {
-//#ifdef QT_DEBUG
-//            std::cout<<this->text_.toStdString()<<std::endl;
-//            for(int i=0; i<=m.lastCapturedIndex();++i)
-//                std::cout<<i<<" : "<<m.captured(i).toStdString()<<std::endl;
-//            std::cout<<std::endl;
-//#endif//ifdef QT_DEBUG
-            this->body_    = m.captured(1);
-            this->comment_ = m.captured(2);
-        } else if( this->text_.startsWith('#') ) {
-            this->body_   = this->text_;
-            this->comment_.clear();
+        int comment_at = this->text_.indexOf('#');
+        if( comment_at==-1) {
+            this->body_ = this->text_;
         } else {
-            throw_<std::runtime_error>("Malformed script line:'%1'\n\tin Text::init_()", this->text_ );
+            this->body_   = this->text_.left(comment_at);
+            this->comment_= this->text_.mid (comment_at);
         }
         Text::staticCompose(this);
     }
@@ -61,6 +52,7 @@ namespace pbs
             if( parent_ ) {
                 parent_->set_is_modified( is_modified_ );
             }
+            this->set_has_unsaved_changes(true);
         }
     }
  //-----------------------------------------------------------------------------
@@ -70,6 +62,22 @@ namespace pbs
     {
         if( !_this_->text_.endsWith('/n'))
             _this_->text_.append('\n');
+    }
+ //-----------------------------------------------------------------------------
+    void Text::print( std::ostream &to, int verbose, bool refresh )
+    {
+        if( refresh && this->is_modified() ) {
+            this->text();
+        }
+        if( verbose ) {
+            to << "\nText::print"
+               << "\n->text_    [[" << this->text_   .toStdString() << "]]"
+               << "\n->body_    [[" << this->body_   .toStdString() << "]]"
+               << "\n->comment_ [[" << this->comment_.toStdString() << "]]"
+               << std::flush;
+        } else {
+            to << this->text_.toStdString() << std::flush;
+        }
     }
  //-----------------------------------------------------------------------------
 }//namespace pbs

@@ -24,6 +24,7 @@ void ToolboxTest::testCase1()
     toolbox::OrderedMap om;
     om["one"]="1";
     QVERIFY2(om["one"]=="1", "Failure");
+    QString now = toolbox::now();
 }
 
 QTEST_APPLESS_MAIN(ToolboxTest)

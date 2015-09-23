@@ -7,6 +7,7 @@
 #include <QList>
 
 #include <stdexcept>
+#include <throw_.h>
 
 namespace cfg
 {//=============================================================================
@@ -37,7 +38,7 @@ namespace cfg
 
      // value
         QVariant const& value() const;
-        void set_value( QVariant const& value = QVariant() );
+        bool set_value( QVariant const& value = QVariant() );
         void set_value_and_type( QVariant const& value = QVariant() );
 
      // default_value
@@ -49,6 +50,8 @@ namespace cfg
         Choices_t const& choices() const {
            return this->choices_;
         }
+        QStringList choices_as_QStringList() const;
+
         void set_choices( Choices_t   const& choices = Choices_t(), bool is_range = false );
         void set_choices( QStringList const& choices              , bool is_range = false );
         template <class T>
@@ -68,7 +71,7 @@ namespace cfg
        }
 
     // test validity of a value
-       bool is_valid(QVariant const& value, bool trow = false ) const;
+       bool is_valid(QVariant const& value, bool must_throw = false ) const;
 
     private:
         QString         name_;              // item name
@@ -123,15 +126,8 @@ namespace cfg
     {
         return cfg_get(config,key,default_value).toString();
     }
-
-
-#define SUBCLASS_EXCEPTION(DERIVED,BASE)                \
-    struct DERIVED : public BASE {                      \
-        DERIVED( char const* what ) : BASE( what ) {}   \
-    };
-
+ //=============================================================================
     SUBCLASS_EXCEPTION( InvalidConfigItemValue , std::runtime_error )
-
  //=============================================================================
 }// namespace cfg
 
