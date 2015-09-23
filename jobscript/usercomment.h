@@ -14,7 +14,6 @@ namespace pbs
     protected:
         UserComment( QString const& line, int ordinate=-1, types::Type type=types::UserComment);
         static UserComment* parse( QString const &line);
-//        virtual void compose();
     private:
         static QString prefix_;
     };
