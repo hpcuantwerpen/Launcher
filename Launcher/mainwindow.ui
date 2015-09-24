@@ -30,7 +30,7 @@
        </sizepolicy>
       </property>
       <property name="currentIndex">
-       <number>0</number>
+       <number>2</number>
       </property>
       <widget class="QWidget" name="wResourcesPage">
        <property name="sizePolicy">
@@ -747,6 +747,31 @@ p, li { white-space: pre-wrap; }
           </item>
          </layout>
         </item>
+        <item>
+         <layout class="QHBoxLayout" name="horizontalLayout_11">
+          <item>
+           <widget class="QPushButton" name="wReload2">
+            <property name="text">
+             <string>Reload</string>
+            </property>
+           </widget>
+          </item>
+          <item>
+           <widget class="QPushButton" name="wSave2">
+            <property name="text">
+             <string>Save</string>
+            </property>
+           </widget>
+          </item>
+          <item>
+           <widget class="QPushButton" name="wSubmit2">
+            <property name="text">
+             <string>Submit</string>
+            </property>
+           </widget>
+          </item>
+         </layout>
+        </item>
        </layout>
       </widget>
       <widget class="QWidget" name="wRetrievePage">
@@ -755,7 +780,7 @@ p, li { white-space: pre-wrap; }
        </attribute>
        <layout class="QVBoxLayout" name="verticalLayout_15">
         <item>
-         <widget class="QPushButton" name="pushButton">
+         <widget class="QPushButton" name="wRefresh">
           <property name="text">
            <string>Jobs submitted and not retrieved (click to refresh job status):</string>
           </property>
@@ -768,6 +793,11 @@ p, li { white-space: pre-wrap; }
             <horstretch>0</horstretch>
             <verstretch>0</verstretch>
            </sizepolicy>
+          </property>
+          <property name="font">
+           <font>
+            <family>Menlo</family>
+           </font>
           </property>
          </widget>
         </item>
@@ -795,6 +825,11 @@ p, li { white-space: pre-wrap; }
             <verstretch>0</verstretch>
            </sizepolicy>
           </property>
+          <property name="font">
+           <font>
+            <family>Menlo</family>
+           </font>
+          </property>
          </widget>
         </item>
         <item>
@@ -803,14 +838,14 @@ p, li { white-space: pre-wrap; }
            <number>0</number>
           </property>
           <item row="2" column="0">
-           <widget class="QPushButton" name="pushButton_2">
+           <widget class="QPushButton" name="wRetrieveSelectedJob">
             <property name="text">
              <string>Retrieve results for selected job id</string>
             </property>
            </widget>
           </item>
           <item row="2" column="1">
-           <widget class="QPushButton" name="pushButton_3">
+           <widget class="QPushButton" name="wDeleteSelectedJob">
             <property name="text">
              <string>Delete selected job (no retrieval)</string>
             </property>
@@ -831,7 +866,7 @@ p, li { white-space: pre-wrap; }
            </widget>
           </item>
           <item row="3" column="0">
-           <widget class="QPushButton" name="pushButton_4">
+           <widget class="QPushButton" name="wRetrieveAllJobs">
             <property name="text">
              <string>Retrieve results for all jobs</string>
             </property>

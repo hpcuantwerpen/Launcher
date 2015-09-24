@@ -40,7 +40,8 @@
       , isDefault_(rhs.isDefault_)
     {}
  //-----------------------------------------------------------------------------
-    NodesetInfo & NodesetInfo::operator=(  NodesetInfo const& rhs ) {
+    NodesetInfo & NodesetInfo::operator=( NodesetInfo const& rhs )
+    {
         name_ = rhs.name_;
         nNodes_ = rhs.nNodes_;
         nCoresPerNode_ = rhs.nCoresPerNode_;
@@ -49,6 +50,7 @@
         features_ = rhs.features_;
         scriptActions_ = rhs.scriptActions_;
         isDefault_ = rhs.isDefault_;
+        return *this;
     }
  //-----------------------------------------------------------------------------
     void NodesetInfo::storeResetValues( int nNodes, int nCoresPerNode, int nCores, double gbPerCore, double gbTotal ) const
@@ -335,5 +337,6 @@
         login_nodes_ = rhs.login_nodes_;
         walltime_limit_ = rhs.walltime_limit_;
         defaultNodeset_ = rhs.defaultNodeset_;
+        return *this;
     }
 

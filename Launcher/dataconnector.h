@@ -76,6 +76,7 @@ namespace dc
             this->configItemName_ = ( configItemName.isEmpty() ? nullptr : &this->configItemName__ );
             this->scriptKey_      = ( scriptKey     .isEmpty() ? nullptr : &this->scriptKey__      );
         }
+        virtual ~DataConnectorBase() {}
 
      // Get this DataConnector's cfg::item
         cfg::Item* configItem() {
@@ -117,7 +118,7 @@ namespace dc
  // Templated versions of QVariants converstion functions
  // generic version, specialisations for V = QString, double, int, bool
     template <class V>
-    V toValue( QVariant const& qv ) {
+    V toValue( QVariant const& /*qv*/ ) {
         throw_<std::logic_error>("Not Implemented toValue<V>( QVariant const& qv ).");
     }
     template <> QString toValue( QVariant const& qv );
@@ -216,7 +217,11 @@ namespace dc
             return w->value();
         }
         static bool set_value( Widget_t* w, Value_t value ) {
-             w->setValue( value );
+            if( w->value()!=value ) {
+                w->setValue( value );
+                return true;
+            } else
+                return false;
         }
         static Choices_t get_choices( Widget_t* w )
         {
@@ -243,12 +248,16 @@ namespace dc
             return w->text();
         }
         static bool set_value( Widget_t* w, Value_t const & value ) {
-            w->setText( value );
+            if( w->text()!=value ) {
+                w->setText( value );
+                return true;
+            } else
+                return false;
         }
-        static Choices_t get_choices( Widget_t* w ) {
+        static Choices_t get_choices( Widget_t* /*w*/ ) {
             return Choices_t();
         }
-        static void set_choices( Widget_t* w, Choices_t const& /*dummy*/  )
+        static void set_choices( Widget_t* /*w*/, Choices_t const& /*dummy*/  )
         {// nothing to do
         }
     };
@@ -262,12 +271,16 @@ namespace dc
             return w->isChecked();
         }
         static bool set_value( Widget_t* w, Value_t value ) {
-            w->setChecked(value);
+            if( w->isChecked() != value ) {
+                w->setChecked(value);
+                return true;
+            } else
+                return false;
         }
-        static Choices_t get_choices( Widget_t* w ){
+        static Choices_t get_choices( Widget_t* /*w*/ ){
             return Choices_t();
         }
-        static void set_choices( Widget_t* w, Choices_t const& /*dummy*/  )
+        static void set_choices( Widget_t* /*w*/, Choices_t const& /*dummy*/  )
         {// nothing to do
         }
     };
@@ -278,10 +291,10 @@ namespace dc
         typedef QWidget Widget_t;
         typedef QString Value_t; // dummy
 
-        static Value_t get_value( Widget_t* w )                         { return QString(); }
-        static bool set_value( Widget_t* w, Value_t const& /*dummy*/ )  {/*nothing to do*/}
-        static Choices_t get_choices( Widget_t* w )                     { return Choices_t(); }
-        static void set_choices( Widget_t* w, Choices_t const& list  )  {/*nothing to do*/}
+        static Value_t get_value( Widget_t* /*w*/ )                                { return QString(); }
+        static bool    set_value( Widget_t* /*w*/, Value_t const& /*dummy*/ )      { return false; }
+        static Choices_t get_choices( Widget_t* /*w*/ )                            { return Choices_t(); }
+        static void      set_choices( Widget_t* /*w*/, Choices_t const& /*list*/ ) {/*nothing to do*/}
     };
 
  // not entirely the same as QVariant::toString()
@@ -367,7 +380,7 @@ namespace dc
             if( !this->qw_ || !this->scriptKey_ ) return false;
 
             Line_t* line = this->script->find_key(*this->scriptKey_);
-            QString qs = (*this->script)[*this->scriptKey_];
+            QString qs = (*const_cast<pbs::Script const*>(this->script))[*this->scriptKey_];
             typename wa::Value_t v = toValue( qs, dynamic_cast<W*>( this->widget() ), line );
             return this->configItem()->set_value(v);
         }

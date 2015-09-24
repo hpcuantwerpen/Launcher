@@ -17,12 +17,14 @@ SOURCES  += main.cpp        \
             mainwindow.cpp  \
             launcher.cpp \
             clusterinfo.cpp \
-    dataconnector.cpp
+    dataconnector.cpp \
+    job.cpp
 
 HEADERS  += mainwindow.h   \
             launcher.h \
             clusterinfo.h \
-    dataconnector.h
+    dataconnector.h \
+    job.h
 
 FORMS    += mainwindow.ui
 

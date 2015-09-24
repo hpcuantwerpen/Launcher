@@ -49,10 +49,15 @@ namespace pbs
     set_is_modified( bool is_modified_ ) {
         if( is_modified_ ) {
             this->text_.clear();
-            if( parent_ ) {
-                parent_->set_is_modified( is_modified_ );
+            if( this->parent_ ) {
+                this->parent_->set_is_modified( is_modified_ );
+#ifdef QT_DEBUG
+                if( !this->parent_->has_unsaved_changes() )
+                    std::cout<<"\nToggling unsaved changes: "<<this->text().toStdString()<<std::flush;
+#endif
             }
             this->set_has_unsaved_changes(true);
+
         }
     }
  //-----------------------------------------------------------------------------

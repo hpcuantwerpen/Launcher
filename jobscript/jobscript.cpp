@@ -141,6 +141,11 @@ namespace pbs
         QTextStream in(&file);
         QString text = in.readAll();
         this->parse( text );
+
+     // this avoid that the script sets unsaved changes to true after composing
+     // the script's text from its lines
+        this->text();
+        this->set_has_unsaved_changes(false);
     }
  //-----------------------------------------------------------------------------
     void
@@ -167,7 +172,9 @@ namespace pbs
         QString const& txt = this->text();
         out << txt;
         non_const_this->filepath_ = new_filepath;
-      //self.set_unsaved_changes(False)
+
+     // obviously, since we just saved:
+        non_const_this->set_has_unsaved_changes(false);
     }
  //-----------------------------------------------------------------------------
     void Script::parse( QString const& text, bool additive )
@@ -245,7 +252,6 @@ namespace pbs
         if( key[0]=='-' ) {
             return line->value_;
         } else {
-            line->set_is_modified();
             QString & val = line->parameters()[key];
             return val;
         }

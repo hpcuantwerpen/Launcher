@@ -11,6 +11,7 @@
 #include <warn_.h>
 #include <ssh2tools.h>
 #include <cmath>
+#include <job.h>
 
  //-----------------------------------------------------------------------------
     QString validateEmailAddress( QString const & address )
@@ -347,6 +348,7 @@
             }
         }
         throw_<std::logic_error>("Widget '%1' not found in QList<DataConnector*>.", widgetName );
+        return nullptr;
     }
  //-----------------------------------------------------------------------------
     cfg::Item*
@@ -532,14 +534,19 @@
     void MainWindow::check_script_unsaved_changes()
     {
         std::cout << "\nChecking unsaved changes : ";
-        if( this->launcher_.script.has_unsaved_changes() ) {
+        bool has_unsaved_changes = this->launcher_.script.has_unsaved_changes();
+        if( has_unsaved_changes ) {
             std::cout << "true." << std::endl;
-            this->ui->wSave->setText("*** Save ***");
-            this->ui->wSave->setToolTip("Save the current script locally (there are unsaved changes).");
+            this->ui->wSave ->setText("*** Save ***");
+            this->ui->wSave2->setText("*** Save ***");
+            this->ui->wSave ->setToolTip("Save the current script locally (there are unsaved changes).");
+            this->ui->wSave2->setToolTip("Save the current script locally (there are unsaved changes).");
         } else {
             std::cout << "false." << std::endl;
-            this->ui->wSave->setText("Save");
-            this->ui->wSave->setToolTip("Save the current script locally.");
+            this->ui->wSave ->setText("Save");
+            this->ui->wSave2->setText("Save");
+            this->ui->wSave ->setToolTip("Save the current script locally.");
+            this->ui->wSave2->setToolTip("Save the current script locally.");
         }
     }
  //-----------------------------------------------------------------------------
@@ -548,7 +555,7 @@
  // SLOTS
  //-----------------------------------------------------------------------------
 
-#define IGNORE_SIGNALS_UNTIL_END_OF_SCOPE; IgnoreSignals ignoreSignals(this)
+#define IGNORE_SIGNALS_UNTIL_END_OF_SCOPE IgnoreSignals ignoreSignals(this)
 
 void MainWindow::on_wCluster_currentIndexChanged( QString const& arg1 )
 {
@@ -680,16 +687,16 @@ void MainWindow::on_wPages_currentChanged(int index)
         if( this->previousPage_==1 )
         {// read the script from wScript
             QString text = this->ui->wScript->toPlainText();
-#ifdef QT_DEBUG
-            std::cout<<text.toStdString()<<std::endl;
-#endif
-            this->launcher_.script.parse( text, false );
-#ifdef QT_DEBUG
-            this->launcher_.script.print(std::cout,1);
-#endif
+            if( this->launcher_.script.has_unsaved_changes() ) {
+                this->launcher_.script.parse( text, false );
+            }
+//#ifdef QT_DEBUG
+//            std::cout<<text.toStdString()<<std::endl;
+//            this->launcher_.script.print(std::cout,1);
+//#endif
         }
         break;
-    case 1:
+    case 1:        
         if( this->previousPage_==0)
         {
             for( QList<dc::DataConnectorBase*>::iterator iter=this->data_.begin(); iter!=this->data_.end(); ++iter )
@@ -699,19 +706,58 @@ void MainWindow::on_wPages_currentChanged(int index)
                 }
             }
             QString text = this->launcher_.script.text();
-#ifdef QT_DEBUG
-            std::cout<<text.toStdString()<<std::endl;
-#endif
+            IGNORE_SIGNALS_UNTIL_END_OF_SCOPE;
             this->ui->wScript->setText(text);
-#ifdef QT_DEBUG
-            this->launcher_.script.print(std::cout,1);
-#endif
+//#ifdef QT_DEBUG
+//            std::cout<<text.toStdString()<<std::endl;
+//            this->launcher_.script.print(std::cout,1);
+//#endif
+        }
+        break;
+    case 2:
+        {
+            if( !Job::sshSession ) Job::sshSession = &this->sshSession_;
+
+            bool ok = this->isUserAuthenticated_();
+            if( !ok ) {
+                QMessageBox::warning(this,"Warning","You are not authenticated. Most of the functionality on this tab is disabled.");
+            }
+            this->ui->wRetrieveAllJobs    ->setEnabled(ok);
+            this->ui->wRetrieveSelectedJob->setEnabled(ok);
+            this->ui->wDeleteSelectedJob  ->setEnabled(ok);
+            this->ui->wRefresh            ->setEnabled(ok);
+            this->refreshNonRetrievedJobs();
         }
         break;
     default:
         break;
     }
     this->previousPage_ = index;
+}
+
+void MainWindow::refreshNonRetrievedJobs()
+{
+    QString username = this->ui->wUsername->text();
+    QString qstat;
+    if( !username.isEmpty() ) {
+        this->sshSession_.execute( QString("qstat -u ").append(username) );
+        qstat = this->sshSession_.qout();
+    }
+
+    QString finished (">>> FINISHED JOBS (not retrieved) <<<");
+    QString submitted("\n\n>>> UNFINISHED JOBS (not retrieved) <<<");
+    QList<Job> notRetrieved = toJobList( this->getConfigItem("job_list")->value().toStringList() );
+    for( QList<Job>::iterator iter=notRetrieved.begin()
+       ; iter!=notRetrieved.end(); ++iter )
+    {
+        if( iter->isFinished() ) {
+            finished.append( iter->toStringFormatted() );
+        } else {
+            submitted.append( iter->toStringFormatted() );
+        }
+    }
+    finished.append(submitted).append(qstat);
+    this->ui->wJobsSubmitted->setText( finished);
 }
 
 void MainWindow::on_wEnforceNNodes_toggled(bool checked)
@@ -1163,7 +1209,7 @@ bool MainWindow::loadJobscript( QString const& filepath )
         return false;
     }
  // read from file, hence no unsaved changes sofar
-    this->launcher_.script.set_has_unsaved_changes(false);
+//    this->launcher_.script.set_has_unsaved_changes(false);
     return true;
 }
 
@@ -1195,7 +1241,7 @@ bool MainWindow::saveJobscript( QString const& filepath )
     }
     this->statusBar()->showMessage( QString("Job script saved: '%1'").arg(filepath) );
  // just saved, hence no unsaved changes yet.
-    this->launcher_.script.set_has_unsaved_changes(false);
+ //   this->launcher_.script.set_has_unsaved_changes(false);
     this->check_script_unsaved_changes();
     return true;
 }
@@ -1290,4 +1336,20 @@ void MainWindow::on_wSubmit_clicked()
                   .append( this->remote_subfolder_jobname() )
                   .append(" && qsub pbs.sh");
     this->sshSession_.execute(cmd);
+    QString job_id = this->sshSession_.qout().trimmed();
+    this->statusBar()->showMessage(QString("Job submitted: %1").arg(job_id));
+    cfg::Item* ci_job_list = this->getConfigItem("job_list");
+    if( ci_job_list->value().type()==QVariant::Invalid )
+        ci_job_list->set_value_and_type( QStringList() );
+    QStringList job_list = ci_job_list->value().toStringList();
+    Job job( job_id, this-> local_subfolder(), this->remote_subfolder(), this->getConfigItem("wJobname")->value().toString(), "submitted.");
+    job_list.append( job.toString() );
+    ci_job_list->set_value( job_list );
+}
+
+void MainWindow::on_wScript_textChanged()
+{
+    PRINT0_AND_CHECK_IGNORESIGNAL("void MainWindow::on_wScript_textChanged()");
+    this->launcher_.script.set_has_unsaved_changes(true);
+    this->check_script_unsaved_changes();
 }

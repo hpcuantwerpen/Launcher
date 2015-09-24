@@ -57,6 +57,8 @@ private:
 //        return this->launcher_.script.has_unsaved_changes();
 //    }
     void check_script_unsaved_changes();
+    void refreshNonRetrievedJobs();
+
 
 private slots:
     void on_wCluster_currentIndexChanged(const QString &arg1);
@@ -114,6 +116,8 @@ private slots:
     void on_wReload_clicked();
 
     void on_wSubmit_clicked();
+
+    void on_wScript_textChanged();
 
 private:
     void      clusterDependencies_( bool updateWidgets );

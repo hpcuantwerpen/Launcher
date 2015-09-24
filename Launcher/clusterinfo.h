@@ -162,7 +162,7 @@
        QRegularExpressionMatch m_;
        QRegularExpression keyword_, list_begin_, list_end_, list_sep_, word_, action_, number_, walltime_;
        ClusterInfo* clusterInfo_;
-       QRegularExpression *re_;
+//       QRegularExpression *re_;
        typedef QMap<QString,List_t> Raw_t;
        Raw_t rawClusterInfo_;
     };

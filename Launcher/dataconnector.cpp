@@ -30,12 +30,12 @@ namespace dc
         return qv.toBool();
     }
 
-    QString toValue( QString const& qs, QWidget       * w, Line_t* line ) { return qs;             }
-//  QString toValue( QString const& qs, QComboBox     * w, Line_t* line ) { return qs;             }
-//  QString toValue( QString const& qs, QLineEdit     * w, Line_t* line ) { return qs;             }
-    int     toValue( QString const& qs, QSpinBox      * w, Line_t* line ) { return qs.toInt();     }
-    double  toValue( QString const& qs, QDoubleSpinBox* w, Line_t* line ) { return qs.toDouble();  }
-    bool    toValue( QString const& qs, QCheckBox     * w, Line_t* line ) { return line->hidden(); }
+    QString toValue( QString const& qs, QWidget       * /*w*/, Line_t* /*line */) { return qs;             }
+//  QString toValue( QString const& qs, QComboBox     * /*w*/, Line_t* /*line*/ ) { return qs;             }
+//  QString toValue( QString const& qs, QLineEdit     * /*w*/, Line_t* /*line */) { return qs;             }
+    int     toValue( QString const& qs, QSpinBox      * /*w*/, Line_t* /*line*/ ) { return qs.toInt();     }
+    double  toValue( QString const& qs, QDoubleSpinBox* /*w*/, Line_t* /*line */) { return qs.toDouble();  }
+    bool    toValue( QString const& qs, QCheckBox     * /*w*/, Line_t*   line   ) { return line->hidden(); }
 
     DataConnectorBase* newDataConnector( QString const& configItemName, QString const& scriptFlag ) {
         return new DataConnector<QWidget>( nullptr, configItemName, scriptFlag );
