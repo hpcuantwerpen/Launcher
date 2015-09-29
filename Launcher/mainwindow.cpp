@@ -11,7 +11,6 @@
 #include <warn_.h>
 #include <ssh2tools.h>
 #include <cmath>
-#include <job.h>
 
  //-----------------------------------------------------------------------------
     QString validateEmailAddress( QString const & address )
@@ -41,7 +40,7 @@
 
 #include <time.h>       /* time */
 
-
+#define TITLE "Launcher 0.9"
  //-----------------------------------------------------------------------------
  // MainWindow::
  //-----------------------------------------------------------------------------
@@ -52,6 +51,8 @@
       , previousPage_(0)
     {
         ui->setupUi(this);
+
+        this->setWindowTitle("Launcher 0.9");
 
         qsrand( time(nullptr) );
 
@@ -186,6 +187,21 @@
         qs = this->getConfigItem("wJobname")->value().toString();
         this->ui->wJobname ->setText(qs);
         this->ui->wJobname2->setText(qs);
+
+        this->getConfigItem("wEmptyRemoteFolder", true );
+        this->data_.append( dc::newDataConnector( this->ui->wEmptyRemoteFolder, "wEmptyRemoteFolder", "") );
+
+        this->getConfigItem("wCheckCopyToDesktop", true );
+        this->data_.append( dc::newDataConnector( this->ui->wCheckCopyToDesktop, "wCheckCopyToDesktop", "") );
+
+        this->getConfigItem("CheckCopyToVscData", true );
+        this->data_.append( dc::newDataConnector( this->ui->wCheckCopyToVscData, "CheckCopyToVscData", "") );
+
+        this->getConfigItem("wCheckDeleteLocalJobFolder", true );
+        this->data_.append( dc::newDataConnector( this->ui->wCheckDeleteLocalJobFolder, "wCheckDeleteLocalJobFolder", "") );
+
+        this->getConfigItem("wCheckDeleteRemoteJobFolder", true );
+        this->data_.append( dc::newDataConnector( this->ui->wCheckDeleteRemoteJobFolder, "wCheckDeleteRemoteJobFolder", "") );
 
         this->setIgnoreSignals(false);
 
@@ -349,6 +365,17 @@
         }
         throw_<std::logic_error>("Widget '%1' not found in QList<DataConnector*>.", widgetName );
         return nullptr;
+    }
+ //-----------------------------------------------------------------------------
+    template <class T>
+    cfg::Item*
+    MainWindow::
+    getConfigItem( QString const& name, T default_value )
+    {
+        cfg::Item* ci = this->launcher_.config.getItem(name);
+        if( ci->type() == QVariant::Invalid )
+            ci->set_value_and_type( default_value );
+        return ci;
     }
  //-----------------------------------------------------------------------------
     cfg::Item*
@@ -720,44 +747,19 @@ void MainWindow::on_wPages_currentChanged(int index)
 
             bool ok = this->isUserAuthenticated_();
             if( !ok ) {
-                QMessageBox::warning(this,"Warning","You are not authenticated. Most of the functionality on this tab is disabled.");
+                QMessageBox::warning(this,TITLE,"Since you are not authenticated, you have no access to the remote host. Remote functionality on this tab is disabled.");
             }
             this->ui->wRetrieveAllJobs    ->setEnabled(ok);
             this->ui->wRetrieveSelectedJob->setEnabled(ok);
-            this->ui->wDeleteSelectedJob  ->setEnabled(ok);
-            this->ui->wRefresh            ->setEnabled(ok);
-            this->refreshNonRetrievedJobs();
+            this->ui->wCheckDeleteRemoteJobFolder->setEnabled(ok);
+            JobList joblist( this->getConfigItem("job_list")->value().toStringList() );
+            this->refreshJobs( joblist );
         }
         break;
     default:
         break;
     }
     this->previousPage_ = index;
-}
-
-void MainWindow::refreshNonRetrievedJobs()
-{
-    QString username = this->ui->wUsername->text();
-    QString qstat;
-    if( !username.isEmpty() ) {
-        this->sshSession_.execute( QString("qstat -u ").append(username) );
-        qstat = this->sshSession_.qout();
-    }
-
-    QString finished (">>> FINISHED JOBS (not retrieved) <<<");
-    QString submitted("\n\n>>> UNFINISHED JOBS (not retrieved) <<<");
-    QList<Job> notRetrieved = toJobList( this->getConfigItem("job_list")->value().toStringList() );
-    for( QList<Job>::iterator iter=notRetrieved.begin()
-       ; iter!=notRetrieved.end(); ++iter )
-    {
-        if( iter->isFinished() ) {
-            finished.append( iter->toStringFormatted() );
-        } else {
-            submitted.append( iter->toStringFormatted() );
-        }
-    }
-    finished.append(submitted).append(qstat);
-    this->ui->wJobsSubmitted->setText( finished);
 }
 
 void MainWindow::on_wEnforceNNodes_toggled(bool checked)
@@ -1078,18 +1080,18 @@ void MainWindow::on_wSubfolderButton_clicked()
     PRINT0_AND_CHECK_IGNORESIGNAL("void MainWindow::on_wSubfolderButton_clicked()" );
 
     if( this->ui->wLocal->text().isEmpty() ) {
-        QMessageBox::warning( this, "Warning", "You must select a local file location first.");
+        QMessageBox::warning( this, TITLE, "You must select a local file location first.");
         return;
     }
 
     QString parent = this->ui->wLocal->text();
     QString folder = QFileDialog::getExistingDirectory( this, "Select subfolder:", parent );
     if( folder.isEmpty() ) {
-        QMessageBox::warning( this, "Warning", "No directory selected.");
+        QMessageBox::warning( this, TITLE, "No directory selected.");
         return;
     }
     if( !folder.startsWith(parent) ) {
-        QMessageBox::critical( this, "Error", QString("The selected directory is not inside '%1.").arg(parent) );
+        QMessageBox::critical( this, TITLE, QString("The selected directory is not inside '%1.").arg(parent) );
         return;
     }
     this->statusBar()->clearMessage();
@@ -1112,22 +1114,22 @@ void MainWindow::on_wJobnameButton_clicked()
     PRINT0_AND_CHECK_IGNORESIGNAL("void MainWindow::on_wJobnameButton_clicked()" );
 
     if( this->ui->wLocal->text().isEmpty() ) {
-        QMessageBox::warning( this, "Warning", "You must select a local file location first.");
+        QMessageBox::warning( this, TITLE, "You must select a local file location first.");
         return;
     }
     if( this->ui->wSubfolder->text().isEmpty() ) {
-        QMessageBox::warning( this, "Warning", "You must select a subfolder first.");
+        QMessageBox::warning( this, TITLE, "You must select a subfolder first.");
         return;
     }
 
     QString parent = this->local_subfolder();
     QString selected = QFileDialog::getExistingDirectory( this, "Select subfolder:", parent );
     if( selected.isEmpty() ) {
-        QMessageBox::warning( this, "Warning", "No directory selected.");
+        QMessageBox::warning( this, TITLE, "No directory selected.");
         return;
     }
     if( !selected.startsWith(parent) ) {
-        QMessageBox::critical( this, "Error", QString("The selected directory is not inside '%1.").arg(parent) );
+        QMessageBox::critical( this, TITLE, QString("The selected directory is not inside '%1.").arg(parent) );
         return;
     }
     this->statusBar()->clearMessage();
@@ -1154,7 +1156,7 @@ void MainWindow::lookForJobscript( QString const& job_folder)
     QString script_file = QString(job_folder).append("/pbs.sh");
     if( QFile::exists(script_file) ) {
         QMessageBox::StandardButton answer =
-            QMessageBox::question(this, "Job script found ..."
+            QMessageBox::question(this, TITLE
                                  , QString("The local job directory '%1' already contains a job script 'pbs.sh'.\nDo you want to load it?")
                                       .arg( job_folder )
                                  );
@@ -1162,7 +1164,7 @@ void MainWindow::lookForJobscript( QString const& job_folder)
             this->loadJobscript(script_file);
             this->statusBar()->showMessage( QString("Job script '%1' loaded.").arg(script_file) );
         } else {
-            QMessageBox::warning( this, "Warning"
+            QMessageBox::warning( this, TITLE
                                 , QString("The job script '%1' was not loaded. It will be overwritten if you save the current job script under this jobname.")
                                      .arg( script_file )
                                 );
@@ -1198,6 +1200,10 @@ bool MainWindow::loadJobscript( QString const& filepath )
         this->getDataConnector("wNotifyAbort")->value_config_to_widget();
         this->getDataConnector("wNotifyBegin")->value_config_to_widget();
         this->getDataConnector("wNotifyEnd"  )->value_config_to_widget();
+
+        if( !this->ui->wUsername->text().isEmpty() ) {
+            this->on_wUsername_editingFinished();
+        }
     }
     catch( std::runtime_error& e )
     {
@@ -1221,7 +1227,7 @@ bool MainWindow::saveJobscript( QString const& filepath )
         std::cout << "done."<< std::endl;
     } catch( pbs::WarnBeforeOverwrite &e ) {
         QMessageBox::StandardButton answer =
-                QMessageBox::question( this, "Ok to overwrite?"
+                QMessageBox::question( this, TITLE
                                      , QString("Ok to overwrite existing job script '%1'?\n(a backup will be made).")
                                           .arg(filepath)
                                      );
@@ -1309,7 +1315,8 @@ void MainWindow::on_wReload_clicked()
     if( !qDir.exists() ) {
         this->statusBar()->showMessage("No job script found, hence not loaded.");
     } else {
-        QMessageBox::StandardButton answer = QMessageBox::question( this, "Reload job script?", "Unsaved changes to the current job script will be lost. Continue?");
+        QMessageBox::StandardButton answer =
+                QMessageBox::question( this, TITLE, "Unsaved changes to the current job script will be lost on reloading. Continue?");
         if( answer==QMessageBox::Yes ) {
             this->loadJobscript(script_file);
             this->statusBar()->showMessage("job script reloaded.");
@@ -1328,13 +1335,26 @@ void MainWindow::on_wSubmit_clicked()
         }
     }
     if( !this->isUserAuthenticated_() ) {
-        QMessageBox::critical( this, "Error", "You must authenticate first...");
+        QMessageBox::critical( this, TITLE, "You must authenticate first...");
+        return;
+    }
+    QString cmd;
+    if( this->ui->wEmptyRemoteFolder->isChecked() )
+    {
+        QMessageBox::Button answer = QMessageBox::question(this,TITLE,"OK to erase remote job folder?");
+        if( answer==QMessageBox::Yes ) {
+                cmd = QString("rm -rf ").append( this->remote_subfolder_jobname() );
+            this->sshSession_.execute(cmd);
+            this->statusBar()->showMessage("Erased remote job folder.");
+        } else {
+            this->statusBar()->showMessage("Remote job folder not erased.");
+        }
     }
     this->sshSession_.sftp_put_dir( this->local_subfolder_jobname(), this->remote_subfolder_jobname(), true );
 
-    QString cmd = QString("cd ")
-                  .append( this->remote_subfolder_jobname() )
-                  .append(" && qsub pbs.sh");
+    cmd = QString("cd ")
+          .append( this->remote_subfolder_jobname() )
+          .append(" && qsub pbs.sh");
     this->sshSession_.execute(cmd);
     QString job_id = this->sshSession_.qout().trimmed();
     this->statusBar()->showMessage(QString("Job submitted: %1").arg(job_id));
@@ -1342,7 +1362,7 @@ void MainWindow::on_wSubmit_clicked()
     if( ci_job_list->value().type()==QVariant::Invalid )
         ci_job_list->set_value_and_type( QStringList() );
     QStringList job_list = ci_job_list->value().toStringList();
-    Job job( job_id, this-> local_subfolder(), this->remote_subfolder(), this->getConfigItem("wJobname")->value().toString(), "submitted.");
+    Job job( job_id, this->ui->wLocal->text(), this->ui->wRemote->currentText(), this->ui->wSubfolder->text(), this->ui->wJobname->text(), Job::Submitted );
     job_list.append( job.toString() );
     ci_job_list->set_value( job_list );
 }
@@ -1350,6 +1370,151 @@ void MainWindow::on_wSubmit_clicked()
 void MainWindow::on_wScript_textChanged()
 {
     PRINT0_AND_CHECK_IGNORESIGNAL("void MainWindow::on_wScript_textChanged()");
+
     this->launcher_.script.set_has_unsaved_changes(true);
     this->check_script_unsaved_changes();
+}
+
+void MainWindow::on_wRefresh_clicked()
+{
+    PRINT0_AND_CHECK_IGNORESIGNAL("void MainWindow::on_wRefresh_clicked()");
+
+    cfg::Item* ci_joblist = this->getConfigItem("job_list");
+    JobList joblist( ci_joblist->value().toStringList() );
+    this->refreshJobs(joblist);
+}
+
+void MainWindow::on_wRetrieveSelectedJob_clicked()
+{
+    PRINT0_AND_CHECK_IGNORESIGNAL("void MainWindow::on_wRetrieveSelectedJob_clicked()");
+
+    QString selection ;
+    while( true )
+    {
+        QTextCursor cursor = this->ui->wFinished->textCursor();
+        cursor.select(QTextCursor::LineUnderCursor);
+        selection = cursor.selectedText();
+        if( !selection.startsWith(">>> ") ) {
+            int bn = cursor.blockNumber(); // = line number, starts at line 0, which is empty
+            if( bn==0 ) {
+                this->statusBar()->showMessage("No job Selected");
+                return;
+            }
+            cursor.movePosition( QTextCursor::Up);
+            this->ui->wFinished->setTextCursor(cursor);
+        } else {
+            this->ui->wFinished->setTextCursor(cursor);
+            break;
+        }
+    }
+    selection = selection.mid(4);
+    //this->statusBar()->showMessage(selection);
+
+    cfg::Item* ci_joblist = this->getConfigItem("job_list");
+    JobList joblist( ci_joblist->value().toStringList() );
+    Job const* job = joblist[selection];
+    if( !job ) {
+        this->statusBar()->showMessage( QString("job not found: %1").arg(selection) );
+        return;
+    }
+    if( job->status()==Job::Retrieved ) {
+        this->statusBar()->showMessage( QString("Job allready retrieved: %1").arg(selection) );
+        return;
+    }
+    if( job->status()==Job::Submitted ) {
+        this->statusBar()->showMessage( QString("Job not finished: %1").arg(selection) );
+        return;
+    }
+
+    this->statusBar()->showMessage( QString("Retrieving job : %1").arg(selection) );
+
+    bool toDesktop = this->ui->wCheckCopyToDesktop->isChecked();
+    bool toVscData = this->ui->wCheckCopyToVscData->isChecked();
+    if( job->retrieve( toDesktop, toVscData ) ) {
+        ci_joblist->set_value( joblist.toStringList( Job::Submitted | Job::Finished ) );
+        this->refreshJobs(joblist);
+    }
+}
+
+void MainWindow::on_wRetrieveAllJobs_clicked()
+{
+    PRINT0_AND_CHECK_IGNORESIGNAL("void MainWindow::on_wRetrieveAllJobs_clicked()");
+
+    cfg::Item* ci_joblist = this->getConfigItem("job_list");
+    JobList joblist( ci_joblist->value().toStringList() );
+
+    bool toDesktop = this->ui->wCheckCopyToDesktop->isChecked();
+    bool toVscData = this->ui->wCheckCopyToVscData->isChecked();
+
+    joblist.retrieveAll( toDesktop, toVscData );
+
+    QStringList list = joblist.toStringList( Job::Submitted | Job::Finished );
+    ci_joblist->set_value( list );
+    this->refreshJobs(joblist);
+}
+
+void MainWindow::refreshJobs( JobList const& joblist )
+{
+    joblist.update(); // first check for finished jobs
+
+    this->ui->wFinished->setText( joblist.toString(Job::Finished) );
+
+    QString text = joblist.toString(Job::Submitted);
+    QString username = this->ui->wUsername->text();
+    if( !username.isEmpty() ) {
+        QString cmd = QString("qstat -u ").append(username);
+        this->sshSession_.execute( cmd );
+        if( !this->sshSession_.qout().isEmpty() ) {
+            text.append( cmd ).append('\n');
+            text.append( this->sshSession_.qout() );
+        }
+    }
+    this->ui->wNotFinished->setText( text);
+
+    this->ui->wRetrieved->setText( joblist.toString(Job::Retrieved) );
+
+    this->getConfigItem("job_list")->set_value( joblist.toStringList(Job::Submitted|Job::Finished) );
+}
+
+void MainWindow::on_wDeleteSelectedJob_clicked()
+{
+    PRINT0_AND_CHECK_IGNORESIGNAL("void MainWindow::on_wDeleteSelectedJob_clicked()");
+    if( this->ui->wCheckDeleteLocalJobFolder->isChecked() ) {
+        QDir qDir( this->local_subfolder_jobname() );
+        qDir.removeRecursively();
+        this->statusBar()->showMessage(QString("Removed: ").append( this->local_subfolder_jobname() ) );
+    }
+    if( this->ui->wCheckDeleteRemoteJobFolder->isChecked() ) {
+        QString cmd = QString("rm -rf ").append( this->remote_subfolder_jobname() );
+        this->sshSession_.execute(cmd);
+        this->statusBar()->showMessage(QString("Removed: ").append( this->remote_subfolder_jobname() ) );
+    }
+}
+
+void MainWindow::on_wCheckCopyToDesktop_toggled(bool checked)
+{
+    PRINT1_AND_CHECK_IGNORESIGNAL("void MainWindow::on_wCheckCopyToDesktop_toggled(bool checked", checked);
+
+    this->getConfigItem("wCheckCopyToDesktop")->set_value(checked);
+}
+
+void MainWindow::on_wCheckCopyToVscData_toggled(bool checked)
+{
+    PRINT1_AND_CHECK_IGNORESIGNAL("void MainWindow::on_wCheckCopyToVscData_toggled(bool checked", checked);
+
+    this->getConfigItem("wCheckCopyToVscData")->set_value(checked);
+}
+
+void MainWindow::on_wCheckDeleteLocalJobFolder_toggled(bool checked)
+{
+    PRINT1_AND_CHECK_IGNORESIGNAL("void MainWindow::on_wCheckDeleteLocalJobFolder_toggled(bool checked", checked);
+
+    this->getConfigItem("wCheckDeleteLocalJobFolder")->set_value(checked);
+}
+
+void MainWindow::on_wCheckDeleteRemoteJobFolder_toggled(bool checked)
+{
+    PRINT1_AND_CHECK_IGNORESIGNAL("void MainWindow::on_wCheckDeleteRemoteJobFolder_toggled(bool checked", checked);
+
+    this->getConfigItem("wCheckDeleteRemoteJobFolder")->set_value(checked);
 }

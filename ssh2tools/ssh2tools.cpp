@@ -289,10 +289,13 @@ namespace ssh2
  //-----------------------------------------------------------------------------
     void Session::exec_( QString const & command_line, QString* qout, QString* qerr )
     {
-        if( !this->isOpen() && Session::autoOpen ) {
-            this->open();
+        if( !this->isOpen() ) {
+            if( Session::autoOpen ) {
+                this->open();
+            } else {
+                throw_<SshOpenError>("SshOpenError");
+            }
         }
-
         int rv=0;
         std::string cmd = command_line.toStdString();
 
@@ -430,8 +433,12 @@ namespace ssh2
                       << "\n    remote: '" << remote_filepath << "'" << std::endl;
         }
 
-        if( !this->isOpen() && Session::autoOpen ) {
-            this->open();
+        if( !this->isOpen() ) {
+            if( Session::autoOpen ) {
+                this->open();
+            } else {
+                throw_<SshOpenError>("SshOpenError");
+            }
         }
      // adapted from http://www.libssh2.org/examples/scp_write_nonblock.html
         struct stat local_fileinfo;
@@ -527,8 +534,12 @@ namespace ssh2
                       << std::endl;
         }
 
-        if( !this->isOpen() && Session::autoOpen ) {
-            this->open();
+        if( !this->isOpen() ) {
+            if( Session::autoOpen ) {
+                this->open();
+            } else {
+                throw_<SshOpenError>("SshOpenError");
+            }
         }
 
         int rc;
@@ -633,8 +644,12 @@ namespace ssh2
                       << std::flush;
         }
 
-        if( !this->isOpen() && Session::autoOpen ) {
-            this->open();
+        if( !this->isOpen() ) {
+            if( Session::autoOpen ) {
+                this->open();
+            } else {
+                throw_<SshOpenError>("SshOpenError");
+            }
         }
 
         int rc;
@@ -883,6 +898,16 @@ namespace ssh2
               << "\n    public  key : "<< this->public_key_
               << "\n    passphrase  : '"<< scramble(this->passphrase_)<<"'"
               << std::endl;
+    }
+ //-----------------------------------------------------------------------------
+    QString Session::get_env( QString const& env)
+    {
+        QString cmd("echo ");
+        if( !env.startsWith('$') ) cmd.append('$');
+        cmd.append(env);
+        this->execute(cmd);
+        QString result = this->qout().trimmed();
+        return result;
     }
  //-----------------------------------------------------------------------------
 }// namespace ssh2

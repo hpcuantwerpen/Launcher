@@ -117,6 +117,9 @@ namespace ssh2
           * source directory.
           */
 
+        QString get_env( QString const& env) ;
+         /* Get the value of a remote environment variable
+          */
     private:
         int sock_;
         LIBSSH2_SESSION *session_;
@@ -147,6 +150,7 @@ namespace ssh2
     SUBCLASS_EXCEPTION( WrongPassphrase      , std::runtime_error )
     SUBCLASS_EXCEPTION( RemoteExecutionFailed, std::runtime_error )
     SUBCLASS_EXCEPTION( FileOpenError        , std::runtime_error )
+    SUBCLASS_EXCEPTION( SshOpenError         , std::runtime_error )
  //=============================================================================
 }// namespace ssh2
 

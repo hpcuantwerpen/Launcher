@@ -11,6 +11,7 @@
 
 #include <launcher.h>
 #include <ssh2tools.h>
+#include <job.h>
 #include <dataconnector.h>
 
 #include <iostream>
@@ -57,7 +58,7 @@ private:
 //        return this->launcher_.script.has_unsaved_changes();
 //    }
     void check_script_unsaved_changes();
-    void refreshNonRetrievedJobs();
+    void refreshJobs( JobList const& joblist );
 
 
 private slots:
@@ -119,6 +120,22 @@ private slots:
 
     void on_wScript_textChanged();
 
+    void on_wRefresh_clicked();
+
+    void on_wRetrieveSelectedJob_clicked();
+
+    void on_wRetrieveAllJobs_clicked();
+
+    void on_wDeleteSelectedJob_clicked();
+
+    void on_wCheckCopyToDesktop_toggled(bool checked);
+
+    void on_wCheckCopyToVscData_toggled(bool checked);
+
+    void on_wCheckDeleteLocalJobFolder_toggled(bool checked);
+
+    void on_wCheckDeleteRemoteJobFolder_toggled(bool checked);
+
 private:
     void      clusterDependencies_( bool updateWidgets );
     void      nodesetDependencies_( bool updateWidgets );
@@ -143,11 +160,15 @@ private:
     int previousPage_;
     QList<dc::DataConnectorBase*> data_;
     dc::DataConnectorBase* getDataConnector( QString const& name );
+
     cfg::Item* getConfigItem( QString const& name );
+    template <class T>
+    cfg::Item* getConfigItem( QString const& name, T default_value );
+     // as above but sets a default value if the item did not exist before.
+
     int walltimeUnitSeconds_; // #seconds in walltime unit as given by this->ui->wWalltimeUnit
 
     QPalette* paletteRedForeground_;
-    QPalette* paletteGreenForeground_;
 
     ssh2::Session sshSession_;
     QString local_subfolder();
