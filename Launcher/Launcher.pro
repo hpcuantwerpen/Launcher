@@ -17,14 +17,14 @@ SOURCES  += main.cpp        \
             mainwindow.cpp  \
             launcher.cpp \
             clusterinfo.cpp \
-    dataconnector.cpp \
-    job.cpp
+            dataconnector.cpp \
+            job.cpp
 
 HEADERS  += mainwindow.h   \
             launcher.h \
             clusterinfo.h \
-    dataconnector.h \
-    job.h
+            dataconnector.h \
+            job.h
 
 FORMS    += mainwindow.ui
 
@@ -39,3 +39,6 @@ arg_lib  = ssh2tools
 include(../depend_on_lib.pri)
 
 include(../ssh2tools/libssh2.pri)
+
+DISTFILES += \
+    DeployDocumentation.txt

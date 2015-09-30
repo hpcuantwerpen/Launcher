@@ -63,11 +63,9 @@ namespace pbs
  //-----------------------------------------------------------------------------
     void
     Script::
-    add(const QString &line, bool hidden, bool parsing_ )
+    add(const QString &line, bool hidden )
     {
      // Note that directly calling add acts like calling parse() with additive=True
-     // _parsing must be true when called by self.parse(), it affects the bookkeeping
-     // of unsaved_changes
         ShellCommand* p_new_script_line( pbs::parse(line) );
         p_new_script_line->setHidden(hidden);
         p_new_script_line->set_parent( this );
@@ -87,8 +85,6 @@ namespace pbs
                 delete p_new_script_line;
             }
         }
-        //            if not _parsing:
-        //                self._unsaved_changes = True
     }
  //-----------------------------------------------------------------------------
     void
@@ -130,7 +126,7 @@ namespace pbs
  //-----------------------------------------------------------------------------
     void
     Script::
-    read( QString const& filepath, bool additive)
+    read( QString const& filepath )
     {
         if( filepath.isEmpty() )
             throw_<InexistingFile>("Empty filename. \n    in 'void Script::read()'");

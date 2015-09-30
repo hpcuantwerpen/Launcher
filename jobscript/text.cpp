@@ -65,7 +65,7 @@ namespace pbs
     Text::
     staticCompose( Text* _this_)
     {
-        if( !_this_->text_.endsWith('/n'))
+        if( !_this_->text_.endsWith('\n'))
             _this_->text_.append('\n');
     }
  //-----------------------------------------------------------------------------

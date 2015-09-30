@@ -37,30 +37,6 @@ public:
     explicit MainWindow(QWidget *parent = 0);
     ~MainWindow();
 
-    void setIgnoreSignals( bool ignore=true );
-    bool getIgnoreSignals() const { return ignoreSignals_; }
-    NodesetInfo const& nodesetInfo() const;
-    ClusterInfo const& clusterInfo() const;
-
-private:
-    void print_( std::string const& signature ) const;
-    template <class T>
-    void print_( std::string const& signature, T arg1 ) const {
-        this->print_(signature);
-        std::cout << "    arg1 = " << arg1 << std::endl;
-    }
-    void storeResetValues_();
-
-//    void set_has_unsaved_changes( bool has_unsaved_changes=true ) {
-//        this->launcher_.script.set_has_unsaved_changes( has_unsaved_changes );
-//    }
-//    bool has_unsaved_changes() const {
-//        return this->launcher_.script.has_unsaved_changes();
-//    }
-    void check_script_unsaved_changes();
-    void refreshJobs( JobList const& joblist );
-
-
 private slots:
     void on_wCluster_currentIndexChanged(const QString &arg1);
 
@@ -136,59 +112,74 @@ private slots:
 
     void on_wCheckDeleteRemoteJobFolder_toggled(bool checked);
 
-private:
-    void      clusterDependencies_( bool updateWidgets );
-    void      nodesetDependencies_( bool updateWidgets );
-    void walltimeUnitDependencies_( bool updateWidgets );
+public:
+    void setIgnoreSignals( bool ignore=true );
+    bool getIgnoreSignals() const { return ignoreSignals_; }
 
-    void update_abe_( QChar c, bool checked );
-    bool getPrivatePublicKeyPair_();
-    void updateResourceItems_();
-    bool isUserAuthenticated_() const;
+    NodesetInfo const& nodesetInfo() const;
+    ClusterInfo const& clusterInfo() const;
+
+    void print_signature( std::string const& signature ) const;
+
+    template <class T>
+    void print_signature( std::string const& signature, T arg1 ) const {
+        this->print_signature(signature);
+        std::cout << "    arg1 = " << arg1 << std::endl;
+    }
+
+    void storeResetValues();
+    void check_script_unsaved_changes();
+    void refreshJobs( JobList const& joblist );
+
+    void      clusterDependencies( bool updateWidgets );
+    void      nodesetDependencies( bool updateWidgets );
+    void walltimeUnitDependencies( bool updateWidgets );
+
+    void update_abe( QChar c, bool checked );
+    bool getPrivatePublicKeyPair();
+    void updateResourceItems();
+    bool isUserAuthenticated() const;
 
     void lookForJobscript( QString const& job_folder );
     bool loadJobscript( QString const& filepath );
     bool saveJobscript( QString const& filepath );
     bool remoteCopyJob();
 
-    void remoteExecute_( QString const& command_line, QString* qout=nullptr, QString* qerr=nullptr );
+    cfg::Item* getConfigItem( QString const& name );
+     // get config item by name and create it (empty) if it does not exist
+    template <class T>
+    cfg::Item* getConfigItem( QString const& name, T default_value );
+     // as above but sets a default value if the item did not exist before.
 
+    QString local_subfolder();
+    QString local_subfolder_jobname();
+    QString remote_subfolder();
+    QString remote_subfolder_jobname();
 
+    void resolveRemoteFileLocations_();
+
+private:
     Ui::MainWindow *ui;
     Launcher launcher_;
     bool ignoreSignals_;
     int previousPage_;
     QList<dc::DataConnectorBase*> data_;
     dc::DataConnectorBase* getDataConnector( QString const& name );
-
-    cfg::Item* getConfigItem( QString const& name );
-    template <class T>
-    cfg::Item* getConfigItem( QString const& name, T default_value );
-     // as above but sets a default value if the item did not exist before.
-
     int walltimeUnitSeconds_; // #seconds in walltime unit as given by this->ui->wWalltimeUnit
-
     QPalette* paletteRedForeground_;
 
     ssh2::Session sshSession_;
-    QString local_subfolder();
-    QString local_subfolder_jobname();
-    QString remote_subfolder();
-    QString remote_subfolder_jobname();
-    QString remote_;
-
-    void resolveRemoteFileLocations_();
     QMap<QString,QString> remote_env_vars_;
 
 };
 
 #define PRINT0_AND_CHECK_IGNORESIGNAL( signature ) \
-    this->print_( signature ); \
+    this->print_signature( signature ); \
     this->check_script_unsaved_changes();\
     if( this->ignoreSignals_ ) return;
 
 #define PRINT1_AND_CHECK_IGNORESIGNAL( signature, arg1 ) \
-    this->print_( signature, (arg1) ); \
+    this->print_signature( signature, (arg1) ); \
     this->check_script_unsaved_changes();\
     if( this->ignoreSignals_ ) return;
 

@@ -1,0 +1,13 @@
+This document gathers information on how to set up a distributable application on the various operating systems
+ - 1. Mac OS X
+ - 2. Linux
+ - 3. Windows
+    a. Windows 8
+    b. Windows 7
+
+1. Mac OS X
+============
+1a. Interesting links
+    http://stackoverflow.com/questions/1596945/building-osx-app-bundle
+    - first answer gives good background
+    - second answer has link to good (?) tool

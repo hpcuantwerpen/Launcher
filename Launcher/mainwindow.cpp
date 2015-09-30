@@ -135,7 +135,7 @@
         }
         if( !ci->isInitialized() )
             ci->set_value( ci->default_value() );
-        this->clusterDependencies_(false);
+        this->clusterDependencies(false);
 
         this->data_.append( dc::newDataConnector( this->ui->wCluster       , "wCluster"       , "cluster"    ) );
         this->data_.append( dc::newDataConnector( this->ui->wNodeset       , "wNodeset"       , "nodeset"    ) );
@@ -147,7 +147,7 @@
         this->data_.append( dc::newDataConnector( this->ui->wWalltime      , "wWalltime"      , ""           ) );
 
 //        this->getDataConnector("wCluster")->config_to_widget();
-        this->storeResetValues_();
+        this->storeResetValues();
 
         this->data_.append( dc::newDataConnector( this->ui->wUsername, "wUsername", "user" ) );
         bool can_authenticate = !this->getConfigItem("wUsername")->value().toString().isEmpty();
@@ -295,7 +295,7 @@
     }
 
  //-----------------------------------------------------------------------------
-    void MainWindow::storeResetValues_()
+    void MainWindow::storeResetValues()
     {
         this->nodesetInfo().storeResetValues
                 ( this->ui->wNNodes       ->value()
@@ -402,7 +402,7 @@
         return nodesetInfo;
     }
  //-----------------------------------------------------------------------------
-    void MainWindow::print_( std::string const& signature ) const
+    void MainWindow::print_signature( std::string const& signature ) const
     {
         if( this->ignoreSignals_ ) {
             std::cout << "\nIgnoring signal:\n";
@@ -412,7 +412,7 @@
         std::cout << signature << std::endl;
     }
  //------------------------------------------------------------------------------
-    void MainWindow::clusterDependencies_( bool updateWidgets )
+    void MainWindow::clusterDependencies( bool updateWidgets )
     {// act on config items only...
 
         {
@@ -430,8 +430,8 @@
                 this->getDataConnector("wNodeset")->  value_config_to_widget();
             }
 
-            this->nodesetDependencies_     (updateWidgets);
-            this->walltimeUnitDependencies_(updateWidgets);
+            this->nodesetDependencies     (updateWidgets);
+            this->walltimeUnitDependencies(updateWidgets);
 
             this->sshSession_.setLoginNode( clusterInfo.loginNodes()[0] );
         }
@@ -451,7 +451,7 @@
         return x;
     }
  //-----------------------------------------------------------------------------
-    void MainWindow::nodesetDependencies_( bool updateWidgets )
+    void MainWindow::nodesetDependencies( bool updateWidgets )
     {
         NodesetInfo const& nodesetInfo = this->nodesetInfo();
         cfg::Item* ci = this->getConfigItem("wNNodes");
@@ -528,7 +528,7 @@
         return s;
     }
  //-----------------------------------------------------------------------------
-    void MainWindow::walltimeUnitDependencies_( bool updateWidgets )
+    void MainWindow::walltimeUnitDependencies( bool updateWidgets )
     {
         QString unit = this->getConfigItem("wWalltimeUnit")->value().toString();
         this->walltimeUnitSeconds_ = nSecondsPerUnit(unit);
@@ -543,7 +543,9 @@
         range.append( step );
 
         cfg::Item* ci_wWalltime = this->getConfigItem("wWalltime");
+#ifdef QT_DEBUG
         double current = ci_wWalltime->value().toDouble();
+#endif
         try {
             ci_wWalltime->set_choices(range,true);
         } catch( cfg::InvalidConfigItemValue& e) {}
@@ -589,7 +591,7 @@ void MainWindow::on_wCluster_currentIndexChanged( QString const& arg1 )
     PRINT1_AND_CHECK_IGNORESIGNAL("void MainWindow::on_wCluster_currentIndexChanged( QString const& arg1 )", arg1.toStdString() )
 
     this->launcher_.config["wCluster"].set_value(arg1);
-    this->clusterDependencies_(true);
+    this->clusterDependencies(true);
 }
 
 void MainWindow::on_wNodeset_currentTextChanged(const QString &arg1)
@@ -597,10 +599,10 @@ void MainWindow::on_wNodeset_currentTextChanged(const QString &arg1)
     PRINT1_AND_CHECK_IGNORESIGNAL( "void MainWindow::on_wNodeset_currentTextChanged(const QString &arg1)", arg1.toStdString() )
 
     this->getConfigItem("wNodeset")->set_value(arg1);
-    this->nodesetDependencies_(true);
+    this->nodesetDependencies(true);
 }
 
-void MainWindow::updateResourceItems_()
+void MainWindow::updateResourceItems()
 {
     IGNORE_SIGNALS_UNTIL_END_OF_SCOPE;;
 
@@ -631,7 +633,7 @@ void MainWindow::on_wRequestNodes_clicked()
     this->getConfigItem("wNCores"       )->set_value( nodeset.granted().nCores );
     this->getConfigItem("wGbPerCore"    )->set_value( nodeset.granted().gbPerCore );
     this->getConfigItem("wGbTotal"      )->set_value( nodeset.granted().gbTotal );
-    this->updateResourceItems_();
+    this->updateResourceItems();
 }
 
 void MainWindow::on_wAutomaticRequests_toggled(bool checked)
@@ -701,7 +703,7 @@ void MainWindow::on_wRequestCores_clicked()
     this->getConfigItem("wNCores"       )->set_value( nodeset.granted().nCores );
     this->getConfigItem("wGbPerCore"    )->set_value( nodeset.granted().gbPerCore );
     this->getConfigItem("wGbTotal"      )->set_value( nodeset.granted().gbTotal );
-    this->updateResourceItems_();
+    this->updateResourceItems();
 }
 
 void MainWindow::on_wPages_currentChanged(int index)
@@ -745,7 +747,7 @@ void MainWindow::on_wPages_currentChanged(int index)
         {
             if( !Job::sshSession ) Job::sshSession = &this->sshSession_;
 
-            bool ok = this->isUserAuthenticated_();
+            bool ok = this->isUserAuthenticated();
             if( !ok ) {
                 QMessageBox::warning(this,TITLE,"Since you are not authenticated, you have no access to the remote host. Remote functionality on this tab is disabled.");
             }
@@ -775,7 +777,7 @@ void MainWindow::on_wWalltimeUnit_currentTextChanged(const QString &arg1)
     PRINT1_AND_CHECK_IGNORESIGNAL("void MainWindow::on_wWalltimeUnit_currentTextChanged(const QString &arg1)", arg1.toStdString() );
 
     this->getDataConnector("wWalltimeUnit")->value_widget_to_config();
-    this->walltimeUnitDependencies_(true);
+    this->walltimeUnitDependencies(true);
 }
 
 void MainWindow::on_wWalltime_valueChanged(double arg1)
@@ -815,7 +817,7 @@ void MainWindow::on_wNotifyAddress_editingFinished()
     }
 }
 
-void MainWindow::update_abe_( QChar c, bool checked )
+void MainWindow::update_abe( QChar c, bool checked )
 {
     cfg::Item* ci_notifyWhen = this->getConfigItem("notifyWhen");
     QString abe = ci_notifyWhen->value().toString();
@@ -834,24 +836,24 @@ void MainWindow::update_abe_( QChar c, bool checked )
 void MainWindow::on_wNotifyAbort_toggled(bool checked)
 {
     PRINT1_AND_CHECK_IGNORESIGNAL("void MainWindow::on_wNotifyAbort_toggled(bool checked)", checked );
-    this->update_abe_('a', checked );
+    this->update_abe('a', checked );
 }
 
 void MainWindow::on_wNotifyBegin_toggled(bool checked)
 {
     PRINT1_AND_CHECK_IGNORESIGNAL("void MainWindow::on_wNotifyBegin_toggled(bool checked)", checked );
 
-    this->update_abe_('b', checked );
+    this->update_abe('b', checked );
 }
 
 void MainWindow::on_wNotifyEnd_toggled(bool checked)
 {
     PRINT1_AND_CHECK_IGNORESIGNAL("void MainWindow::on_wNotifyend_toggled(bool checked)", checked );
 
-    this->update_abe_('e', checked );
+    this->update_abe('e', checked );
 }
 
-bool MainWindow::getPrivatePublicKeyPair_()
+bool MainWindow::getPrivatePublicKeyPair()
 {
     QString private_key = QFileDialog::getOpenFileName( this, "Select PRIVATE key file:", this->launcher_.homePath() );
     if( !QFileInfo( private_key ).exists() ) {
@@ -923,7 +925,7 @@ void MainWindow::on_wUsername_editingFinished()
     }
 }
 
-bool MainWindow::isUserAuthenticated_() const
+bool MainWindow::isUserAuthenticated() const
 {
     return this->ui->wAuthenticate->text() == "authenticated";
 }
@@ -960,7 +962,7 @@ void MainWindow::on_wAuthenticate_clicked()
             continue;
         }
         catch( ssh2::MissingKey& e ) {
-            if( !this->getPrivatePublicKeyPair_() )
+            if( !this->getPrivatePublicKeyPair() )
             {// failed to provide existing keys
                 break;
             } else
@@ -1029,7 +1031,7 @@ void MainWindow::on_wAuthenticate_clicked()
         this->getConfigItem("publicKey" )->set_value( QString() );
         this->statusBar()->showMessage( QString("Authentication failed: %1 failed attempts to provide passphrase.").arg(max_attempts) );
     }
-    if( !this->isUserAuthenticated_() ) {
+    if( !this->isUserAuthenticated() ) {
         QString modules_cluster = QString("modules_").append(this->getConfigItem("wCluster")->value().toString() );
         QStringList modules = this->getConfigItem(modules_cluster)->choices_as_QStringList();
         if( modules.isEmpty() ) {
@@ -1277,16 +1279,15 @@ void MainWindow::on_wRemote_currentIndexChanged(const QString &arg1)
     PRINT1_AND_CHECK_IGNORESIGNAL("void MainWindow::on_wRemote_currentIndexChanged(const QString &arg1)", arg1.toStdString() );
 
     this->getConfigItem("wRemote")->set_value(arg1);
-    this->remote_ = arg1;
-    if( this->isUserAuthenticated_() ) {
+    if( this->isUserAuthenticated() ) {
         QString qout;
-        QString cmd = QString("echo ").append(this->remote_);
+        QString cmd = QString("echo ").append(arg1);
         this->sshSession_.execute( cmd );
         std::cout << "\n" << cmd.toStdString()
                   << "\n''" << this->sshSession_.qout().toStdString() <<"''" <<std::endl;
     }
 
-    if( !this->remote_env_vars_.contains(arg1) && this->isUserAuthenticated_() ) {
+    if( !this->remote_env_vars_.contains(arg1) && this->isUserAuthenticated() ) {
         this->resolveRemoteFileLocations_();
     }
     QString tooltip = arg1;
@@ -1334,7 +1335,7 @@ void MainWindow::on_wSubmit_clicked()
             return;
         }
     }
-    if( !this->isUserAuthenticated_() ) {
+    if( !this->isUserAuthenticated() ) {
         QMessageBox::critical( this, TITLE, "You must authenticate first...");
         return;
     }

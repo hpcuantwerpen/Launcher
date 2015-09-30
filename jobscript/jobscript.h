@@ -37,13 +37,13 @@ namespace pbs
               );
         ~Script();
 
-        void read ( QString const& filepath,  bool additive=false );
+        void read ( QString const& filepath );
         void write( QString const& filepath    = QString()
                   , bool warn_before_overwrite = true
                   ) const;
 
         void parse( QString const& text, bool additive=false );
-        void add  ( QString const& line,bool hidden=false, bool parsing_=false );
+        void add  ( QString const& line, bool hidden=false );
 
         virtual void compose();
         int index( ShellCommand const* line ) const;

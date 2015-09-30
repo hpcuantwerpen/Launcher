@@ -7,7 +7,7 @@
     <x>0</x>
     <y>0</y>
     <width>920</width>
-    <height>573</height>
+    <height>599</height>
    </rect>
   </property>
   <property name="sizePolicy">
@@ -30,7 +30,7 @@
        </sizepolicy>
       </property>
       <property name="currentIndex">
-       <number>0</number>
+       <number>1</number>
       </property>
       <widget class="QWidget" name="wResourcesPage">
        <property name="sizePolicy">

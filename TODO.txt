@@ -1,27 +1,12 @@
 TODO LIST
-- add a save button to the wScript tab
-- add mpi functionality
+- make a installable application for mac
 - add icon
-- add app on mac wth icon
-  see https://mathiasbynens.be/notes/shell-script-mac-apps
-- add shortcut on desktop of windows with icon
-- reload job script from disk, discarding changes
-- tab completion
-- delete remote files
-- on windows do not show the log
+- WINDOWS VERSION + INSTALLER
+- LINUX VERSION + INSTALLER
+- add mpi functionality
 
-DONE
-- dialog to save before exit
-- test on linux ubuntu
-- test on windows
-- automatic check for updates
-- create public repository
-- test Launcher.node_set_has_changed
-- add option to dos2unix all files transferred (and the other way around)
-- add menu with some tools to 
-	. edit clusters
-	. login nodes
-- cleanup pbs.py
-+ nodesets require extra pbs options.
-+ improve the log
-+ store last window size in configuration and use it when the Launcher is reopened.
+  see https://mathiasbynens.be/notes/shell-script-mac-apps
+
+- add shortcut on desktop of windows with icon
+
+- improve the log
