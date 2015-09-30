@@ -113,6 +113,7 @@ private slots:
     void on_wCheckDeleteRemoteJobFolder_toggled(bool checked);
 
 public:
+    void setupHome();
     void setIgnoreSignals( bool ignore=true );
     bool getIgnoreSignals() const { return ignoreSignals_; }
 

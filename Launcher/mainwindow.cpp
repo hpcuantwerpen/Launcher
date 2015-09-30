@@ -11,6 +11,7 @@
 #include <warn_.h>
 #include <ssh2tools.h>
 #include <cmath>
+#include <time.h>
 
  //-----------------------------------------------------------------------------
     QString validateEmailAddress( QString const & address )
@@ -38,9 +39,9 @@
     }
  //-----------------------------------------------------------------------------
 
-#include <time.h>       /* time */
 
 #define TITLE "Launcher 0.9"
+
  //-----------------------------------------------------------------------------
  // MainWindow::
  //-----------------------------------------------------------------------------
@@ -51,6 +52,8 @@
       , previousPage_(0)
     {
         ui->setupUi(this);
+
+        this->setupHome();
 
         this->setWindowTitle("Launcher 0.9");
 
@@ -1518,4 +1521,42 @@ void MainWindow::on_wCheckDeleteRemoteJobFolder_toggled(bool checked)
     PRINT1_AND_CHECK_IGNORESIGNAL("void MainWindow::on_wCheckDeleteRemoteJobFolder_toggled(bool checked", checked);
 
     this->getConfigItem("wCheckDeleteRemoteJobFolder")->set_value(checked);
+}
+
+SUBCLASS_EXCEPTION(BadLauncherHome,std::runtime_error)
+SUBCLASS_EXCEPTION(BadDistribution,std::runtime_error)
+
+void MainWindow::setupHome()
+{
+    QDir launcher_home( this->launcher_.homePath() );
+    if( !launcher_home.exists() )
+    {// This must be the first time after installation...
+        if( !launcher_home.mkpath("clusters") ) {
+            throw_<BadLauncherHome>("Cannot create directory '%1'.", launcher_home.absoluteFilePath("clusters") );
+        }
+        if( !launcher_home.mkpath("jobs") ) {
+            throw_<BadLauncherHome>("Cannot create directory '%1'.", launcher_home.absoluteFilePath("jobs") );
+        }
+        QDir dir = QDir::current();
+        QString clusters_path = dir.absoluteFilePath("../Resources/clusters");
+        dir = QDir(clusters_path);
+        if( !dir.exists() ) {
+            throw_<BadDistribution>("Could not find clusters in distribution.");
+        }
+        QStringList filters;
+        filters << "*.info";
+        dir.setNameFilters(filters);
+        QFileInfoList clusters = dir.entryInfoList();
+        QString destination = this->launcher_.homePath("clusters");
+        for ( QFileInfoList::ConstIterator iter=clusters.cbegin()
+            ; iter!=clusters.cend(); ++iter )
+        {
+            QString tmp = iter->absoluteFilePath();
+            QFile qFile( tmp );
+            tmp = QString(destination).append('/').append( iter->fileName() );
+            qFile.copy( tmp );
+
+        }
+    }
+
 }

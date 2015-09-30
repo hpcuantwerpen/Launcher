@@ -11,3 +11,11 @@ This document gathers information on how to set up a distributable application o
     http://stackoverflow.com/questions/1596945/building-osx-app-bundle
     - first answer gives good background
     - second answer has link to good (?) tool
+      this fixes the dependency on libssh2 and the dependencies thereof.
+
+    http://doc.qt.io/qt-5/osx-deployment.html
+    - how to fix the dependencies on Qt libraries
+    - mind the remark that QtGui depends itself on QtCore and needs fixing
+
+    https://developer.apple.com/library/mac/documentation/Porting/Conceptual/PortingUnix/distributing/distibuting.html
+    - how to create a .dmg file

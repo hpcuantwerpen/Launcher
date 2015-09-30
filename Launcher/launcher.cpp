@@ -20,8 +20,8 @@
  //-----------------------------------------------------------------------------
     QString Launcher::homePath( QString const& sub )
     {
-        QString home = QProcessEnvironment::systemEnvironment().value("HOME");
-        QString root = QDir::cleanPath( QDir(home).filePath("Launcher_pp") );
+        QDir home = QDir::home();
+        QString root = QDir::cleanPath( home.filePath("Launcher") );
         if( sub.isEmpty() ) {
             return root;
         } else {
