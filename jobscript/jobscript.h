@@ -62,7 +62,7 @@ namespace pbs
         ShellCommand* find_key( QString const& key );
          // find the script line associated with key
 
-        virtual void print( std::ostream& to=std::cout, int verbose=0, bool refresh=false);
+        virtual QString toString( int verbose=0, bool refresh=false );
 
     private:
         ScriptLines_t lines_;

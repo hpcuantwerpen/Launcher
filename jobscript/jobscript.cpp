@@ -386,24 +386,25 @@ namespace pbs
         return nullptr; //keep compiler happy
     }
  //-----------------------------------------------------------------------------
-    void Script::print( std::ostream& to, int verbose, bool refresh )
+    QString Script::toString( int verbose, bool refresh )
     {
-        this->Text::print(to,verbose,refresh);
-        if( verbose ) {
-            to << "\nJobSript::print"
-               << "\n->filepath_  [[" << this->filepath_.toStdString() << "]]"
-               << "\n->lines_  #  [[" << this->lines_.size()           << "]]"
-               << std::flush
+        QString s = this->Text::toString(verbose,refresh);
+        if( verbose )
+        {
+            QTextStream ts(&s);
+            ts << "\nJobSript::print"
+               << "\n->filepath_  [[" << this->filepath_     << "]]"
+               << "\n->lines_  #  [[" << this->lines_.size() << "]]"
                ;
             int il=0;
             for ( ScriptLines_t::const_iterator iter=this->lines_.cbegin()
                 ; iter != this->lines_.cend(); ++iter )
             {
-                to << "\n#[" << il << "]";
-                (*iter)->print(to,verbose,refresh);
+                ts << "\n#[" << il << "]" << (*iter)->toString(verbose,refresh);
                 ++il;
             }
         }
+        return s;
     }
  //-----------------------------------------------------------------------------
 }// namespace pbs

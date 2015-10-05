@@ -6,6 +6,8 @@
 #include <QMap>
 #include <QRegularExpression>
 
+#include <throw_.h>
+
  //=============================================================================
     class ClusterInfoReader;
  //=============================================================================
@@ -167,5 +169,6 @@
        Raw_t rawClusterInfo_;
     };
  //=============================================================================
+SUBCLASS_EXCEPTION(NoClustersFound,std::runtime_error)
 #endif // CLUSTERINFO
 

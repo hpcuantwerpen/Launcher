@@ -78,7 +78,7 @@ namespace pbs
         virtual void compose();
         QString const& flag() const { return flag_; }
 
-        virtual void print( std::ostream& to=std::cout, int verbose=0 , bool refresh=false);
+        virtual QString toString( int verbose=0 , bool refresh=false );
 
     private:
         static ShellCommand* parse ( QString const &line);

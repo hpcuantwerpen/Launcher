@@ -1,6 +1,7 @@
 #include "text.h"
 #include <throw_.h>
 #include <QRegularExpression>
+#include <QTextStream>
 
 namespace pbs
 {//-----------------------------------------------------------------------------
@@ -69,20 +70,23 @@ namespace pbs
             _this_->text_.append('\n');
     }
  //-----------------------------------------------------------------------------
-    void Text::print( std::ostream &to, int verbose, bool refresh )
+    QString Text::toString( int verbose, bool refresh )
     {
+        QString s;
         if( refresh && this->is_modified() ) {
             this->text();
         }
+        QTextStream ts(&s);
         if( verbose ) {
-            to << "\nText::print"
-               << "\n->text_    [[" << this->text_   .toStdString() << "]]"
-               << "\n->body_    [[" << this->body_   .toStdString() << "]]"
-               << "\n->comment_ [[" << this->comment_.toStdString() << "]]"
-               << std::flush;
+            ts << "\nText::toString"
+               << "\n->text_    [[" << this->text_    << "]]"
+               << "\n->body_    [[" << this->body_    << "]]"
+               << "\n->comment_ [[" << this->comment_ << "]]"
+              ;
         } else {
-            to << this->text_.toStdString() << std::flush;
+            ts << this->text_;
         }
+        return s;
     }
  //-----------------------------------------------------------------------------
 }//namespace pbs

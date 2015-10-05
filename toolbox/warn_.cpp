@@ -1,6 +1,7 @@
 #include "warn_.h"
 #include <iostream>
+#include <QtDebug>
 
 void warn_( char const* msg ) {
-    std::cerr << msg << std::endl;
+    qWarning() << msg;
 }

@@ -12,6 +12,9 @@ TARGET = Launcher
 TEMPLATE = app
 
 CONFIG   += c++11
+CONFIG   -= console
+
+QMAKE_CXXFLAGS += -Wno-format-security
 
 SOURCES  += main.cpp        \
             mainwindow.cpp  \
@@ -40,5 +43,3 @@ include(../depend_on_lib.pri)
 
 include(../ssh2tools/libssh2.pri)
 
-DISTFILES += \
-    DeployDocumentation.txt

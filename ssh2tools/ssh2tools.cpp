@@ -19,6 +19,8 @@
 
 #include <QDir>
 #include <QFileInfo>
+#include <QTextStream>
+#include <QtDebug>
 
 static int waitsocket(int socket_fd, LIBSSH2_SESSION *session)
 {
@@ -341,9 +343,9 @@ namespace ssh2
                     {
                         this->bytecount_[iq] += rv;
                         if( Session::verbose > 1 ) {
-                            std::cerr << '\n' << name[iq] << " buffer<<<" << std::flush;
+                            std::cerr << '\n' << name[iq] << " buffer<<<";
                             for( int i=0; i < rv; ++i ) fputc( buffer[i], stderr);
-                            std::cerr << ">>>" << std::flush;
+                            std::cerr << ">>>";
                         }
                         buffer[rv] ='\0';
                         qxxx[iq]->append(buffer);
@@ -388,30 +390,30 @@ namespace ssh2
     {
         try {
             if( Session::verbose )
-                std::cout << "\nRemote execution of \n    command  : '" << cmd.toStdString() << "'" << std::endl;
+                qInfo() << "\nRemote execution of \n    command  : '" << cmd << "'";
 
             this->exec_( cmd, &this->qout_, &this->qerr_ );
 
             if( Session::verbose || this->cmd_exit_code_ ) {
-                std::cout <<   "    exit code: " << this->cmd_exit_code_   << std::flush;
+                qInfo() <<   "    exit code: " << this->cmd_exit_code_;
                 if( this->cmd_exit_signal_ )
-                std::cout << "\n    exit signal: " << this->cmd_exit_signal_ << std::flush;
+                qInfo() << "\n    exit signal: " << this->cmd_exit_signal_;
                 if( !this->qout().isEmpty() ) {
-                    std::cout << "\n    stdout   :"
+                    qInfo() << "\n    stdout   :"
                               << "\n----------------\n"
-                              << this->qout().toStdString()
-                              << "\n----------------" << std::flush;
+                              << this->qout()
+                              << "\n----------------";
                 }
                 if( !this->qerr().isEmpty() ) {
-                    std::cout << "\n    stderr   :"
+                    qInfo() << "\n    stderr   :"
                               << "\n----------------\n"
-                              << this->qerr().toStdString()
-                              << "\n----------------" << std::flush;
+                              << this->qerr()
+                              << "\n----------------";
                 }
-                std::cout <<'\n';
+                qInfo() <<'\n';
             }
         } catch( std::runtime_error& e ) {
-            std::cerr << e.what() << std::endl;
+            std::cerr << e.what();
         }
         return this->cmd_exit_code_;
     }
@@ -428,9 +430,9 @@ namespace ssh2
         char const*  p_local_filepath =  local_filepath.c_str();
         char const* p_remote_filepath = remote_filepath.c_str();
         if( Session::verbose ) {
-            std::cout << "\nFile transfer : local >> remote"
+            qInfo() << "\nFile transfer : local >> remote"
                       << "\n    local : '" << local_filepath << "'"
-                      << "\n    remote: '" << remote_filepath << "'" << std::endl;
+                      << "\n    remote: '" << remote_filepath << "'";
         }
 
         if( !this->isOpen() ) {
@@ -514,7 +516,7 @@ namespace ssh2
         channel = nullptr;
 
         if( Session::verbose ) {
-            std::cout << "\n    copied: " << (unsigned long)local_fileinfo.st_size << " bytes" << std::endl;
+            qInfo() << "\n    copied: " << (unsigned long)local_fileinfo.st_size << " bytes";
         }
     }
 #endif//#ifdef SCP
@@ -528,10 +530,10 @@ namespace ssh2
         std::string  local_filepath =  q_local_filepath.toStdString();
         std::string remote_filepath = q_remote_filepath.toStdString();
         if( Session::verbose ) {
-            std::cout << "\nFile transfer : local >> remote"
-                      << "\n    local : '" <<  local_filepath << "'"
-                      << "\n    remote: '" << remote_filepath << "'"
-                      << std::endl;
+            qInfo() << "\nFile transfer : local >> remote"
+                    << "\n    local : '" <<  q_local_filepath << "'"
+                    << "\n    remote: '" << q_remote_filepath << "'"
+                    ;
         }
 
         if( !this->isOpen() ) {
@@ -638,10 +640,10 @@ namespace ssh2
         std::string  local_filepath =  q_local_filepath.toStdString();
         std::string remote_filepath = q_remote_filepath.toStdString();
         if( Session::verbose ) {
-            std::cout << "\nFile transfer : remote >> local"
-                      << "\n    remote: '" << remote_filepath << "'"
-                      << "\n    local : '" <<  local_filepath << "'"
-                      << std::flush;
+            qInfo() << "\nFile transfer : remote >> local"
+                      << "\n    remote: '" << q_remote_filepath << "'"
+                      << "\n    local : '" <<  q_local_filepath << "'"
+                     ;
         }
 
         if( !this->isOpen() ) {
@@ -889,15 +891,18 @@ namespace ssh2
         return out.toStdString();
     }
  //-----------------------------------------------------------------------------
-    void Session::print( std::ostream& ostrm ) const
+    QString Session::toString() const
     {
-        ostrm << "\nssh2 Session"
-              << "\n    login node  : "<< this->login_node_
-              << "\n    username    : "<< this->username_
-              << "\n    private key : "<< this->private_key_
-              << "\n    public  key : "<< this->public_key_
-              << "\n    passphrase  : '"<< scramble(this->passphrase_)<<"'"
-              << std::endl;
+        QString s;
+        QTextStream ts(&s);
+        ts << "\nssh2 Session"
+           << "\n    login node  : " << QString( this->login_node_          .c_str() )
+           << "\n    username    : " << QString( this->username_            .c_str() )
+           << "\n    private key : " << QString( this->private_key_         .c_str() )
+           << "\n    public  key : " << QString( this->public_key_          .c_str() )
+           << "\n    passphrase  : '"<< QString( scramble(this->passphrase_).c_str() )<<"'"
+           ;
+        return s;
     }
  //-----------------------------------------------------------------------------
     QString Session::get_env( QString const& env)

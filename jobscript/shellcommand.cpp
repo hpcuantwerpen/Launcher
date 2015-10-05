@@ -1,5 +1,6 @@
 #include "shellcommand.h"
 #include "usercomment.h"
+#include <QTextStream>
 
 namespace pbs
 {//-----------------------------------------------------------------------------
@@ -53,7 +54,7 @@ namespace pbs
         }
     }
  //-----------------------------------------------------------------------------
-    std::string toStdString(Parameters_t parameters)
+    QString toString(Parameters_t parameters)
     {
         QString result("{ ");
         for ( Parameters_t::const_iterator iter=parameters.cbegin()
@@ -62,10 +63,10 @@ namespace pbs
             result.append( QString("(%1:%2) ").arg(iter->first).arg(iter->second) );
         }
         result.append("}");
-        return result.toStdString();
+        return result;
     }
  //-----------------------------------------------------------------------------
-    std::string toStdString(Features_t features)
+    QString toString(Features_t features)
     {
         QString result("{ ");
         for ( Features_t::const_iterator iter=features.cbegin()
@@ -74,22 +75,25 @@ namespace pbs
             result.append( QString("(%1) ").arg(*iter) );
         }
         result.append("}");
-        return result.toStdString();
+        return result;
     }
  //-----------------------------------------------------------------------------
-    void ShellCommand::print( std::ostream& to, int verbose , bool refresh )
+    QString ShellCommand::toString( int verbose, bool refresh )
     {
-        this->Text::print(to,verbose,refresh);
-        if( verbose ) {
-            to << "\nShellCommand::print"
+        QString s = this->Text::toString(verbose,refresh);
+        if( verbose )
+        {
+            QTextStream ts(&s);
+            ts << "\nShellCommand::toString"
                << "\n->type_      [[" << this->type_                      << "]]"
-               << "\n->value_     [[" << this->value_   .toStdString()    << "]]"
-               << "\n->flag_      [[" << this->flag_    .toStdString()    << "]]"
-               << "\n->parameters_[[" << toStdString( this->parameters_ ) << "]]"
-               << "\n->features_  [[" << toStdString( this->features_   ) << "]]"
+               << "\n->value_     [[" << this->value_                     << "]]"
+               << "\n->flag_      [[" << this->flag_                      << "]]"
+               << "\n->parameters_[[" << pbs::toString( this->parameters_ ) << "]]"
+               << "\n->features_  [[" << pbs::toString( this->features_   ) << "]]"
                << "\n->hidden_    [[" << (this->hidden_?1:0)              << "]]"
-               << std::flush;
+               ;
         }
+        return s;
     }
  //-----------------------------------------------------------------------------
 }//namespace pbs

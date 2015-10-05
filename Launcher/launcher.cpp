@@ -29,20 +29,31 @@
         }
     }
  //-----------------------------------------------------------------------------
-    void Launcher::readClusterInfo()
+    void Launcher::readClusterInfo( QString const& clusters_dir )
     {
-        QString pwd = QDir::currentPath();
-        QDir dir( Launcher::homePath("clusters"), "*.info");
-        QStringList clusters = dir.entryList();
-        if( clusters.size()==0 ) {
-            throw_<std::runtime_error>("No Clusters found.");
+        QDir dir( clusters_dir, "*.info");
+        if( !dir.exists() ) {
+            throw_<NoClustersFound>("Directory '%1' does not exist.", clusters_dir );
         }
-        QDir::setCurrent( dir.absolutePath() );
-        for (int i=0; i<clusters.size(); ++i) {
-            ClusterInfo cluster_i( clusters[i] );
+
+//        QString pwd = QDir::currentPath();
+
+        QFileInfoList clusters = dir.entryInfoList();
+        if( clusters.size()==0 ) {
+            throw_<NoClustersFound>("No .info files found in '%1'.", clusters_dir );
+        }
+        for ( QFileInfoList::const_iterator iter=clusters.cbegin()
+            ; iter!=clusters.cend(); ++iter )
+        {
+            ClusterInfo cluster_i( iter->absoluteFilePath() );
             this->clusters[cluster_i.name()] = cluster_i;
         }
-        QDir::setCurrent( pwd );
+//        QDir::setCurrent( dir.absolutePath() );
+//        for ( int i=0; i<clusters.size(); ++i) {
+//            ClusterInfo cluster_i( clusters[i] );
+//            this->clusters[cluster_i.name()] = cluster_i;
+//        }
+//        QDir::setCurrent( pwd );
     }
  //-----------------------------------------------------------------------------
     void Launcher::modifyScript( NodesetInfo const& nodeset )

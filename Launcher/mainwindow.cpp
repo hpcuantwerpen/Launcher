@@ -50,6 +50,7 @@
       , ui(new Ui::MainWindow)
       , ignoreSignals_(false)
       , previousPage_(0)
+      , verbosity_(1)
     {
         ui->setupUi(this);
 
@@ -89,34 +90,22 @@
         ci = this->getConfigItem("wWalltimeUnit");
         if( !ci->isInitialized() ) {
             QStringList units;
-            units.append("seconds");
-            units.append("minutes");
-            units.append("hours");
-            units.append("days");
-            units.append("weeks");
+            units <<"seconds"<<"minutes"<<"hours"<<"days"<<"weeks";
             ci->set_choices(units);
             ci->set_value("hours");
         }
 
-        ci = this->getConfigItem("walltimeSeconds");
-        if( !ci->isInitialized() ) {
-            ci->set_value("1:00:00");
-        }
-        ci = this->getConfigItem("wNotifyAddress");
-        if( !ci->isInitialized() ) {
-            ci->set_value("");
-        }
+        ci = this->getConfigItem("walltimeSeconds","1:00:00");
+
+        ci = this->getConfigItem("wNotifyAddress", QString() );
         ci = this->getConfigItem("notifyWhen");
         if( !ci->isInitialized() ) {
             ci->set_value("");
-            this->getConfigItem("wNotifyAbort")->set_value(false);
-            this->getConfigItem("wNotifyBegin")->set_value(false);
-            this->getConfigItem("wNotifyEnd"  )->set_value(false);
+            this->getConfigItem("wNotifyAbort", false );
+            this->getConfigItem("wNotifyBegin", false );
+            this->getConfigItem("wNotifyEnd"  , false );
         }
-        ci = this->getConfigItem("wJobname");
-        if( !ci->isInitialized() ) {
-            ci->set_value("");
-        }
+        ci = this->getConfigItem("wJobname", QString() );
 
         dc::DataConnectorBase::config = &(this->launcher_.config);
         dc::DataConnectorBase::script = &(this->launcher_.script);
@@ -129,7 +118,14 @@
         this->data_.append( dc::newDataConnector( this->ui->wNotifyBegin  , "wNotifyBegin"   , ""         ) );
 
      // this->ui->wCluster
-        this->launcher_.readClusterInfo(); // this throws if there are no clusters/*.info files
+        QString path_to_clusters = this->get_path_to_clusters();
+        if( path_to_clusters.isEmpty() ) {
+            QString msg("No clusters found (.info files).\n   ABORTING!");
+            QMessageBox::critical( this, TITLE, msg );
+            throw_<NoClustersFound>( msg.toStdString().c_str() );
+        } else {
+            this->launcher_.readClusterInfo( path_to_clusters );
+        }
         ci = this->getConfigItem("wCluster");
         try {
             ci->set_choices( this->launcher_.clusters.keys() );
@@ -149,7 +145,6 @@
         this->data_.append( dc::newDataConnector( this->ui->wGbTotal       , "wGbTotal"       , "Gb_total"   ) );
         this->data_.append( dc::newDataConnector( this->ui->wWalltime      , "wWalltime"      , ""           ) );
 
-//        this->getDataConnector("wCluster")->config_to_widget();
         this->storeResetValues();
 
         this->data_.append( dc::newDataConnector( this->ui->wUsername, "wUsername", "user" ) );
@@ -311,6 +306,7 @@
  //-----------------------------------------------------------------------------
     MainWindow::~MainWindow()
     {
+        qInfo("    closing down");
         for( QList<dc::DataConnectorBase*>::iterator iter = this->data_.begin(); iter!=this->data_.end(); ++iter ) {
             (*iter)->value_widget_to_config();
             delete (*iter);
@@ -320,6 +316,7 @@
         this->getConfigItem("windowWidth" )->set_value( windowSize.width () );
         this->getConfigItem("windowHeight")->set_value( windowSize.height() );
 
+        qInfo("~    saving config file.");
         this->launcher_.config.save();
 
         delete ui;
@@ -330,12 +327,12 @@
  //-----------------------------------------------------------------------------
     void MainWindow::setIgnoreSignals( bool ignore )
     {
-        if( ignore ) {
-            if( !this->ignoreSignals_ )
-                std::cout << "\n<<< ignoring signals >>>" << std::endl;
-        } else {
-            if( this->ignoreSignals_ )
-                std::cout << "\n<<< stopping ignoring signals >>>" << std::endl;
+        if( this->verbosity_ > 1 ) {
+            if( ignore ) {
+                if(!this->ignoreSignals_ ) qInfo() << "    ignoring signals ... ";
+            } else {
+                if( this->ignoreSignals_ ) qInfo() << "    ... ignoring signals has stopped";
+            }
         }
         this->ignoreSignals_ = ignore;
     }
@@ -405,15 +402,17 @@
         return nodesetInfo;
     }
  //-----------------------------------------------------------------------------
-    void MainWindow::print_signature( std::string const& signature ) const
-    {
-        if( this->ignoreSignals_ ) {
-            std::cout << "\nIgnoring signal:\n";
-        } else {
-            std::cout << "\nExecuting slot:\n";
-        }
-        std::cout << signature << std::endl;
-    }
+//    QString MainWindow::signature( QString const& sig ) const
+//    {
+//        QString s;
+//        if( this->ignoreSignals_ ) {
+//            s = "\nIgnoring signal:\n";
+//        } else {
+//            s ="\nExecuting slot:\n";
+//        }
+//        s += sig;
+//        return s;
+//    }
  //------------------------------------------------------------------------------
     void MainWindow::clusterDependencies( bool updateWidgets )
     {// act on config items only...
@@ -546,9 +545,6 @@
         range.append( step );
 
         cfg::Item* ci_wWalltime = this->getConfigItem("wWalltime");
-#ifdef QT_DEBUG
-        double current = ci_wWalltime->value().toDouble();
-#endif
         try {
             ci_wWalltime->set_choices(range,true);
         } catch( cfg::InvalidConfigItemValue& e) {}
@@ -563,23 +559,26 @@
         }
     }
  //-----------------------------------------------------------------------------
-    void MainWindow::check_script_unsaved_changes()
+    QString MainWindow::check_script_unsaved_changes()
     {
-        std::cout << "\nChecking unsaved changes : ";
+        QString msg;
+        QTextStream ts(&msg);
+        ts << "    Checking unsaved changes : ";
         bool has_unsaved_changes = this->launcher_.script.has_unsaved_changes();
         if( has_unsaved_changes ) {
-            std::cout << "true." << std::endl;
+            ts << "true";
             this->ui->wSave ->setText("*** Save ***");
             this->ui->wSave2->setText("*** Save ***");
             this->ui->wSave ->setToolTip("Save the current script locally (there are unsaved changes).");
             this->ui->wSave2->setToolTip("Save the current script locally (there are unsaved changes).");
         } else {
-            std::cout << "false." << std::endl;
+            ts << "false";
             this->ui->wSave ->setText("Save");
             this->ui->wSave2->setText("Save");
             this->ui->wSave ->setToolTip("Save the current script locally.");
             this->ui->wSave2->setToolTip("Save the current script locally.");
         }
+        return msg;
     }
  //-----------------------------------------------------------------------------
 
@@ -589,9 +588,22 @@
 
 #define IGNORE_SIGNALS_UNTIL_END_OF_SCOPE IgnoreSignals ignoreSignals(this)
 
+#define PRINT_AND_CHECK_IGNORESIGNAL( msg ) \
+    QString qmsg;\
+    if( !QString((msg)).isEmpty() ) qmsg.append("    argument = ").append(msg).append('\n');\
+    qmsg.append( this->check_script_unsaved_changes() ) ;\
+    if( this->ignoreSignals_ ) qmsg.append("\n    ignoring signal");\
+    std::string s = qmsg.toStdString();\
+    char const* c = s.c_str();\
+    qInfo(c,nullptr);\
+    if( this->ignoreSignals_ ) return;
+
+#define FORWARDING \
+    qInfo() << "    forwarding";
+
 void MainWindow::on_wCluster_currentIndexChanged( QString const& arg1 )
 {
-    PRINT1_AND_CHECK_IGNORESIGNAL("void MainWindow::on_wCluster_currentIndexChanged( QString const& arg1 )", arg1.toStdString() )
+    PRINT_AND_CHECK_IGNORESIGNAL( arg1 );
 
     this->launcher_.config["wCluster"].set_value(arg1);
     this->clusterDependencies(true);
@@ -599,7 +611,7 @@ void MainWindow::on_wCluster_currentIndexChanged( QString const& arg1 )
 
 void MainWindow::on_wNodeset_currentTextChanged(const QString &arg1)
 {
-    PRINT1_AND_CHECK_IGNORESIGNAL( "void MainWindow::on_wNodeset_currentTextChanged(const QString &arg1)", arg1.toStdString() )
+    PRINT_AND_CHECK_IGNORESIGNAL( arg1 )
 
     this->getConfigItem("wNodeset")->set_value(arg1);
     this->nodesetDependencies(true);
@@ -607,7 +619,7 @@ void MainWindow::on_wNodeset_currentTextChanged(const QString &arg1)
 
 void MainWindow::updateResourceItems()
 {
-    IGNORE_SIGNALS_UNTIL_END_OF_SCOPE;;
+    IGNORE_SIGNALS_UNTIL_END_OF_SCOPE;
 
     QStringList itemList({"wNNodes", "wNCoresPerNode", "wNCores", "wGbPerCore", "wGbTotal"});
     for( QStringList::const_iterator iter=itemList.cbegin(); iter!=itemList.cend(); ++iter )
@@ -621,7 +633,7 @@ void MainWindow::updateResourceItems()
 
 void MainWindow::on_wRequestNodes_clicked()
 {
-    PRINT0_AND_CHECK_IGNORESIGNAL("void MainWindow::on_wRequestNodes_clicked()")
+    PRINT_AND_CHECK_IGNORESIGNAL("")
 
     NodesetInfo const& nodeset = this->nodesetInfo();
     try {
@@ -641,7 +653,7 @@ void MainWindow::on_wRequestNodes_clicked()
 
 void MainWindow::on_wAutomaticRequests_toggled(bool checked)
 {
-    PRINT1_AND_CHECK_IGNORESIGNAL("void on_wAutomaticRequests_toggled(bool checked)", (checked?"true":"false") )
+    PRINT_AND_CHECK_IGNORESIGNAL( (checked?"true":"false") )
 
     bool manual = !checked;
     this->ui->wRequestNodes->setEnabled(manual);
@@ -650,7 +662,7 @@ void MainWindow::on_wAutomaticRequests_toggled(bool checked)
 
 void MainWindow::on_wNNodes_valueChanged(int arg1)
 {
-    PRINT1_AND_CHECK_IGNORESIGNAL("void MainWindow::on_wNNodes_valueChanged(int arg1)", arg1 )
+    PRINT_AND_CHECK_IGNORESIGNAL( QString().setNum(arg1) )
 
     if( this->ui->wAutomaticRequests->isChecked() ) {
         FORWARDING
@@ -660,7 +672,7 @@ void MainWindow::on_wNNodes_valueChanged(int arg1)
 
 void MainWindow::on_wNCoresPerNode_valueChanged(int arg1)
 {
-    PRINT1_AND_CHECK_IGNORESIGNAL("void MainWindow::on_wNCoresPerNode_valueChanged(int arg1)", arg1 )
+    PRINT_AND_CHECK_IGNORESIGNAL( QString().setNum(arg1) )
 
     if( this->ui->wAutomaticRequests->isChecked() ) {
         FORWARDING
@@ -670,7 +682,7 @@ void MainWindow::on_wNCoresPerNode_valueChanged(int arg1)
 
 void MainWindow::on_wNCores_valueChanged(int arg1)
 {
-    PRINT1_AND_CHECK_IGNORESIGNAL("void MainWindow::on_wNCores_valueChanged(int arg1)", arg1 )
+    PRINT_AND_CHECK_IGNORESIGNAL( QString().setNum(arg1) )
 
     if( this->ui->wAutomaticRequests->isChecked() ) {
         FORWARDING
@@ -680,7 +692,7 @@ void MainWindow::on_wNCores_valueChanged(int arg1)
 
 void MainWindow::on_wGbPerCore_valueChanged(double arg1)
 {
-    PRINT1_AND_CHECK_IGNORESIGNAL("void MainWindow::on_wGbPerCore_valueChanged(double arg1)", arg1 )
+    PRINT_AND_CHECK_IGNORESIGNAL( QString().setNum(arg1) )
 
     if( this->ui->wAutomaticRequests->isChecked() ) {
         FORWARDING
@@ -690,7 +702,7 @@ void MainWindow::on_wGbPerCore_valueChanged(double arg1)
 
 void MainWindow::on_wRequestCores_clicked()
 {
-    PRINT0_AND_CHECK_IGNORESIGNAL("void MainWindow::on_wRequestCores_clicked()")
+    PRINT_AND_CHECK_IGNORESIGNAL("")
 
     NodesetInfo const& nodeset = this->nodesetInfo();
     try {
@@ -711,9 +723,9 @@ void MainWindow::on_wRequestCores_clicked()
 
 void MainWindow::on_wPages_currentChanged(int index)
 {
-    PRINT1_AND_CHECK_IGNORESIGNAL("void MainWindow::on_wPages_currentChanged(int index)", index )
+    PRINT_AND_CHECK_IGNORESIGNAL( QString().setNum(index) )
 
-    std::cout << "    previous page: " << this->previousPage_ << std::endl;
+    qInfo() << "    previous page: " << this->previousPage_;
     switch (index) {
     case 0:
         if( this->previousPage_==1 )
@@ -723,8 +735,8 @@ void MainWindow::on_wPages_currentChanged(int index)
                 this->launcher_.script.parse( text, false );
             }
 //#ifdef QT_DEBUG
-//            std::cout<<text.toStdString()<<std::endl;
-//            this->launcher_.script.print(std::cout,1);
+//            qInfo()<<text.toStdString()<<std::endl;
+//            this->launcher_.script.print(qInfo(),1);
 //#endif
         }
         break;
@@ -741,8 +753,8 @@ void MainWindow::on_wPages_currentChanged(int index)
             IGNORE_SIGNALS_UNTIL_END_OF_SCOPE;
             this->ui->wScript->setText(text);
 //#ifdef QT_DEBUG
-//            std::cout<<text.toStdString()<<std::endl;
-//            this->launcher_.script.print(std::cout,1);
+//            qInfo()<<text.toStdString()<<std::endl;
+//            this->launcher_.script.print(qInfo(),1);
 //#endif
         }
         break;
@@ -769,7 +781,7 @@ void MainWindow::on_wPages_currentChanged(int index)
 
 void MainWindow::on_wEnforceNNodes_toggled(bool checked)
 {
-    PRINT1_AND_CHECK_IGNORESIGNAL("void MainWindow::on_wEnforceNNodes_toggled(bool checked)", checked );
+    PRINT_AND_CHECK_IGNORESIGNAL( (checked?"true":"false") )
 
     bool hide = !checked;
     this->launcher_.script.find_key("-W")->setHidden(hide);
@@ -777,7 +789,7 @@ void MainWindow::on_wEnforceNNodes_toggled(bool checked)
 
 void MainWindow::on_wWalltimeUnit_currentTextChanged(const QString &arg1)
 {
-    PRINT1_AND_CHECK_IGNORESIGNAL("void MainWindow::on_wWalltimeUnit_currentTextChanged(const QString &arg1)", arg1.toStdString() );
+    PRINT_AND_CHECK_IGNORESIGNAL( arg1 );
 
     this->getDataConnector("wWalltimeUnit")->value_widget_to_config();
     this->walltimeUnitDependencies(true);
@@ -785,26 +797,25 @@ void MainWindow::on_wWalltimeUnit_currentTextChanged(const QString &arg1)
 
 void MainWindow::on_wWalltime_valueChanged(double arg1)
 {
-    PRINT1_AND_CHECK_IGNORESIGNAL("void MainWindow::on_wWalltime_valueChanged(double arg1)", arg1 );
+    PRINT_AND_CHECK_IGNORESIGNAL( QString().setNum(arg1) );
 
-    IGNORE_SIGNALS_UNTIL_END_OF_SCOPE;;
+    IGNORE_SIGNALS_UNTIL_END_OF_SCOPE;
 
     cfg::Item* walltimeSeconds = this->getConfigItem("walltimeSeconds");
     double seconds = arg1*this->walltimeUnitSeconds_;
     walltimeSeconds->set_value( formatWalltimeSeconds( seconds ) );
     this->getDataConnector("walltimeSeconds")->value_config_to_script();
-    std::cout <<"    walltime set to: " << seconds << "s." << std::endl;
+    qInfo() <<"    walltime set to: " << seconds << "s.";
 }
 
 void MainWindow::on_wNotifyAddress_editingFinished()
 {
-    PRINT0_AND_CHECK_IGNORESIGNAL("void MainWindow::on_wNotifyAddress_editingFinished()" );
-
+    PRINT_AND_CHECK_IGNORESIGNAL("");
 
     QString validated = validateEmailAddress( this->ui->wNotifyAddress->text() );
     if( validated.isEmpty() )
     {// not a valid address
-        IGNORE_SIGNALS_UNTIL_END_OF_SCOPE;;
+        IGNORE_SIGNALS_UNTIL_END_OF_SCOPE;
         this->ui->wNotifyAddress->setPalette(*this->paletteRedForeground_);
         this->statusBar()->showMessage("Invalid email address.");
     } else {
@@ -812,7 +823,7 @@ void MainWindow::on_wNotifyAddress_editingFinished()
         this->statusBar()->clearMessage();
         this->getConfigItem("wNotifyAddress")->set_value(validated);
 
-        IGNORE_SIGNALS_UNTIL_END_OF_SCOPE;;
+        IGNORE_SIGNALS_UNTIL_END_OF_SCOPE;
         dc::DataConnectorBase* link = this->getDataConnector("wNotifyAddress");
         if( link->value_config_to_widget() ) {
             link->value_config_to_script();
@@ -831,28 +842,26 @@ void MainWindow::update_abe( QChar c, bool checked )
         abe.remove(i,1);
     }
     ci_notifyWhen->set_value( abe );
-    std::cout << "    abe set to: '" << abe.toStdString() << "'." << std::endl;
+    qInfo() << "    abe set to: '" << abe << "'.";
 
     this->getDataConnector("notifyWhen")->value_config_to_script();
 }
 
 void MainWindow::on_wNotifyAbort_toggled(bool checked)
 {
-    PRINT1_AND_CHECK_IGNORESIGNAL("void MainWindow::on_wNotifyAbort_toggled(bool checked)", checked );
+    PRINT_AND_CHECK_IGNORESIGNAL( (checked?"true":"false") )
     this->update_abe('a', checked );
 }
 
 void MainWindow::on_wNotifyBegin_toggled(bool checked)
 {
-    PRINT1_AND_CHECK_IGNORESIGNAL("void MainWindow::on_wNotifyBegin_toggled(bool checked)", checked );
-
+    PRINT_AND_CHECK_IGNORESIGNAL( (checked?"true":"false") )
     this->update_abe('b', checked );
 }
 
 void MainWindow::on_wNotifyEnd_toggled(bool checked)
 {
-    PRINT1_AND_CHECK_IGNORESIGNAL("void MainWindow::on_wNotifyend_toggled(bool checked)", checked );
-
+    PRINT_AND_CHECK_IGNORESIGNAL( (checked?"true":"false") )
     this->update_abe('e', checked );
 }
 
@@ -882,7 +891,7 @@ bool MainWindow::getPrivatePublicKeyPair()
 
 void MainWindow::on_wUsername_editingFinished()
 {
-    PRINT0_AND_CHECK_IGNORESIGNAL("void MainWindow::on_wUsername_editingFinished()" );
+    PRINT_AND_CHECK_IGNORESIGNAL("");
 
     QString username = validateUsername( this->ui->wUsername->text() );
 
@@ -935,7 +944,7 @@ bool MainWindow::isUserAuthenticated() const
 
 void MainWindow::on_wAuthenticate_clicked()
 {
-    PRINT0_AND_CHECK_IGNORESIGNAL("void MainWindow::on_wAuthenticate_clicked()" );
+    PRINT_AND_CHECK_IGNORESIGNAL("");
 
     this->setIgnoreSignals();
     int max_attempts = 3;
@@ -994,7 +1003,7 @@ void MainWindow::on_wAuthenticate_clicked()
                 msg.append(" (verify your internet connection).");
             }
             this->statusBar()->showMessage(msg);
-            std::cerr << msg.toStdString() << std::endl;
+            qInfo() << msg;
          // remove keys from ssh session and from config
             this->sshSession_.setUsername( this->getConfigItem("wUsername")->value().toString() );
             this->getConfigItem("privateKey")->set_value( QString() );
@@ -1023,7 +1032,7 @@ void MainWindow::on_wAuthenticate_clicked()
         this->getConfigItem(modules_cluster)->set_choices(modules);
 
 #ifdef QT_DEBUG
-        this->sshSession_.print();
+        qDebug() << this->sshSession_.toString();
 #endif
         break;
     }
@@ -1064,7 +1073,7 @@ void MainWindow::resolveRemoteFileLocations_()
 
 void MainWindow::on_wLocalFileLocationButton_clicked()
 {
-    PRINT0_AND_CHECK_IGNORESIGNAL("void MainWindow::on_wLocalFileLocationButton_clicked()" );
+    PRINT_AND_CHECK_IGNORESIGNAL("");
 
     QString directory = QFileDialog::getExistingDirectory( this, "Select local file location:", this->launcher_.homePath() );
     if( directory.isEmpty() ) return;
@@ -1082,7 +1091,7 @@ void MainWindow::on_wLocalFileLocationButton_clicked()
 
 void MainWindow::on_wSubfolderButton_clicked()
 {
-    PRINT0_AND_CHECK_IGNORESIGNAL("void MainWindow::on_wSubfolderButton_clicked()" );
+    PRINT_AND_CHECK_IGNORESIGNAL("");
 
     if( this->ui->wLocal->text().isEmpty() ) {
         QMessageBox::warning( this, TITLE, "You must select a local file location first.");
@@ -1116,7 +1125,7 @@ void MainWindow::on_wSubfolderButton_clicked()
 
 void MainWindow::on_wJobnameButton_clicked()
 {
-    PRINT0_AND_CHECK_IGNORESIGNAL("void MainWindow::on_wJobnameButton_clicked()" );
+    PRINT_AND_CHECK_IGNORESIGNAL("");
 
     if( this->ui->wLocal->text().isEmpty() ) {
         QMessageBox::warning( this, TITLE, "You must select a local file location first.");
@@ -1212,11 +1221,11 @@ bool MainWindow::loadJobscript( QString const& filepath )
     }
     catch( std::runtime_error& e )
     {
-        std::cerr << QString("ERROR: in 'void MainWindow:: loadJobscript( QString const& filepath /*=%1*/)'\n")
+        qInfo() << QString("ERROR: in 'void MainWindow:: loadJobscript( QString const& filepath /*=%1*/)'\n")
                         .arg(filepath)
-                        .toStdString()
+
                   << e.what()
-                  << std::endl;
+                 ;
         return false;
     }
  // read from file, hence no unsaved changes sofar
@@ -1226,10 +1235,10 @@ bool MainWindow::loadJobscript( QString const& filepath )
 
 bool MainWindow::saveJobscript( QString const& filepath )
 {
-    std::cout << "    writing script '" << filepath.toStdString() << "' ... "<< std::flush;
+    qInfo() << "    writing script '" << filepath << "' ... ";
     try {
         this->launcher_.script.write( filepath );
-        std::cout << "done."<< std::endl;
+        qInfo() << "done.";
     } catch( pbs::WarnBeforeOverwrite &e ) {
         QMessageBox::StandardButton answer =
                 QMessageBox::question( this, TITLE
@@ -1243,9 +1252,9 @@ bool MainWindow::saveJobscript( QString const& filepath )
             qFile.copy(backup);
          // and save
             this->launcher_.script.write( filepath, false );
-            std::cout << "done (overwritten, but made backup '"<<backup.toStdString()<<"')."<< std::endl;
+            qInfo() << "done (overwritten, but made backup '"<<backup<<"').";
         } else {
-            std::cout << "aborted."<< std::endl;
+            qInfo() << "aborted.";
             this->statusBar()->showMessage( QString("Job script NOT SAVED: '%1'").arg(filepath) );
             return false;
         }
@@ -1259,7 +1268,7 @@ bool MainWindow::saveJobscript( QString const& filepath )
 
 void MainWindow::on_wSubfolder_textChanged(const QString &arg1)
 {
-    PRINT1_AND_CHECK_IGNORESIGNAL("void MainWindow::on_wSubfolder_textChanged(const QString &arg1)", arg1.toStdString() );
+    PRINT_AND_CHECK_IGNORESIGNAL( arg1 );
 
     this->ui->wSubfolder2->setText(arg1);
 
@@ -1269,7 +1278,7 @@ void MainWindow::on_wSubfolder_textChanged(const QString &arg1)
 
 void MainWindow::on_wJobname_textChanged(const QString &arg1)
 {
-    PRINT1_AND_CHECK_IGNORESIGNAL("void MainWindow::on_wJobname_textChanged(const QString &arg1)", arg1.toStdString() );
+    PRINT_AND_CHECK_IGNORESIGNAL( arg1 );
 
     this->ui->wJobname2->setText(arg1);
 
@@ -1279,15 +1288,15 @@ void MainWindow::on_wJobname_textChanged(const QString &arg1)
 
 void MainWindow::on_wRemote_currentIndexChanged(const QString &arg1)
 {
-    PRINT1_AND_CHECK_IGNORESIGNAL("void MainWindow::on_wRemote_currentIndexChanged(const QString &arg1)", arg1.toStdString() );
+    PRINT_AND_CHECK_IGNORESIGNAL( arg1 );
 
     this->getConfigItem("wRemote")->set_value(arg1);
     if( this->isUserAuthenticated() ) {
         QString qout;
         QString cmd = QString("echo ").append(arg1);
         this->sshSession_.execute( cmd );
-        std::cout << "\n" << cmd.toStdString()
-                  << "\n''" << this->sshSession_.qout().toStdString() <<"''" <<std::endl;
+        qInfo() << "\n" << cmd
+                  << "\n''" << this->sshSession_.qout() <<"''";
     }
 
     if( !this->remote_env_vars_.contains(arg1) && this->isUserAuthenticated() ) {
@@ -1304,7 +1313,7 @@ void MainWindow::on_wRemote_currentIndexChanged(const QString &arg1)
 
 void MainWindow::on_wSave_clicked()
 {
-    PRINT0_AND_CHECK_IGNORESIGNAL("void MainWindow::on_wSave_clicked()");
+    PRINT_AND_CHECK_IGNORESIGNAL("");
 
     QString filepath = QString( this->local_subfolder_jobname() ).append("/pbs.sh");
     this->saveJobscript( filepath );
@@ -1312,7 +1321,7 @@ void MainWindow::on_wSave_clicked()
 
 void MainWindow::on_wReload_clicked()
 {
-    PRINT0_AND_CHECK_IGNORESIGNAL("void MainWindow::on_wReload_clicked()");
+    PRINT_AND_CHECK_IGNORESIGNAL("");
 
     QString script_file = QString( this->local_subfolder_jobname() ).append("/pbs.sh");
     QDir qDir(script_file);
@@ -1330,7 +1339,7 @@ void MainWindow::on_wReload_clicked()
 
 void MainWindow::on_wSubmit_clicked()
 {
-    PRINT0_AND_CHECK_IGNORESIGNAL("void MainWindow::on_wSubmit_clicked()");
+    PRINT_AND_CHECK_IGNORESIGNAL("");
 
     QString filepath = QString( this->local_subfolder_jobname() ).append("/pbs.sh");
     if( this->launcher_.script.has_unsaved_changes() ) {
@@ -1373,7 +1382,7 @@ void MainWindow::on_wSubmit_clicked()
 
 void MainWindow::on_wScript_textChanged()
 {
-    PRINT0_AND_CHECK_IGNORESIGNAL("void MainWindow::on_wScript_textChanged()");
+    PRINT_AND_CHECK_IGNORESIGNAL("");
 
     this->launcher_.script.set_has_unsaved_changes(true);
     this->check_script_unsaved_changes();
@@ -1381,7 +1390,7 @@ void MainWindow::on_wScript_textChanged()
 
 void MainWindow::on_wRefresh_clicked()
 {
-    PRINT0_AND_CHECK_IGNORESIGNAL("void MainWindow::on_wRefresh_clicked()");
+    PRINT_AND_CHECK_IGNORESIGNAL("");
 
     cfg::Item* ci_joblist = this->getConfigItem("job_list");
     JobList joblist( ci_joblist->value().toStringList() );
@@ -1390,7 +1399,7 @@ void MainWindow::on_wRefresh_clicked()
 
 void MainWindow::on_wRetrieveSelectedJob_clicked()
 {
-    PRINT0_AND_CHECK_IGNORESIGNAL("void MainWindow::on_wRetrieveSelectedJob_clicked()");
+    PRINT_AND_CHECK_IGNORESIGNAL("");
 
     QString selection ;
     while( true )
@@ -1442,7 +1451,7 @@ void MainWindow::on_wRetrieveSelectedJob_clicked()
 
 void MainWindow::on_wRetrieveAllJobs_clicked()
 {
-    PRINT0_AND_CHECK_IGNORESIGNAL("void MainWindow::on_wRetrieveAllJobs_clicked()");
+    PRINT_AND_CHECK_IGNORESIGNAL("");
 
     cfg::Item* ci_joblist = this->getConfigItem("job_list");
     JobList joblist( ci_joblist->value().toStringList() );
@@ -1482,7 +1491,7 @@ void MainWindow::refreshJobs( JobList const& joblist )
 
 void MainWindow::on_wDeleteSelectedJob_clicked()
 {
-    PRINT0_AND_CHECK_IGNORESIGNAL("void MainWindow::on_wDeleteSelectedJob_clicked()");
+    PRINT_AND_CHECK_IGNORESIGNAL("");
     if( this->ui->wCheckDeleteLocalJobFolder->isChecked() ) {
         QDir qDir( this->local_subfolder_jobname() );
         qDir.removeRecursively();
@@ -1497,29 +1506,25 @@ void MainWindow::on_wDeleteSelectedJob_clicked()
 
 void MainWindow::on_wCheckCopyToDesktop_toggled(bool checked)
 {
-    PRINT1_AND_CHECK_IGNORESIGNAL("void MainWindow::on_wCheckCopyToDesktop_toggled(bool checked", checked);
-
+    PRINT_AND_CHECK_IGNORESIGNAL( (checked?"true":"false") )
     this->getConfigItem("wCheckCopyToDesktop")->set_value(checked);
 }
 
 void MainWindow::on_wCheckCopyToVscData_toggled(bool checked)
 {
-    PRINT1_AND_CHECK_IGNORESIGNAL("void MainWindow::on_wCheckCopyToVscData_toggled(bool checked", checked);
-
+    PRINT_AND_CHECK_IGNORESIGNAL( (checked?"true":"false") )
     this->getConfigItem("wCheckCopyToVscData")->set_value(checked);
 }
 
 void MainWindow::on_wCheckDeleteLocalJobFolder_toggled(bool checked)
 {
-    PRINT1_AND_CHECK_IGNORESIGNAL("void MainWindow::on_wCheckDeleteLocalJobFolder_toggled(bool checked", checked);
-
+    PRINT_AND_CHECK_IGNORESIGNAL( (checked?"true":"false") )
     this->getConfigItem("wCheckDeleteLocalJobFolder")->set_value(checked);
 }
 
 void MainWindow::on_wCheckDeleteRemoteJobFolder_toggled(bool checked)
 {
-    PRINT1_AND_CHECK_IGNORESIGNAL("void MainWindow::on_wCheckDeleteRemoteJobFolder_toggled(bool checked", checked);
-
+    PRINT_AND_CHECK_IGNORESIGNAL( (checked?"true":"false") )
     this->getConfigItem("wCheckDeleteRemoteJobFolder")->set_value(checked);
 }
 
@@ -1529,8 +1534,9 @@ SUBCLASS_EXCEPTION(BadDistribution,std::runtime_error)
 void MainWindow::setupHome()
 {
     QDir launcher_home( this->launcher_.homePath() );
-    if( !launcher_home.exists() )
+    if( !QDir(this->launcher_.homePath("clusters")).exists() )
     {// This must be the first time after installation...
+     // create standard paths
         if( !launcher_home.mkpath("clusters") ) {
             throw_<BadLauncherHome>("Cannot create directory '%1'.", launcher_home.absoluteFilePath("clusters") );
         }
@@ -1538,14 +1544,16 @@ void MainWindow::setupHome()
             throw_<BadLauncherHome>("Cannot create directory '%1'.", launcher_home.absoluteFilePath("jobs") );
         }
         QDir dir = QDir::current();
-        QString clusters_path = dir.absoluteFilePath("../Resources/clusters");
-        dir = QDir(clusters_path);
-        if( !dir.exists() ) {
-            throw_<BadDistribution>("Could not find clusters in distribution.");
+        QString path_to_clusters = dir.absoluteFilePath("../Resources/clusters");
+        dir = QDir(path_to_clusters, "*.info");
+        if( dir.entryInfoList().size()==0 ) {
+            QMessageBox::Button answer = QMessageBox::question(this,TITLE,"Your Launcher distribution has no clusters .info files.\nClick OK to select a clusters directory on your local file system, or Cancel to abort.", QMessageBox::Ok|QMessageBox::Cancel,QMessageBox::Cancel);
+            if( answer==QMessageBox::Ok) {
+                dir = QDir( this->get_path_to_clusters() );
+            } else {
+                throw_<NoClustersFound>("Aborting on user request.");
+            }
         }
-        QStringList filters;
-        filters << "*.info";
-        dir.setNameFilters(filters);
         QFileInfoList clusters = dir.entryInfoList();
         QString destination = this->launcher_.homePath("clusters");
         for ( QFileInfoList::ConstIterator iter=clusters.cbegin()
@@ -1555,8 +1563,31 @@ void MainWindow::setupHome()
             QFile qFile( tmp );
             tmp = QString(destination).append('/').append( iter->fileName() );
             qFile.copy( tmp );
-
         }
     }
+}
 
+QString MainWindow::get_path_to_clusters()
+{
+ // look for standard clusters path
+    QString path_to_clusters = Launcher::homePath("clusters");
+    QDir dir( path_to_clusters, "*.info");
+    if( dir.entryInfoList().size() > 0 ) return path_to_clusters;
+
+ // look for non standard clusters path in config file:
+    path_to_clusters = this->getConfigItem("path_to_clusters", QString() )->value().toString();
+    dir = QDir( path_to_clusters, "*.info");
+    if( dir.entryInfoList().size() > 0 ) return path_to_clusters;
+
+ // ask the user for the path to the clusters directory
+    path_to_clusters = "keep_trying";
+    while( !path_to_clusters.isEmpty() ) {
+        path_to_clusters = QFileDialog::getExistingDirectory
+                ( this, "Select a clusters directory (containing at least 1 .info file):"
+                , this->launcher_.homePath() );
+        if( path_to_clusters.isEmpty() ) return path_to_clusters;
+        dir = QDir( path_to_clusters, "*.info");
+        if( dir.entryInfoList().size() > 0 ) return path_to_clusters;
+    }
+    return QString();
 }

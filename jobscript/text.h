@@ -32,7 +32,7 @@ namespace pbs
         bool has_unsaved_changes() const {
             return has_unsaved_changes_;
         }
-        virtual void print( std::ostream& to=std::cout, int verbose=0, bool refresh=false);
+        virtual QString toString( int verbose=0, bool refresh=false );
 
     protected:
         QString text_;

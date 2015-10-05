@@ -6,9 +6,18 @@ BUILD_DIR=~/qws/build-Launcher-Desktop_Qt_5_5_0_clang_64bit-Release
 APP_DIR=$BUILD_DIR/distribute/macosx
 #   this is where we create the distributable
 
+################################################################################
+# Copy the application bundle
+
+rm -rf   $APP_DIR
 mkdir -p $APP_DIR
 cp -r $BUILD_DIR/Launcher/Launcher.app $APP_DIR
 
+################################################################################
+#Copy clusters file to distribution
+cp -Rf ~/Launcher_pp/clusters $APP_DIR/Launcher.app/Contents/Resources
+
+exit
 ################################################################################
 #Add dependencies
 dylibbundler -od -b -x $APP_DIR/Launcher.app/Contents/MacOS/Launcher -d $APP_DIR/Launcher.app/Contents/libs/
@@ -76,6 +85,3 @@ echo otool -L $APP_DIR/Launcher.app/Contents/Frameworks/QtWidgets.framework/Vers
 otool -L $APP_DIR/Launcher.app/Contents/Frameworks/QtWidgets.framework/Versions/5/QtWidgets
 
 
-################################################################################
-#Copy clusters file to distribution
-cp -Rf ~/Launcher_pp/clusters $APP_DIR/Launcher.app/Contents/Resources

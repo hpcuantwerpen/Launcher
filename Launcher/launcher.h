@@ -18,7 +18,7 @@
     public:
         Launcher();
         ~Launcher();
-        void readClusterInfo();
+        void readClusterInfo( QString const& clusters_dir );
         static QString homePath( QString const& sub1 = QString() );
 
         void modifyScript( NodesetInfo const& nodeset );

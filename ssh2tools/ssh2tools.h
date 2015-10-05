@@ -70,7 +70,8 @@ namespace ssh2
         static int  verbose;
 
         static void cleanup();
-        void print( std::ostream& ostrm = std::cout ) const;
+        //void print( std::ostream& ostrm = std::cout ) const;
+        QString toString() const;
 
         int execute( QString const& cmd );
          /* Remotely execute the command cmd.

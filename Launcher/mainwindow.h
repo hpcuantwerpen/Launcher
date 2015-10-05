@@ -8,6 +8,7 @@
 #include <QCheckBox>
 #include <QPalette>
 #include <QMap>
+#include <QtDebug>
 
 #include <launcher.h>
 #include <ssh2tools.h>
@@ -120,16 +121,17 @@ public:
     NodesetInfo const& nodesetInfo() const;
     ClusterInfo const& clusterInfo() const;
 
-    void print_signature( std::string const& signature ) const;
+//    QString signature( QString const& sig ) const;
 
     template <class T>
-    void print_signature( std::string const& signature, T arg1 ) const {
-        this->print_signature(signature);
-        std::cout << "    arg1 = " << arg1 << std::endl;
+    QString signature( T arg1 ) const {
+        QString s;
+        s.append( QString("    arg1 = %1\n").arg(arg1) );
+        return s;
     }
 
     void storeResetValues();
-    void check_script_unsaved_changes();
+    QString check_script_unsaved_changes();
     void refreshJobs( JobList const& joblist );
 
     void      clusterDependencies( bool updateWidgets );
@@ -159,6 +161,8 @@ public:
 
     void resolveRemoteFileLocations_();
 
+    QString get_path_to_clusters();
+
 private:
     Ui::MainWindow *ui;
     Launcher launcher_;
@@ -171,21 +175,8 @@ private:
 
     ssh2::Session sshSession_;
     QMap<QString,QString> remote_env_vars_;
-
+    int verbosity_;
 };
-
-#define PRINT0_AND_CHECK_IGNORESIGNAL( signature ) \
-    this->print_signature( signature ); \
-    this->check_script_unsaved_changes();\
-    if( this->ignoreSignals_ ) return;
-
-#define PRINT1_AND_CHECK_IGNORESIGNAL( signature, arg1 ) \
-    this->print_signature( signature, (arg1) ); \
-    this->check_script_unsaved_changes();\
-    if( this->ignoreSignals_ ) return;
-
-#define FORWARDING \
-    std::cout << "    forwarding" << std::flush;
 
 
 #endif // MAINWINDOW_H
