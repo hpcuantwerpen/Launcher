@@ -14,15 +14,28 @@ mkdir -p $APP_DIR
 cp -r $BUILD_DIR/Launcher/Launcher.app $APP_DIR
 
 ################################################################################
-#Copy clusters file to distribution
-cp -Rf ~/Launcher_pp/clusters $APP_DIR/Launcher.app/Contents/Resources
-
-exit
-################################################################################
 #Add dependencies
 dylibbundler -od -b -x $APP_DIR/Launcher.app/Contents/MacOS/Launcher -d $APP_DIR/Launcher.app/Contents/libs/
 #   this adds the non standard libraries we depend on (Libssh2)
 #   (but not Qt)
+
+cp /usr/local/Cellar/openssl/1.0.2d_1/lib/libcrypto.1.0.0.dylib $APP_DIR/Launcher.app/Contents/libs/libcrypto_.1.0.0.dylib
+
+echo
+otool -L $APP_DIR/Launcher.app/Contents/libs/libssl.1.0.0.dylib
+install_name_tool -change /usr/local/Cellar/openssl/1.0.2d_1/lib/libcrypto.1.0.0.dylib @executable_path/../libs/libcrypto_.1.0.0.dylib $APP_DIR/Launcher.app/Contents/libs/libssl.1.0.0.dylib
+echo
+otool -L $APP_DIR/Launcher.app/Contents/libs/libssl.1.0.0.dylib
+
+echo
+otool -L $APP_DIR/Launcher.app/Contents/libs/libssh2.1.dylib
+install_name_tool -change /usr/local/Cellar/openssl/1.0.2d_1/lib/libcrypto.1.0.0.dylib @executable_path/../libs/libcrypto.1.0.0.dylib $APP_DIR/Launcher.app/Contents/libs/libssh2.1.dylib
+echo
+otool -L $APP_DIR/Launcher.app/Contents/libs/libssh2.1.dylib
+
+################################################################################
+#Copy clusters file to distribution
+cp -Rf ~/Launcher_pp/clusters $APP_DIR/Launcher.app/Contents/Resources
 
 ################################################################################
 #Add Qt framework dependencies
@@ -36,8 +49,7 @@ mkdir -p $APP_DIR/Launcher.app/Contents/Frameworks
 
 QT_FRAMEWORK_DIR=~/QtNew/5.5/clang_64/lib
 
-
-for qt in QtWidgets QtGui QtCore
+for qt in QtWidgets QtGui QtCore QtPrintSupport
 do
     echo
     echo Launcher depends on $qt
@@ -70,6 +82,38 @@ echo QtWidgets depends on QtGui
 echo
 echo install_name_tool -change @rpath/QtGui.framework/Versions/5/QtGui @executable_path/../Frameworks/QtGui.framework/Versions/5/QtGui $APP_DIR/Launcher.app/Contents/Frameworks/QtWidgets.framework/Versions/5/QtWidgets
      install_name_tool -change @rpath/QtGui.framework/Versions/5/QtGui @executable_path/../Frameworks/QtGui.framework/Versions/5/QtGui $APP_DIR/Launcher.app/Contents/Frameworks/QtWidgets.framework/Versions/5/QtWidgets
+
+################################################################################
+# cope with the following error:
+# This application failed to start because it could not find or load the Qt platform plugin "cocoa".
+# see https://forum.qt.io/topic/25915/qt-5-0-and-failed-to-load-platform-plugin-cocoa
+# 1. install libqcocoa library
+mkdir -p $APP_DIR/Launcher.app/Contents/PlugIns/platforms
+QT_PLUGINS_DIR=~/QtNew/5.5/clang_64/plugins
+
+cp $QT_PLUGINS_DIR/platforms/libqcocoa.dylib $APP_DIR/Launcher.app/Contents/PlugIns/platforms
+
+# 2. fix its identity and references to others
+install_name_tool -id @executable_path/../PlugIns/platforms/libqcocoa.dylib $APP_DIR/Launcher.app/Contents/PlugIns/platforms/libqcocoa.dylib
+for qt in QtWidgets QtGui QtCore QtPrintSupport
+do
+    install_name_tool -change $QT_FRAMEWORK_DIR/lib/$qt.framework/Versions/5/$qt @executable_path/../Frameworks/$qt.framework/Versions/5/$qt $APP_DIR/Launcher.app/Contents/PlugIns/platforms/libqcocoa.dylib
+#install_name_tool -change $QT_FRAMEWORK_DIR/lib/QtPrintSupport.framework/Versions/5/QtPrintSupport @executable_path/../Frameworks/QtPrintSupport.framework/Versions/5/QtPrintSupport $APP_DIR/Launcher.app/Contents/PlugIns/platforms/libqcocoa.dylib
+#install_name_tool -change $QT_FRAMEWORK_DIR/lib/QtWidgets.framework/Versions/5/QtWidgets @executable_path/../Frameworks/QtWidgets.framework/Versions/5/QtWidgets $APP_DIR/Launcher.app/Contents/PlugIns/platforms/libqcocoa.dylib
+#install_name_tool -change $QT_FRAMEWORK_DIR/lib/QtGui.framework/Versions/5/QtGui @executable_path/../Frameworks/QtGui.framework/Versions/5/QtGui $APP_DIR/Launcher.app/Contents/PlugIns/platforms/libqcocoa.dylib
+#install_name_tool -change $QT_FRAMEWORK_DIR/lib/QtCore.framework/Versions/5/QtCore @executable_path/../Frameworks/QtCore.framework/Versions/5/QtCore $APP_DIR/Launcher.app/Contents/PlugIns/platforms/libqcocoa.dylib
+done
+# 3. install QtPrintSupport framework
+cp -r $QT_FRAMEWORK_DIR/QtPrintSupport.framework $APP_DIR/Launcher.app/Contents/Frameworks
+
+# 4. fix its identity and references to others
+install_name_tool -id @executable_path/../Frameworks/QtPrintSupport.framework/Versions/5/QtPrintSupport $APP_DIR/Launcher.app/Contents/Frameworks/QtPrintSupport.framework/Versions/5/QtPrintSupport
+install_name_tool -change $QT_FRAMEWORK_DIR/QtWidgets.framework/Versions/5/QtWidgets @executable_path/../Frameworks/QtWidgets.framework/Versions/5/QtWidgets $APP_DIR/Launcher.app/Contents/Frameworks/QtPrintSupport.framework/Versions/5/QtPrintSupport
+install_name_tool -change $QT_FRAMEWORK_DIR/QtGui.framework/Versions/5/QtGui @executable_path/../Frameworks/QtGui.framework/Versions/5/QtGui $APP_DIR/Launcher.app/Contents/Frameworks/QtPrintSupport.framework/Versions/5/QtPrintSupport
+install_name_tool -change $QT_FRAMEWORK_DIR/QtCore.framework/Versions/5/QtCore @executable_path/../Frameworks/QtCore.framework/Versions/5/QtCore $APP_DIR/Launcher.app/Contents/Frameworks/QtPrintSupport.framework/Versions/5/QtPrintSupport
+
+
+
 
 #verify:
 echo

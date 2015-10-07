@@ -1,3 +1,4 @@
+#define QT_DEBUG
 #include "mainwindow.h"
 #include "ui_mainwindow.h"
 
@@ -54,8 +55,10 @@
     {
         ui->setupUi(this);
 
-        this->setupHome();
-
+        if( !QFile(this->launcher_.homePath("Launcher.cfg")).exists() )
+        {// This must be the first time after installation...
+            this->setupHome();
+        }
         this->setWindowTitle("Launcher 0.9");
 
         qsrand( time(nullptr) );
@@ -212,6 +215,26 @@
             this->lookForJobscript( local_subfolder_jobname );
         }
         this->on_wAuthenticate_clicked();
+
+        createActions();
+        createMenus();
+    }
+
+    void MainWindow::createActions()
+    {
+        aboutAction_ = new QAction(tr("&About"), this);
+        connect(aboutAction_, SIGNAL(triggered()), this, SLOT(about()));
+    }
+
+    void MainWindow::createMenus()
+    {
+        helpMenu_ = menuBar()->addMenu("&Help");
+        helpMenu_->addAction(aboutAction_);
+    }
+
+    void MainWindow::about()
+    {
+        this->statusBar()->showMessage("about");
     }
 
     QString
@@ -304,9 +327,17 @@
                 );
     }
  //-----------------------------------------------------------------------------
+#define PRINT_HEADER \
+    QString header("[ MainWindow::%1, %2, %3 ]");\
+    header = header.arg(__func__).arg(__FILE__).arg(__LINE__);\
+    qInfo(header.toUtf8().data());\
+    if( this->ignoreSignals_ ) return;
+ //-----------------------------------------------------------------------------
     MainWindow::~MainWindow()
     {
-        qInfo("    closing down");
+        PRINT_HEADER
+
+        qInfo("~Launcher closing down");
         for( QList<dc::DataConnectorBase*>::iterator iter = this->data_.begin(); iter!=this->data_.end(); ++iter ) {
             (*iter)->value_widget_to_config();
             delete (*iter);
@@ -316,13 +347,22 @@
         this->getConfigItem("windowWidth" )->set_value( windowSize.width () );
         this->getConfigItem("windowHeight")->set_value( windowSize.height() );
 
-        qInfo("~    saving config file.");
+        qInfo("~saving config file.");
         this->launcher_.config.save();
+
+        if ( this->launcher_.script.has_unsaved_changes() ) {
+            QMessageBox::Button answer = QMessageBox::question(this,TITLE,"The current script has unsaved changes.\nDo you want to save?");
+            if(answer==QMessageBox::Yes) {
+                qInfo( QString("~Calling on_wSave_clicked()").toUtf8().data() );
+                this->on_wSave_clicked();
+            }
+        }
 
         delete ui;
         ssh2::Session::cleanup();
 
         delete this->paletteRedForeground_;
+        qInfo("~Launcher closed.");
     }
  //-----------------------------------------------------------------------------
     void MainWindow::setIgnoreSignals( bool ignore )
@@ -401,18 +441,6 @@
         NodesetInfo const& nodesetInfo = *( this->launcher_.clusters[clusterName].nodesets().find( nodesetName ) );
         return nodesetInfo;
     }
- //-----------------------------------------------------------------------------
-//    QString MainWindow::signature( QString const& sig ) const
-//    {
-//        QString s;
-//        if( this->ignoreSignals_ ) {
-//            s = "\nIgnoring signal:\n";
-//        } else {
-//            s ="\nExecuting slot:\n";
-//        }
-//        s += sig;
-//        return s;
-//    }
  //------------------------------------------------------------------------------
     void MainWindow::clusterDependencies( bool updateWidgets )
     {// act on config items only...
@@ -563,7 +591,7 @@
     {
         QString msg;
         QTextStream ts(&msg);
-        ts << "    Checking unsaved changes : ";
+        ts << "Checking unsaved changes : ";
         bool has_unsaved_changes = this->launcher_.script.has_unsaved_changes();
         if( has_unsaved_changes ) {
             ts << "true";
@@ -589,14 +617,17 @@
 #define IGNORE_SIGNALS_UNTIL_END_OF_SCOPE IgnoreSignals ignoreSignals(this)
 
 #define PRINT_AND_CHECK_IGNORESIGNAL( msg ) \
-    QString qmsg;\
-    if( !QString((msg)).isEmpty() ) qmsg.append("    argument = ").append(msg).append('\n');\
-    qmsg.append( this->check_script_unsaved_changes() ) ;\
-    if( this->ignoreSignals_ ) qmsg.append("\n    ignoring signal");\
+    QString qmsg("[ MainWindow::%1, %2, %3 ]");\
+    qmsg = qmsg.arg(__func__).arg(__FILE__).arg(__LINE__);\
+    if( !QString((msg)).isEmpty() ) qmsg.append("\n    Function was called with argument : ").append(msg);\
+    qmsg.append("\n    ").append( this->check_script_unsaved_changes() ) ;\
+    if( this->ignoreSignals_ ) qmsg.append("\n    Ignoring signal");\
+    else                       qmsg.append("\n    Executing signal");\
     std::string s = qmsg.toStdString();\
     char const* c = s.c_str();\
-    qInfo(c,nullptr);\
+    qInfo(c);\
     if( this->ignoreSignals_ ) return;
+
 
 #define FORWARDING \
     qInfo() << "    forwarding";
@@ -1315,8 +1346,14 @@ void MainWindow::on_wSave_clicked()
 {
     PRINT_AND_CHECK_IGNORESIGNAL("");
 
-    QString filepath = QString( this->local_subfolder_jobname() ).append("/pbs.sh");
-    this->saveJobscript( filepath );
+    QString filepath = QString( this->local_subfolder_jobname() );
+    if( filepath.isEmpty() ) {
+
+        QMessageBox::critical(this,TITLE,"Local file location/subfolder/jobname not fully specified.\nSaving as ");
+    } else {
+        filepath.append("/pbs.sh");
+        this->saveJobscript( filepath );
+    }
 }
 
 void MainWindow::on_wReload_clicked()
@@ -1533,37 +1570,46 @@ SUBCLASS_EXCEPTION(BadDistribution,std::runtime_error)
 
 void MainWindow::setupHome()
 {
+    PRINT_HEADER
+
+ // create standard paths
+    qInfo("~creating standard paths ");
     QDir launcher_home( this->launcher_.homePath() );
-    if( !QDir(this->launcher_.homePath("clusters")).exists() )
-    {// This must be the first time after installation...
-     // create standard paths
-        if( !launcher_home.mkpath("clusters") ) {
-            throw_<BadLauncherHome>("Cannot create directory '%1'.", launcher_home.absoluteFilePath("clusters") );
+    if( !launcher_home.mkpath("clusters") ) {
+        throw_<BadLauncherHome>("Cannot create directory '%1'.", launcher_home.absoluteFilePath("clusters") );
+    }
+    qInfo( QString("~    ").append( this->launcher_.homePath("clusters")).toUtf8().data() );
+    if( !launcher_home.mkpath("jobs") ) {
+        throw_<BadLauncherHome>("Cannot create directory '%1'.", launcher_home.absoluteFilePath("jobs") );
+    }
+    qInfo( QString("~    ").append( this->launcher_.homePath("jobs")).toUtf8().data() );
+
+ // get the location of the application and derive the location of the clusters info files.
+ // see http://stackoverflow.com/questions/4515602/how-to-get-executable-name-in-qt
+    QString applicationFilePath = QCoreApplication::applicationFilePath();
+    QDir dir = QFileInfo( applicationFilePath ).absoluteDir();
+    QString path_to_clusters = dir.absoluteFilePath("../Resources/clusters");
+
+    qInfo( QString("~copying cluster info files from '%1'.").arg(path_to_clusters).toUtf8().data() );
+    dir = QDir(path_to_clusters, "*.info");
+    if( dir.entryInfoList().size()==0 ) {
+        QMessageBox::Button answer = QMessageBox::question(this,TITLE,"Your Launcher distribution has no clusters .info files.\nClick OK to select a clusters directory on your local file system, or Cancel to abort.", QMessageBox::Ok|QMessageBox::Cancel,QMessageBox::Cancel);
+        if( answer==QMessageBox::Ok) {
+            dir = QDir( this->get_path_to_clusters() );
+        } else {
+            throw_<NoClustersFound>("Aborting on user request.");
         }
-        if( !launcher_home.mkpath("jobs") ) {
-            throw_<BadLauncherHome>("Cannot create directory '%1'.", launcher_home.absoluteFilePath("jobs") );
-        }
-        QDir dir = QDir::current();
-        QString path_to_clusters = dir.absoluteFilePath("../Resources/clusters");
-        dir = QDir(path_to_clusters, "*.info");
-        if( dir.entryInfoList().size()==0 ) {
-            QMessageBox::Button answer = QMessageBox::question(this,TITLE,"Your Launcher distribution has no clusters .info files.\nClick OK to select a clusters directory on your local file system, or Cancel to abort.", QMessageBox::Ok|QMessageBox::Cancel,QMessageBox::Cancel);
-            if( answer==QMessageBox::Ok) {
-                dir = QDir( this->get_path_to_clusters() );
-            } else {
-                throw_<NoClustersFound>("Aborting on user request.");
-            }
-        }
-        QFileInfoList clusters = dir.entryInfoList();
-        QString destination = this->launcher_.homePath("clusters");
-        for ( QFileInfoList::ConstIterator iter=clusters.cbegin()
-            ; iter!=clusters.cend(); ++iter )
-        {
-            QString tmp = iter->absoluteFilePath();
-            QFile qFile( tmp );
-            tmp = QString(destination).append('/').append( iter->fileName() );
-            qFile.copy( tmp );
-        }
+    }
+    QFileInfoList clusters = dir.entryInfoList();
+    QString destination = this->launcher_.homePath("clusters");
+    for ( QFileInfoList::ConstIterator iter=clusters.cbegin()
+        ; iter!=clusters.cend(); ++iter )
+    {
+        qInfo( QString("~    ").append( iter->fileName() ).toUtf8().data() );
+        QString tmp = iter->absoluteFilePath();
+        QFile qFile( tmp );
+        tmp = QString(destination).append('/').append( iter->fileName() );
+        qFile.copy( tmp );
     }
 }
 

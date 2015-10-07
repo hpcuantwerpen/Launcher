@@ -39,6 +39,8 @@ public:
     ~MainWindow();
 
 private slots:
+    void about();
+
     void on_wCluster_currentIndexChanged(const QString &arg1);
 
     void on_wNodeset_currentTextChanged(const QString &arg1);
@@ -113,6 +115,8 @@ private slots:
 
     void on_wCheckDeleteRemoteJobFolder_toggled(bool checked);
 
+
+
 public:
     void setupHome();
     void setIgnoreSignals( bool ignore=true );
@@ -163,6 +167,8 @@ public:
 
     QString get_path_to_clusters();
 
+    void createActions();
+    void createMenus();
 private:
     Ui::MainWindow *ui;
     Launcher launcher_;
@@ -176,6 +182,8 @@ private:
     ssh2::Session sshSession_;
     QMap<QString,QString> remote_env_vars_;
     int verbosity_;
+    QAction *aboutAction_;
+    QMenu *helpMenu_;
 };
 
 

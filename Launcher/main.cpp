@@ -10,27 +10,26 @@ void messageHandler( QtMsgType type, QMessageLogContext const& context, QString 
   */
     QString s;
     if( msg.startsWith('~') ) { // no header line
-        s.append( msg.mid(1) );
+        s.append("    ")
+         .append( msg.mid(1) );
     } else {                    // create header line
-        QString format;
         switch (type) {
         case QtDebugMsg:
-            format = QString("\nDebug [%1,%2,%3]:\n");
+            s= QString("\nDebug ");
             break;
         case QtInfoMsg:
-            format = QString("\nInfo [%1,%2,%3]:\n");
+            s= QString("\nInfo ");
             break;
         case QtWarningMsg:
-            format = QString("\nWarning [%1,%2,%3]:\n");
+            s= QString("\nWarning ");
             break;
         case QtCriticalMsg:
-            format = QString("\nCritical [%1,%2,%3]:\n");
+            s= QString("\nCritical ");
             break;
         case QtFatalMsg:
-            format = QString("\nFATAL [%1,%2,%3]:\n");
+            s= QString("\nFATAL ");
             break;
         }
-        s = format.arg(context.file).arg(context.line).arg(context.function);
         s.append(msg);
     }
     QDir().mkpath(Launcher::homePath());
@@ -43,13 +42,15 @@ void messageHandler( QtMsgType type, QMessageLogContext const& context, QString 
 
 int main(int argc, char *argv[])
 {
-    qInstallMessageHandler(messageHandler);
+  qInstallMessageHandler(messageHandler);
     qInfo()
         << "\n================================================================================"
         << "\nLauncher started " << toolbox::now().toStdString().c_str()
         << "\n================================================================================"
         ;
+
     QApplication a(argc, argv);
+
     MainWindow w;
     w.show();
 

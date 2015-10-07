@@ -16,6 +16,37 @@ This document gathers information on how to set up a distributable application o
     http://doc.qt.io/qt-5/osx-deployment.html
     - how to fix the dependencies on Qt libraries
     - mind the remark that QtGui depends itself on QtCore and needs fixing
+    - it finally mentions the macdeployqt tool - it works nicely.
+      <<<
+        etijskens@etijskens [537] ~/qws/Launcher/Launcher$ ~/QtNew/5.5/clang_64/bin/macdeployqt
+        Usage: macdeployqt app-bundle [options]
+
+        Options:
+           -verbose=<0-3>     : 0 = no output, 1 = error/warning (default), 2 = normal, 3 = debug
+           -no-plugins        : Skip plugin deployment
+           -dmg               : Create a .dmg disk image
+           -no-strip          : Don't run 'strip' on the binaries
+           -use-debug-libs    : Deploy with debug versions of frameworks and plugins (implies -no-strip)
+           -executable=<path> : Let the given executable use the deployed frameworks too
+           -qmldir=<path>     : Deploy imports used by .qml files in the given path
+           -always-overwrite  : Copy files even if the target file exists
+           -codesign=<ident>  : Run codesign with the given identity on all executables
+
+        macdeployqt takes an application bundle as input and makes it
+        self-contained by copying in the Qt frameworks and plugins that
+        the application uses.
+
+        Plugins related to a framework are copied in with the
+        framework. The accessibilty, image formats, and text codec
+        plugins are always copied, unless "-no-plugins" is specified.
+
+        See the "Deploying an Application on Qt/Mac" topic in the
+        documentation for more information about deployment on Mac OS X.
+      >>>
 
     https://developer.apple.com/library/mac/documentation/Porting/Conceptual/PortingUnix/distributing/distibuting.html
     - how to create a .dmg file
+
+    https://forum.qt.io/topic/25915/qt-5-0-and-failed-to-load-platform-plugin-cocoa
+    - solve this error 'This application failed to start because it could not find or load the Qt platform plugin "cocoa".'
+

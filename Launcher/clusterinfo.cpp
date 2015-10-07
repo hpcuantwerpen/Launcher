@@ -182,7 +182,7 @@
                     name = name.mid(1);
                     isDefault = true;
                 }
-                name.append(" (%1 Gb/node; %2 cores/node)");
+                name.append(" (%1 GB/node; %2 cores/node)");
                 double gb = list_i.at(3).toDouble() - list_i.at(4).toDouble();
                 NodesetInfo nodesetInfo
                   ( name.arg(gb).arg(list_i.at(2).toInt())

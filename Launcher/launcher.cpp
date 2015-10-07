@@ -35,9 +35,6 @@
         if( !dir.exists() ) {
             throw_<NoClustersFound>("Directory '%1' does not exist.", clusters_dir );
         }
-
-//        QString pwd = QDir::currentPath();
-
         QFileInfoList clusters = dir.entryInfoList();
         if( clusters.size()==0 ) {
             throw_<NoClustersFound>("No .info files found in '%1'.", clusters_dir );
@@ -46,14 +43,8 @@
             ; iter!=clusters.cend(); ++iter )
         {
             ClusterInfo cluster_i( iter->absoluteFilePath() );
-            this->clusters[cluster_i.name()] = cluster_i;
+            this->clusters[iter->baseName()] = cluster_i;
         }
-//        QDir::setCurrent( dir.absolutePath() );
-//        for ( int i=0; i<clusters.size(); ++i) {
-//            ClusterInfo cluster_i( clusters[i] );
-//            this->clusters[cluster_i.name()] = cluster_i;
-//        }
-//        QDir::setCurrent( pwd );
     }
  //-----------------------------------------------------------------------------
     void Launcher::modifyScript( NodesetInfo const& nodeset )
