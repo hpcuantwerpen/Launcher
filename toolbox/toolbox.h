@@ -7,6 +7,7 @@
 #include "warn_.h"
 #include "orderedmap.h"
 #include "datetime_now.h"
+#include "log.h"
 
 #endif // TOOLBOX_H
 

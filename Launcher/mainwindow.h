@@ -40,6 +40,7 @@ public:
 
 private slots:
     void about();
+    void hello();
 
     void on_wCluster_currentIndexChanged(const QString &arg1);
 
@@ -184,6 +185,8 @@ private:
     int verbosity_;
     QAction *aboutAction_;
     QMenu *helpMenu_;
+    QAction *helloAction_;
+    QMenu *extraMenu_;
 };
 
 

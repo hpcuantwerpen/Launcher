@@ -1,4 +1,6 @@
 #include "ssh2tools.h"
+#include <log.h>
+
 #include <libssh2_sftp.h>
 
 #ifdef Q_OS_WIN
@@ -20,7 +22,6 @@
 #include <QDir>
 #include <QFileInfo>
 #include <QTextStream>
-#include <QtDebug>
 
 static int waitsocket(int socket_fd, LIBSSH2_SESSION *session)
 {
@@ -390,27 +391,27 @@ namespace ssh2
     {
         try {
             if( Session::verbose )
-                qInfo() << "\nRemote execution of \n    command  : '" << cmd << "'";
+                Log(1) << "\nRemote execution of \n    command  : '" << cmd.C_STR() << "'";
 
             this->exec_( cmd, &this->qout_, &this->qerr_ );
 
             if( Session::verbose || this->cmd_exit_code_ ) {
-                qInfo() <<   "    exit code: " << this->cmd_exit_code_;
+                Log(1) <<   "    exit code: " << this->cmd_exit_code_;
                 if( this->cmd_exit_signal_ )
-                qInfo() << "\n    exit signal: " << this->cmd_exit_signal_;
+                Log(1) << "\n    exit signal: " << this->cmd_exit_signal_;
                 if( !this->qout().isEmpty() ) {
-                    qInfo() << "\n    stdout   :"
+                    Log(1) << "\n    stdout   :"
                               << "\n----------------\n"
-                              << this->qout()
+                              << this->qout().C_STR()
                               << "\n----------------";
                 }
                 if( !this->qerr().isEmpty() ) {
-                    qInfo() << "\n    stderr   :"
+                    Log(1) << "\n    stderr   :"
                               << "\n----------------\n"
-                              << this->qerr()
+                              << this->qerr().C_STR()
                               << "\n----------------";
                 }
-                qInfo() <<'\n';
+                Log(1) <<'\n';
             }
         } catch( std::runtime_error& e ) {
             std::cerr << e.what();
@@ -430,7 +431,7 @@ namespace ssh2
         char const*  p_local_filepath =  local_filepath.c_str();
         char const* p_remote_filepath = remote_filepath.c_str();
         if( Session::verbose ) {
-            qInfo() << "\nFile transfer : local >> remote"
+            Log(1) << "\nFile transfer : local >> remote"
                       << "\n    local : '" << local_filepath << "'"
                       << "\n    remote: '" << remote_filepath << "'";
         }
@@ -516,7 +517,7 @@ namespace ssh2
         channel = nullptr;
 
         if( Session::verbose ) {
-            qInfo() << "\n    copied: " << (unsigned long)local_fileinfo.st_size << " bytes";
+            Log(1) << "\n    copied: " << (unsigned long)local_fileinfo.st_size << " bytes";
         }
     }
 #endif//#ifdef SCP
@@ -530,9 +531,9 @@ namespace ssh2
         std::string  local_filepath =  q_local_filepath.toStdString();
         std::string remote_filepath = q_remote_filepath.toStdString();
         if( Session::verbose ) {
-            qInfo() << "\nFile transfer : local >> remote"
-                    << "\n    local : '" <<  q_local_filepath << "'"
-                    << "\n    remote: '" << q_remote_filepath << "'"
+            Log(1) << "\nFile transfer : local >> remote"
+                    << "\n    local : '" <<  q_local_filepath.C_STR() << "'"
+                    << "\n    remote: '" << q_remote_filepath.C_STR() << "'"
                     ;
         }
 
@@ -640,9 +641,9 @@ namespace ssh2
         std::string  local_filepath =  q_local_filepath.toStdString();
         std::string remote_filepath = q_remote_filepath.toStdString();
         if( Session::verbose ) {
-            qInfo() << "\nFile transfer : remote >> local"
-                      << "\n    remote: '" << q_remote_filepath << "'"
-                      << "\n    local : '" <<  q_local_filepath << "'"
+            Log(1) << "\nFile transfer : remote >> local"
+                      << "\n    remote: '" << q_remote_filepath.C_STR() << "'"
+                      << "\n    local : '" <<  q_local_filepath.C_STR() << "'"
                      ;
         }
 

@@ -50,3 +50,29 @@ This document gathers information on how to set up a distributable application o
     https://forum.qt.io/topic/25915/qt-5-0-and-failed-to-load-platform-plugin-cocoa
     - solve this error 'This application failed to start because it could not find or load the Qt platform plugin "cocoa".'
 
+2. Windows 7
+============
+    2.1 libssh2
+    ============
+    http://report5.blogspot.be/2012/09/how-to-compile-libssh2-for-windows-with.html
+
+    a) zlib. 
+       downloaded zlib source code from zlib.net, unpack the tarball,  cd into it and type the following commands:
+
+        make -f win32/Makefile.gcc
+        make install -f win32/Makefile.gcc BINARY_PATH=/mingw/bin INCLUDE_PATH=/mingw/include LIBRARY_PATH=/mingw/lib
+
+       i replaced
+         - make with ming32-make that comes with QT Creator
+         - /mingw/bin with /Users/etijskens/qws/_bin etc..
+
+    b) openssl. 
+       the mentioned http://kemovitra.blogspot.be/2012/09/build-openssl-with-mingw.html no longer exists,
+       neither does the redirection http://go.kblog.us/2012/09/build-openssl-with-mingw.html.
+       Instead, we follow http://stackoverflow.com/questions/9379363/how-to-build-openssl-with-mingw-in-windows.
+       
+       used strawberry perlma
+       to the make commands i added: CXX=/c/Qt/Tools/mingw492_32/g++.exe CC=/c/Qt/Tools/mingw492_32/gcc.exe
+       
+       
+    
