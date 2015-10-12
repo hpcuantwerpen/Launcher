@@ -12,3 +12,8 @@ TODO LIST
 - improve the log
     std::cout << debug version
     file      << release version
+
+- disable #PBS -o and -e	
+
+- add single job policy
+   #PBS -l naccesspolicy=singlejob

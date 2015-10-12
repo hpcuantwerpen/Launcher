@@ -397,9 +397,9 @@
     {
         if( this->verbosity_ > 2 ) {
             if( ignore ) {
-                if(!this->ignoreSignals_ ) qInfo() << "    ignoring signals ... ";
+                if(!this->ignoreSignals_ ) Log(1) << "\n>>> ignoring signals";
             } else {
-                if( this->ignoreSignals_ ) qInfo() << "    ... ignoring signals has stopped";
+                if( this->ignoreSignals_ ) Log(1) << "\n>>> stopped ignoring signals";
             }
         }
         this->ignoreSignals_ = ignore;
@@ -648,18 +648,6 @@
 
 #define IGNORE_SIGNALS_UNTIL_END_OF_SCOPE IgnoreSignals ignoreSignals(this)
 
-#define PRINT_AND_CHECK_IGNORESIGNAL( msg ) \
-    QString qmsg("[ MainWindow::%1, %2, %3 ]");\
-    qmsg = qmsg.arg(__func__).arg(__FILE__).arg(__LINE__);\
-    if( this->verbosity_ && !QString((msg)).isEmpty() ) qmsg.append("\n    Function was called with argument : ").append(msg);\
-    qmsg.append( this->check_script_unsaved_changes() ) ;\
-    if( this->verbosity_ > 1 ) {\
-        if( this->ignoreSignals_ ) qmsg.append("\n    Ignoring signal");\
-        else                       qmsg.append("\n    Executing signal");\
-    }\
-    qInfo() << qmsg;\
-    if( this->ignoreSignals_ ) return;
-
 #define NO_ARGUMENT QString()
 #define LOG_AND_CHECK_IGNORESIGNAL( ARGUMENT ) \
   {\
@@ -675,8 +663,6 @@
     Log() << INFO << msg.toStdString();\
     if( this->ignoreSignals_ ) return;\
   }
-#define FORWARDING \
-    qInfo() << "    forwarding";
 
 void MainWindow::on_wCluster_currentIndexChanged( QString const& arg1 )
 {
@@ -742,7 +728,7 @@ void MainWindow::on_wNNodes_valueChanged(int arg1)
     LOG_AND_CHECK_IGNORESIGNAL( QString().setNum(arg1) );
 
     if( this->ui->wAutomaticRequests->isChecked() ) {
-        FORWARDING
+        Log(1) <<"\n    q to on_wRequestNodes_clicked()";
         on_wRequestNodes_clicked();
     }
 }
@@ -752,8 +738,8 @@ void MainWindow::on_wNCoresPerNode_valueChanged(int arg1)
     LOG_AND_CHECK_IGNORESIGNAL( QString().setNum(arg1) );
 
     if( this->ui->wAutomaticRequests->isChecked() ) {
-        FORWARDING
-        on_wRequestNodes_clicked();
+        Log(1) <<"\n    Forwarding to on_wRequestNodes_clicked()";
+                on_wRequestNodes_clicked();
     }
 }
 
@@ -762,7 +748,7 @@ void MainWindow::on_wNCores_valueChanged(int arg1)
     LOG_AND_CHECK_IGNORESIGNAL( QString().setNum(arg1) );
 
     if( this->ui->wAutomaticRequests->isChecked() ) {
-        FORWARDING
+        Log(1) <<"\n    Forwarding to on_wRequestCores_clicked()";
         on_wRequestCores_clicked();
     }
 }
@@ -772,7 +758,7 @@ void MainWindow::on_wGbPerCore_valueChanged(double arg1)
     LOG_AND_CHECK_IGNORESIGNAL( QString().setNum(arg1) )
 
     if( this->ui->wAutomaticRequests->isChecked() ) {
-        FORWARDING
+        Log(1) <<"\n    Forwarding to on_wRequestCores_clicked()";
         on_wRequestCores_clicked();
     }
 }
@@ -802,7 +788,7 @@ void MainWindow::on_wPages_currentChanged(int index)
 {
     LOG_AND_CHECK_IGNORESIGNAL( QString().setNum(index) );
 
-    qInfo() << "    previous page: " << this->previousPage_;
+    Log(1) << QString("\n    changing tab %1->%2: ").arg(this->previousPage_).arg(index).C_STR();
     switch (index) {
     case 0:
         if( this->previousPage_==1 )
@@ -811,10 +797,6 @@ void MainWindow::on_wPages_currentChanged(int index)
             if( this->launcher_.script.has_unsaved_changes() ) {
                 this->launcher_.script.parse( text, false );
             }
-//#ifdef QT_DEBUG
-//            qInfo()<<text.toStdString()<<std::endl;
-//            this->launcher_.script.print(qInfo(),1);
-//#endif
         }
         break;
     case 1:        
@@ -829,10 +811,6 @@ void MainWindow::on_wPages_currentChanged(int index)
             QString text = this->launcher_.script.text();
             IGNORE_SIGNALS_UNTIL_END_OF_SCOPE;
             this->ui->wScript->setText(text);
-//#ifdef QT_DEBUG
-//            qInfo()<<text.toStdString()<<std::endl;
-//            this->launcher_.script.print(qInfo(),1);
-//#endif
         }
         break;
     case 2:
@@ -882,7 +860,7 @@ void MainWindow::on_wWalltime_valueChanged(double arg1)
     double seconds = arg1*this->walltimeUnitSeconds_;
     walltimeSeconds->set_value( formatWalltimeSeconds( seconds ) );
     this->getDataConnector("walltimeSeconds")->value_config_to_script();
-    qInfo() <<"    walltime set to: " << seconds << "s.";
+    Log(1) <<"    walltime set to: " << seconds << "s.";
 }
 
 void MainWindow::on_wNotifyAddress_editingFinished()
@@ -919,7 +897,7 @@ void MainWindow::update_abe( QChar c, bool checked )
         abe.remove(i,1);
     }
     ci_notifyWhen->set_value( abe );
-    qInfo() << "    abe set to: '" << abe << "'.";
+    Log(1) << QString("    abe set to: '%1'.").arg(abe).C_STR();
 
     this->getDataConnector("notifyWhen")->value_config_to_script();
 }
@@ -1080,7 +1058,7 @@ void MainWindow::on_wAuthenticate_clicked()
                 msg.append(" (verify your internet connection).");
             }
             this->statusBar()->showMessage(msg);
-            qInfo() << msg;
+            Log(0) << msg.prepend("\n    ").C_STR();
          // remove keys from ssh session and from config
             this->sshSession_.setUsername( this->getConfigItem("wUsername")->value().toString() );
             this->getConfigItem("privateKey")->set_value( QString() );
@@ -1108,9 +1086,6 @@ void MainWindow::on_wAuthenticate_clicked()
         QString modules_cluster = QString("modules_").append(this->getConfigItem("wCluster")->value().toString() );
         this->getConfigItem(modules_cluster)->set_choices(modules);
 
-#ifdef QT_DEBUG
-        qDebug() << this->sshSession_.toString();
-#endif
         break;
     }
     if( attempts==0 )
@@ -1298,11 +1273,10 @@ bool MainWindow::loadJobscript( QString const& filepath )
     }
     catch( std::runtime_error& e )
     {
-        qInfo() << QString("ERROR: in 'void MainWindow:: loadJobscript( QString const& filepath /*=%1*/)'\n")
-                        .arg(filepath)
-
-                  << e.what()
-                 ;
+        Log() << QString("ERROR: in 'void MainWindow:: loadJobscript( QString const& filepath /*=%1*/)'\n")
+                        .arg(filepath).C_STR()
+              << e.what()
+              ;
         return false;
     }
  // read from file, hence no unsaved changes sofar
@@ -1312,10 +1286,10 @@ bool MainWindow::loadJobscript( QString const& filepath )
 
 bool MainWindow::saveJobscript( QString const& filepath )
 {
-    qInfo() << "    writing script '" << filepath << "' ... ";
+    Log() << QString ("\n    writing script '%1' ... ").arg(filepath).C_STR();
     try {
         this->launcher_.script.write( filepath );
-        qInfo() << "done.";
+        Log() << "done.";
     } catch( pbs::WarnBeforeOverwrite &e ) {
         QMessageBox::StandardButton answer =
                 QMessageBox::question( this, TITLE
@@ -1329,9 +1303,9 @@ bool MainWindow::saveJobscript( QString const& filepath )
             qFile.copy(backup);
          // and save
             this->launcher_.script.write( filepath, false );
-            qInfo() << "done (overwritten, but made backup '"<<backup<<"').";
+            Log() << QString("done (overwritten, but made backup '%1').").arg(backup).C_STR();
         } else {
-            qInfo() << "aborted.";
+            Log() << "aborted.";
             this->statusBar()->showMessage( QString("Job script NOT SAVED: '%1'").arg(filepath) );
             return false;
         }
@@ -1372,8 +1346,6 @@ void MainWindow::on_wRemote_currentIndexChanged(const QString &arg1)
         QString qout;
         QString cmd = QString("echo ").append(arg1);
         this->sshSession_.execute( cmd );
-        qInfo() << "\n" << cmd
-                  << "\n''" << this->sshSession_.qout() <<"''";
     }
 
     if( !this->remote_env_vars_.contains(arg1) && this->isUserAuthenticated() ) {
@@ -1394,7 +1366,6 @@ void MainWindow::on_wSave_clicked()
 
     QString filepath = QString( this->local_subfolder_jobname() );
     if( filepath.isEmpty() ) {
-
         QMessageBox::critical(this,TITLE,"Local file location/subfolder/jobname not fully specified.\nSaving as ");
     } else {
         filepath.append("/pbs.sh");
