@@ -2,7 +2,7 @@
 #define JOB_H
 
 #include <QString>
-#include <QList>
+#include <QStringList>
 
 #include <ssh2tools.h>
 
