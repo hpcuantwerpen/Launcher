@@ -31,16 +31,21 @@ HEADERS  += mainwindow.h   \
 
 FORMS    += mainwindow.ui
 
+# The order below matters! In cygwin we get undefined references to functions
+# in libtoolbox.a which are referenced in libjobscript.a if toolbox comes
+# before jobscript.
 arg_path = ..
-arg_lib  = toolbox
-include(../depend_on_lib.pri)
 arg_lib  = cfg
 include(../depend_on_lib.pri)
 arg_lib  = jobscript
+include(../depend_on_lib.pri)
+arg_lib  = toolbox
 include(../depend_on_lib.pri)
 arg_lib  = ssh2tools
 include(../depend_on_lib.pri)
 
 include(../ssh2tools/libssh2.pri)
+
+
 
 

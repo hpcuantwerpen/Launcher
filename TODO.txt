@@ -9,10 +9,6 @@ TODO LIST
 
 - add shortcut on desktop of windows with icon
 
-- improve the log
-    std::cout << debug version
-    file      << release version
-
 - disable #PBS -o and -e	
 
 - add single job policy

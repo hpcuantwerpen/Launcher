@@ -17,7 +17,7 @@ SUBDIRS +=          \
      ssh2tools.depends = toolbox
 ssh2tools_test.depends = ssh2tools toolbox
 jobscript_test.depends = jobscript toolbox cfg
-#      Launcher.depends = jobscript toolbox cfg sshtools
+      Launcher.depends = jobscript toolbox cfg ssh2tools
 
 QMAKE_MACOSX_DEPLOYMENT_TARGET = 10.7
 

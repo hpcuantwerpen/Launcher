@@ -3,7 +3,7 @@
 
 #include <cstdlib>
 #include <iostream>
-
+#include <stdexcept>
 #include <QString>
 
 // preprocessor macro to subclass an exception class
