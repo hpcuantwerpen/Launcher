@@ -1,9 +1,9 @@
-nodesets    [ [ Turing-Harpertown    , 64,  8, 16, 2, [harpertown    ], [] ]
+nodesets    [ [ Turing-Harpertown    , 93,  8, 16, 2, [harpertown    ], [] ]
             , [ Turing-Harpertown-GbE, 64,  8, 16, 2, [harpertown,gbe], [] ]
-            , [ Turing-Harpertown-IB , 32,  8, 16, 2, [harpertown,ib ], [] ]
-            , [*Turing-Westmere      , 64, 12, 24, 2, [westmere      ], [] ]
-            , [ Turing-Westmere-GbE  , 64, 12, 24, 2, [westmere  ,gbe], [] ]
-            , [ Turing-Westmere-IB   ,  8, 12, 24, 2, [westmere  ,ib ], [] ]
+            , [ Turing-Harpertown-IB , 29,  8, 16, 2, [harpertown,ib ], [] ]
+            , [*Turing-Westmere      , 72, 12, 24, 2, [westmere      ], [] ]
+            , [ Turing-Westmere-GbE  ,  8, 12, 24, 2, [westmere  ,gbe], [] ]
+            , [ Turing-Westmere-IB   , 64, 12, 24, 2, [westmere  ,ib ], [] ]
             ]
 login_nodes [ login.turing.calcua.ua.ac.be
             , login1.turing.calcua.ua.ac.be

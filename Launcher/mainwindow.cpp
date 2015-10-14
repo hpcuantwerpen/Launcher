@@ -697,7 +697,7 @@ void MainWindow::updateResourceItems()
 
 void MainWindow::on_wRequestNodes_clicked()
 {
-    LOG_AND_CHECK_IGNORESIGNAL("");
+    LOG_AND_CHECK_IGNORESIGNAL(NO_ARGUMENT);
 
     NodesetInfo const& nodeset = this->nodesetInfo();
     try {
@@ -775,7 +775,7 @@ void MainWindow::on_wGbPerCore_valueChanged(double arg1)
 
 void MainWindow::on_wRequestCores_clicked()
 {
-    LOG_AND_CHECK_IGNORESIGNAL("");
+    LOG_AND_CHECK_IGNORESIGNAL(NO_ARGUMENT);
 
     NodesetInfo const& nodeset = this->nodesetInfo();
     try {
@@ -886,7 +886,7 @@ void MainWindow::on_wWalltime_valueChanged(double arg1)
 
 void MainWindow::on_wNotifyAddress_editingFinished()
 {
-    LOG_AND_CHECK_IGNORESIGNAL("");
+    LOG_AND_CHECK_IGNORESIGNAL(NO_ARGUMENT);
 
     QString validated = validateEmailAddress( this->ui->wNotifyAddress->text() );
     if( validated.isEmpty() )
@@ -943,9 +943,26 @@ void MainWindow::on_wNotifyEnd_toggled(bool checked)
 
 bool MainWindow::getPrivatePublicKeyPair()
 {
-    QString private_key = QFileDialog::getOpenFileName( this, "Select PRIVATE key file:", this->launcher_.homePath() );
-    if( !QFileInfo( private_key ).exists() ) {
-        this->statusBar()->showMessage( QString( "Private key '%1' not found.").arg(private_key) );
+    QString start_in;
+#if defined(Q_OS_MAC)||defined(Q_OS_LINUX)
+    QDir home = QDir::home();
+    if( home.exists(".ssh") ) {
+        start_in = home.filePath(".ssh");
+    } else {
+        start_in = this->launcher_.homePath();
+    }
+#else
+    start_in = this->launcher_.homePath();
+#endif
+    QString private_key;
+    QMessageBox::StandardButton answer = QMessageBox::question(this,TITLE,"You must provide a PRIVATE key file.\n Continue?", QMessageBox::Ok|QMessageBox::No,QMessageBox::Ok);
+    if( answer==QMessageBox::Ok ) {
+        private_key = QFileDialog::getOpenFileName( this, "Select your PRIVATE key file:", start_in );
+        if( !QFileInfo( private_key ).exists() ) {
+            this->statusBar()->showMessage( QString( "Private key '%1' not found.").arg(private_key) );
+            return false;
+        }
+    } else {
         return false;
     }
  // private key is provided, now public key
@@ -953,11 +970,14 @@ bool MainWindow::getPrivatePublicKeyPair()
     public_key.append(".pub"); // make an educated guess...
     if( !QFileInfo( public_key ).exists() )
     {
-        public_key = QFileDialog::getOpenFileName( this, "Select PUBLIC key file:", this->launcher_.homePath() );
-        if( public_key.isEmpty() || !QFileInfo(public_key).exists() )
-        {// not provided or inexisting
-            this->statusBar()->showMessage(QString("Public key '%1' not found or not provided.").arg(public_key) );
-            return false;
+        answer = QMessageBox::question(this,TITLE,"You must also provide the corresponding PUBLIC key file.\n Continue?", QMessageBox::Ok|QMessageBox::No,QMessageBox::Ok);
+        if( answer==QMessageBox::Ok ) {
+            public_key = QFileDialog::getOpenFileName( this, "Select PUBLIC key file:", start_in );
+            if( public_key.isEmpty() || !QFileInfo(public_key).exists() )
+            {// not provided or inexisting
+                this->statusBar()->showMessage(QString("Public key '%1' not found or not provided.").arg(public_key) );
+                return false;
+            }
         }
     }
     this->statusBar()->showMessage("Private/public key pair found.");
@@ -967,7 +987,7 @@ bool MainWindow::getPrivatePublicKeyPair()
 
 void MainWindow::on_wUsername_editingFinished()
 {
-    LOG_AND_CHECK_IGNORESIGNAL("");
+    LOG_AND_CHECK_IGNORESIGNAL(NO_ARGUMENT);
 
     QString username = validateUsername( this->ui->wUsername->text() );
 
@@ -977,6 +997,9 @@ void MainWindow::on_wUsername_editingFinished()
         this->statusBar()->showMessage("Invalid username");
      // reset the ssh session
         this->sshSession_.reset();
+     // and forget the keys in the config file
+        this->getConfigItem("privateKey")->set_value( QString() );
+        this->getConfigItem("publicKey" )->set_value( QString() );
      // deactivate the authenticate button
         this->ui->wAuthenticate->setText("authenticate...");
         this->ui->wAuthenticate->setEnabled(false);
@@ -1020,7 +1043,7 @@ bool MainWindow::isUserAuthenticated() const
 
 void MainWindow::on_wAuthenticate_clicked()
 {
-    LOG_AND_CHECK_IGNORESIGNAL("");
+    LOG_AND_CHECK_IGNORESIGNAL(NO_ARGUMENT);
 
     this->setIgnoreSignals();
     int max_attempts = 3;
@@ -1060,7 +1083,7 @@ void MainWindow::on_wAuthenticate_clicked()
         }
         catch( ssh2::PassphraseNeeded& e ) {
             QString msg = QString("Enter passphrase for unlocking key '%1':").arg( this->sshSession_.privateKey() );
-            QString passphrase = QInputDialog::getText( 0, "Passphrase needed", msg );
+            QString passphrase = QInputDialog::getText( 0, TITLE, msg, QLineEdit::Password );
             this->sshSession_.setPassphrase( passphrase );
             --attempts;
             continue;
@@ -1146,7 +1169,7 @@ void MainWindow::resolveRemoteFileLocations_()
 
 void MainWindow::on_wLocalFileLocationButton_clicked()
 {
-    LOG_AND_CHECK_IGNORESIGNAL("");
+    LOG_AND_CHECK_IGNORESIGNAL(NO_ARGUMENT);
 
     QString directory = QFileDialog::getExistingDirectory( this, "Select local file location:", this->launcher_.homePath() );
     if( directory.isEmpty() ) return;
@@ -1164,7 +1187,7 @@ void MainWindow::on_wLocalFileLocationButton_clicked()
 
 void MainWindow::on_wSubfolderButton_clicked()
 {
-    LOG_AND_CHECK_IGNORESIGNAL("");
+    LOG_AND_CHECK_IGNORESIGNAL(NO_ARGUMENT);
 
     if( this->ui->wLocal->text().isEmpty() ) {
         QMessageBox::warning( this, TITLE, "You must select a local file location first.");
@@ -1198,7 +1221,7 @@ void MainWindow::on_wSubfolderButton_clicked()
 
 void MainWindow::on_wJobnameButton_clicked()
 {
-    LOG_AND_CHECK_IGNORESIGNAL("");
+    LOG_AND_CHECK_IGNORESIGNAL(NO_ARGUMENT);
 
     if( this->ui->wLocal->text().isEmpty() ) {
         QMessageBox::warning( this, TITLE, "You must select a local file location first.");
@@ -1383,7 +1406,7 @@ void MainWindow::on_wRemote_currentIndexChanged(const QString &arg1)
 
 void MainWindow::on_wSave_clicked()
 {
-    LOG_AND_CHECK_IGNORESIGNAL("");
+    LOG_AND_CHECK_IGNORESIGNAL(NO_ARGUMENT);
 
     QString filepath = QString( this->local_subfolder_jobname() );
     if( filepath.isEmpty() ) {
@@ -1396,7 +1419,7 @@ void MainWindow::on_wSave_clicked()
 
 void MainWindow::on_wReload_clicked()
 {
-    LOG_AND_CHECK_IGNORESIGNAL("");
+    LOG_AND_CHECK_IGNORESIGNAL(NO_ARGUMENT);
 
     QString script_file = QString( this->local_subfolder_jobname() ).append("/pbs.sh");
     QDir qDir(script_file);
@@ -1414,7 +1437,7 @@ void MainWindow::on_wReload_clicked()
 
 void MainWindow::on_wSubmit_clicked()
 {
-    LOG_AND_CHECK_IGNORESIGNAL("");
+    LOG_AND_CHECK_IGNORESIGNAL(NO_ARGUMENT);
 
     QString filepath = QString( this->local_subfolder_jobname() ).append("/pbs.sh");
     if( this->launcher_.script.has_unsaved_changes() ) {
@@ -1457,7 +1480,7 @@ void MainWindow::on_wSubmit_clicked()
 
 void MainWindow::on_wScript_textChanged()
 {
-    LOG_AND_CHECK_IGNORESIGNAL("");
+    LOG_AND_CHECK_IGNORESIGNAL(NO_ARGUMENT);
 
     this->launcher_.script.set_has_unsaved_changes(true);
     this->check_script_unsaved_changes();
@@ -1465,7 +1488,7 @@ void MainWindow::on_wScript_textChanged()
 
 void MainWindow::on_wRefresh_clicked()
 {
-    LOG_AND_CHECK_IGNORESIGNAL("");
+    LOG_AND_CHECK_IGNORESIGNAL(NO_ARGUMENT);
 
     cfg::Item* ci_joblist = this->getConfigItem("job_list");
     JobList joblist( ci_joblist->value().toStringList() );
@@ -1474,7 +1497,7 @@ void MainWindow::on_wRefresh_clicked()
 
 void MainWindow::on_wRetrieveSelectedJob_clicked()
 {
-    LOG_AND_CHECK_IGNORESIGNAL("");
+    LOG_AND_CHECK_IGNORESIGNAL(NO_ARGUMENT);
 
     QString selection ;
     while( true )
@@ -1526,7 +1549,7 @@ void MainWindow::on_wRetrieveSelectedJob_clicked()
 
 void MainWindow::on_wRetrieveAllJobs_clicked()
 {
-    LOG_AND_CHECK_IGNORESIGNAL("");
+    LOG_AND_CHECK_IGNORESIGNAL(NO_ARGUMENT);
 
     cfg::Item* ci_joblist = this->getConfigItem("job_list");
     JobList joblist( ci_joblist->value().toStringList() );
@@ -1566,7 +1589,7 @@ void MainWindow::refreshJobs( JobList const& joblist )
 
 void MainWindow::on_wDeleteSelectedJob_clicked()
 {
-    LOG_AND_CHECK_IGNORESIGNAL("");
+    LOG_AND_CHECK_IGNORESIGNAL(NO_ARGUMENT);
     if( this->ui->wCheckDeleteLocalJobFolder->isChecked() ) {
         QDir qDir( this->local_subfolder_jobname() );
         qDir.removeRecursively();
@@ -1673,4 +1696,59 @@ QString MainWindow::get_path_to_clusters()
         if( dir.entryInfoList().size() > 0 ) return path_to_clusters;
     }
     return QString();
+}
+
+void MainWindow::on_wSelectModule_currentIndexChanged(const QString &arg1)
+{
+    LOG_AND_CHECK_IGNORESIGNAL( arg1 )
+
+    if( arg1.startsWith('/') ) {
+
+    } else {
+        QTextCursor cursor;
+        if( this->ui->wScript->find("cd $PBS_O_WORKDIR") ) {
+            while( this->ui->wScript->find("module load") ) {}
+            cursor = this->ui->wScript->textCursor();
+        } else {// insert at current position (or rather just before the next line)
+            cursor = this->ui->wScript->textCursor();
+        }
+        cursor.movePosition( QTextCursor::EndOfLine );
+        cursor.movePosition( QTextCursor::NextCharacter );
+        cursor.insertText( QString("module load ").append(arg1).append('\n') );
+        this->ui->wScript->setTextCursor( cursor );
+        this->launcher_.script.set_has_unsaved_changes();
+    }
+}
+
+void MainWindow::on_wReload2_clicked()
+{
+    LOG_AND_CHECK_IGNORESIGNAL(NO_ARGUMENT);
+    Log(1) <<"\n    Forwarding to on_wReload_clicked()";
+    this->on_wReload_clicked();
+    if( this->statusBar()->currentMessage().startsWith("No script found") ) {
+        this->statusBar()->showMessage("Script reloaded from resources page");
+    }
+
+    for( QList<dc::DataConnectorBase*>::iterator iter=this->data_.begin(); iter!=this->data_.end(); ++iter )
+    {
+        if( (*iter)->value_widget_to_config() ) {
+            (*iter)->value_config_to_script();
+        }
+    }
+    QString text = this->launcher_.script.text();
+    this->ui->wScript->setText(text);
+}
+
+void MainWindow::on_wSave2_clicked()
+{
+    LOG_AND_CHECK_IGNORESIGNAL(NO_ARGUMENT);
+    Log(1) <<"\n    Forwarding to on_wSave_clicked()";
+    this->on_wSave_clicked();
+}
+
+void MainWindow::on_wSubmit2_clicked()
+{
+    LOG_AND_CHECK_IGNORESIGNAL(NO_ARGUMENT);
+    Log(1) <<"\n    Forwarding to on_wSubmit_clicked()";
+    this->on_wSubmit_clicked();
 }

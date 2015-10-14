@@ -116,7 +116,13 @@ private slots:
 
     void on_wCheckDeleteRemoteJobFolder_toggled(bool checked);
 
+    void on_wSelectModule_currentIndexChanged(const QString &arg1);
 
+    void on_wReload2_clicked();
+
+    void on_wSave2_clicked();
+
+    void on_wSubmit2_clicked();
 
 public:
     void setupHome();

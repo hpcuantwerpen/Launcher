@@ -7,7 +7,7 @@
     <x>0</x>
     <y>0</y>
     <width>920</width>
-    <height>599</height>
+    <height>611</height>
    </rect>
   </property>
   <property name="sizePolicy">
@@ -218,7 +218,7 @@
                 <number>0</number>
                </property>
                <item>
-                <layout class="QGridLayout" name="gridLayout_2" rowstretch="0,0,0,0,0,0,0,0">
+                <layout class="QGridLayout" name="gridLayout_2" rowstretch="0,0,0,0,0,0">
                  <property name="verticalSpacing">
                   <number>0</number>
                  </property>

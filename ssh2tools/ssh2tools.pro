@@ -19,11 +19,4 @@ arg_path = ..
 arg_lib  = toolbox
 include(../depend_on_lib.pri)
 
-#USE_SYSTEM_LIBSSH2 = 1
-#equals(USE_SYSTEM_LIBSSH2,1) {
-#    message("USE_SYSTEM_LIBSSH2 is true")
-#} else {
-#    message("USE_SYSTEM_LIBSSH2 is false")
-#}
-
 include(libssh2.pri)
