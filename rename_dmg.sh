@@ -5,7 +5,7 @@ rm ttt.dmg
 hdiutil convert Launcher.dmg -format UDRW -o ttt.dmg
 mv Launcher.dmg Launcher.0.dmg
 open ttt.dmg
-sleep 5
+sleep 20
 #diskutil list (kijk na onder welke /dev/diskX de image gemount is, bvb. disk3)
 diskutil list
 for i in `seq 1 10`;
