@@ -21,7 +21,7 @@ do
 done
 #echo disk${i}
 diskutil renameVolume /Volumes/:\Users* Launcher
-rm -rf /Volumes/Launcher/.Trashes /Volumes/Launcher/.fseventsd
+sudo rm -rf /Volumes/Launcher/.Trashes /Volumes/Launcher/.fseventsd
 diskutil eject disk$i
 hdiutil convert ttt.dmg -format UDRO -ov -o Launcher.dmg
 
