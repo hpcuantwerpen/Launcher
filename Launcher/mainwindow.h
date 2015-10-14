@@ -187,6 +187,11 @@ private:
     QMenu *helpMenu_;
     QAction *helloAction_;
     QMenu *extraMenu_;
+    enum PendingRequest {
+        NoPendingRequest=0
+      , NodesAndCoresPerNode
+      , CoresAndGbPerCore
+    } pendingRequest_;
 };
 
 

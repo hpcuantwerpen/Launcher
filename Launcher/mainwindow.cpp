@@ -65,6 +65,7 @@
       , ignoreSignals_(false)
       , previousPage_(0)
       , verbosity_(INITIAL_VERBOSITY)
+      , pendingRequest_(NoPendingRequest)
     {
         ui->setupUi(this);
 
@@ -712,6 +713,7 @@ void MainWindow::on_wRequestNodes_clicked()
     this->getConfigItem("wGbPerCore"    )->set_value( nodeset.granted().gbPerCore );
     this->getConfigItem("wGbTotal"      )->set_value( nodeset.granted().gbTotal );
     this->updateResourceItems();
+    this->pendingRequest_ = NoPendingRequest;
 }
 
 void MainWindow::on_wAutomaticRequests_toggled(bool checked)
@@ -730,6 +732,8 @@ void MainWindow::on_wNNodes_valueChanged(int arg1)
     if( this->ui->wAutomaticRequests->isChecked() ) {
         Log(1) <<"\n    q to on_wRequestNodes_clicked()";
         on_wRequestNodes_clicked();
+    } else {
+        this->pendingRequest_ = NodesAndCoresPerNode;
     }
 }
 
@@ -739,7 +743,9 @@ void MainWindow::on_wNCoresPerNode_valueChanged(int arg1)
 
     if( this->ui->wAutomaticRequests->isChecked() ) {
         Log(1) <<"\n    Forwarding to on_wRequestNodes_clicked()";
-                on_wRequestNodes_clicked();
+        on_wRequestNodes_clicked();
+    } else {
+        this->pendingRequest_ = NodesAndCoresPerNode;
     }
 }
 
@@ -750,6 +756,8 @@ void MainWindow::on_wNCores_valueChanged(int arg1)
     if( this->ui->wAutomaticRequests->isChecked() ) {
         Log(1) <<"\n    Forwarding to on_wRequestCores_clicked()";
         on_wRequestCores_clicked();
+    } else {
+        this->pendingRequest_ = CoresAndGbPerCore;
     }
 }
 
@@ -760,6 +768,8 @@ void MainWindow::on_wGbPerCore_valueChanged(double arg1)
     if( this->ui->wAutomaticRequests->isChecked() ) {
         Log(1) <<"\n    Forwarding to on_wRequestCores_clicked()";
         on_wRequestCores_clicked();
+    } else {
+        this->pendingRequest_ = CoresAndGbPerCore;
     }
 }
 
@@ -782,6 +792,7 @@ void MainWindow::on_wRequestCores_clicked()
     this->getConfigItem("wGbPerCore"    )->set_value( nodeset.granted().gbPerCore );
     this->getConfigItem("wGbTotal"      )->set_value( nodeset.granted().gbTotal );
     this->updateResourceItems();
+    this->pendingRequest_ = NoPendingRequest;
 }
 
 void MainWindow::on_wPages_currentChanged(int index)
@@ -802,6 +813,16 @@ void MainWindow::on_wPages_currentChanged(int index)
     case 1:        
         if( this->previousPage_==0)
         {
+            switch( this->pendingRequest_ ) {
+              case NodesAndCoresPerNode:
+                this->on_wRequestNodes_clicked();
+                break;
+              case( CoresAndGbPerCore ):
+                this->on_wRequestCores_clicked();
+                break;
+              default:
+                break;
+            }
             for( QList<dc::DataConnectorBase*>::iterator iter=this->data_.begin(); iter!=this->data_.end(); ++iter )
             {
                 if( (*iter)->value_widget_to_config() ) {
