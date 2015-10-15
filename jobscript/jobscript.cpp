@@ -39,8 +39,8 @@ namespace pbs
 
         this->add( QString("#PBS -l nodes=%1:ppn=%2").arg(cfg_get_str(config,"wNNodes"       ,1) )
                                                      .arg(cfg_get_str(config,"wNCoresPerNode",1) ) );
-
         this->add( QString("#PBS -l walltime=%1")    .arg(cfg_get_str(config,"walltime","1:00:00") ) );
+        this->add( QString("#PBS -l naccesspolicy=singlejob"), /*hidden=*/true );
 
         this->add( QString("#PBS -M %1")             .arg(cfg_get_str(config,"notify_M","your.email@address.here") ), true );
         this->add( QString("#PBS -m %1")             .arg(cfg_get_str(config,"notify_m","e") ), true );
@@ -361,7 +361,7 @@ namespace pbs
  //-----------------------------------------------------------------------------
     ShellCommand*
     Script::
-    find_key( QString const& key )
+    find_key(QString const& key, bool must_throw )
     {
         if( key[0]=='-' ) {
             ScriptLines_t::iterator iter =
@@ -382,8 +382,10 @@ namespace pbs
                 }
             }
         }
-        throw_<std::range_error>("Key '%1' was not found in script.",key);
-        return nullptr; //keep compiler happy
+        if( must_throw ) {
+            throw_<std::range_error>("Key '%1' was not found in script.",key);
+        }
+        return nullptr;
     }
  //-----------------------------------------------------------------------------
     QString Script::toString( int verbose, bool refresh )

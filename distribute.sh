@@ -1,4 +1,7 @@
 echo Copying Launcher.app
+mkdir -p ~/qws/build-Launcher-Desktop_Qt_5_5_0_clang_64bit-Release/distribute/macosx/
+rm -rf   ~/qws/build-Launcher-Desktop_Qt_5_5_0_clang_64bit-Release/distribute/macosx/*
+
 cp -R ~/qws/build-Launcher-Desktop_Qt_5_5_0_clang_64bit-Release/Launcher/Launcher.app ~/qws/build-Launcher-Desktop_Qt_5_5_0_clang_64bit-Release/distribute/macosx/
 
 echo Running macdeployqt

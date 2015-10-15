@@ -863,6 +863,14 @@ void MainWindow::on_wEnforceNNodes_toggled(bool checked)
     this->launcher_.script.find_key("-W")->setHidden(hide);
 }
 
+void MainWindow::on_wSingleJob_toggled(bool checked)
+{
+    LOG_AND_CHECK_IGNORESIGNAL( (checked?"true":"false") );
+
+    bool hide = !checked;
+    this->launcher_.script.find_key("naccesspolicy")->setHidden(hide);
+}
+
 void MainWindow::on_wWalltimeUnit_currentTextChanged(const QString &arg1)
 {
     LOG_AND_CHECK_IGNORESIGNAL( arg1 );

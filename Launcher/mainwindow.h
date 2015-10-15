@@ -124,6 +124,8 @@ private slots:
 
     void on_wSubmit2_clicked();
 
+    void on_wSingleJob_toggled(bool checked);
+
 public:
     void setupHome();
     void setIgnoreSignals( bool ignore=true );

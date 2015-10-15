@@ -59,7 +59,7 @@ namespace pbs
         void    add_features( QString const& key, Features_t const& features );
         void remove_features( QString const& key, Features_t const& features );
 
-        ShellCommand* find_key( QString const& key );
+        ShellCommand* find_key( QString const& key, bool must_throw=true );
          // find the script line associated with key
 
         virtual QString toString( int verbose=0, bool refresh=false );

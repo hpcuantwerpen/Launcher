@@ -81,7 +81,7 @@ namespace pbs
         virtual QString toString( int verbose=0 , bool refresh=false );
 
     private:
-        static ShellCommand* parse ( QString const &line);
+        static ShellCommand* parse( QString const &line);
     private:
         int          ordinate_;
         types::Type  type_;
