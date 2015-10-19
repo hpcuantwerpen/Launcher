@@ -112,7 +112,7 @@
         {
             QString cmd = QString("mkdir -p ").append( this->vsc_data_job_parent_folder() );
             int rc = this->sshSession->execute(cmd);
-
+            if( rc ) {/*keep compiler happy (rc unused variable)*/}
             cmd = QString("cp -rv ").append( this->remote_job_folder() )
                                     .append(" ").append( this->vsc_data_job_parent_folder() );
             rc = this->sshSession->execute(cmd);

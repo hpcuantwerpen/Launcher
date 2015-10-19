@@ -11,6 +11,7 @@ TARGET = ssh2tools
 TEMPLATE = lib
 CONFIG += staticlib
 
+
 SOURCES += ssh2tools.cpp
 
 HEADERS += ssh2tools.h

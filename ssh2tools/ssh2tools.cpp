@@ -5,6 +5,7 @@
 
 #ifdef Q_OS_WIN
     #include <windows.h>
+    #include <ws2tcpip.h>
 #else
     #include <sys/types.h>
     #include <sys/socket.h>
@@ -155,7 +156,7 @@ namespace ssh2
         hints.ai_socktype = SOCK_STREAM;
 
         if( (rv=getaddrinfo( this->login_node_.c_str(), "22", &hints, &servinfo )) != 0 )
-            throw_<std::runtime_error>("getaddrinfo[%1] : %2", rv, gai_strerror(rv) );
+            throw_<std::runtime_error>("getaddrinfo[%1] : %2", rv, gai_strerrorA(rv) );
 
      // loop through all the results and connect to the first we can
         for( p=servinfo; p!=NULL; p=p->ai_next)
