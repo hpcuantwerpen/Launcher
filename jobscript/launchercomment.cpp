@@ -16,8 +16,8 @@ namespace pbs
     QString LauncherComment::prefix_ = "#LAU";
  //-----------------------------------------------------------------------------
     LauncherComment::
-    LauncherComment( QString const &line, int ordinate, types::Type type)
-      : UserComment(line,ordinate,type)
+    LauncherComment( QString const &line, types::Position position, types::Type type)
+      : UserComment(line,position,type)
     {}
  //-----------------------------------------------------------------------------
     void LauncherComment::init()
@@ -63,7 +63,7 @@ namespace pbs
     bool LauncherComment::
     equals( ShellCommand const* rhs) const
     {
-        if( rhs->type() == types::LauncherComment ) {
+        if( rhs->type() == types::LauncherCommentType ) {
             if( this->parameters().isEmpty() || rhs->parameters().isEmpty() )
                 return false;
          // there's only one key and it should be the same

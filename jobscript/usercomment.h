@@ -12,7 +12,11 @@ namespace pbs
         template <class T>
         friend T* create(QString const& line );
     protected:
-        UserComment( QString const& line, int ordinate=-1, types::Type type=types::UserComment);
+        UserComment
+          ( QString const&  line
+          , types::Position position = types::UserCommentPosition
+          , types::Type     type     = types::UserCommentType
+          );
         static UserComment* parse( QString const &line);
     private:
         static QString prefix_;

@@ -43,7 +43,10 @@ namespace pbs
                   ) const;
 
         void parse( QString const& text, bool additive=false );
-        void add  ( QString const& line, bool hidden=false );
+        void add  ( QString const&  line
+                  , bool            hidden   = false
+                  , types::Position position = types::DefaultPosition
+                  );
 
         virtual void compose();
         int index( ShellCommand const* line ) const;

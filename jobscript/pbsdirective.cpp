@@ -16,8 +16,8 @@ namespace pbs
     QString PbsDirective   ::prefix_ = "#PBS";
  //-----------------------------------------------------------------------------
     PbsDirective::
-    PbsDirective( QString const &line, int ordinate, types::Type type)
-      : UserComment(line,ordinate,type)
+    PbsDirective( QString const &line, types::Position position, types::Type type)
+      : UserComment(line,position,type)
     {}
  //-----------------------------------------------------------------------------
     void PbsDirective::init()
@@ -111,7 +111,7 @@ namespace pbs
     bool PbsDirective::
     equals( ShellCommand const* rhs) const
     {
-        if( rhs->type() == types::PbsDirective ) {
+        if( rhs->type() == types::PbsDirectiveType ) {
             PbsDirective const* rhs2 = reinterpret_cast<PbsDirective const*>(rhs);
             if( this->flag_ != rhs2->flag_ ) // different flags are never equal
                 return false;

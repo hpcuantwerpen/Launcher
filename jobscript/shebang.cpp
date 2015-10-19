@@ -16,14 +16,14 @@ namespace pbs
     QString Shebang::default_value = "#!/bin/bash";
  //-----------------------------------------------------------------------------
     Shebang::
-    Shebang( QString const &line, int ordinate, types::Type type)
-      : UserComment(line,ordinate,type)
+    Shebang( QString const &line, types::Position position, types::Type type)
+      : UserComment(line,position,type)
     {}
  //-----------------------------------------------------------------------------
     bool Shebang::
     equals( ShellCommand const* rhs) const
     {
-        return ( rhs->type() == types::Shebang );
+        return ( rhs->type() == types::ShebangType );
     }
  //-----------------------------------------------------------------------------
 }//namespace pbs

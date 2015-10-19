@@ -18,7 +18,11 @@ namespace pbs
         virtual QString const& value() const;
         virtual void setValue( QString const& value );
     protected:
-        PbsDirective(QString const& line, int ordinate=2, types::Type type=types::PbsDirective);
+        PbsDirective
+          ( QString const&  line
+          , types::Position position = types::PbsDirectivePosition
+          , types::Type     type     = types::PbsDirectiveType
+          );
         virtual void init();
         static PbsDirective* parse( QString const &line);
     private:

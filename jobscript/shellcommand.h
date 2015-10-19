@@ -8,13 +8,24 @@
 
 namespace pbs
 {//=============================================================================
-    namespace types {
+    namespace types
+    {
         enum Type
-        { ShellCommand = 0
-        , UserComment
-        , Shebang
-        , LauncherComment
-        , PbsDirective
+        { ShellCommandType = 0
+        , UserCommentType
+        , ShebangType
+        , LauncherCommentType
+        , PbsDirectiveType
+        };
+
+        enum Position
+        { DefaultPosition         = -9999
+        , ShebangPosition         =     0
+        , LauncherCommentPosition =     1
+        , PbsDirectivePosition    =     2
+        , ShellCommandPosition    =    10
+        , UserCommentPosition     =    -1 // => keep where inserted
+        , LastPosition            =  9999
         };
     }
  //=============================================================================
@@ -44,12 +55,17 @@ namespace pbs
         friend T* create( QString const& line );
         friend class Script;
     protected:
-        ShellCommand( QString const& line, int ordinate=10, types::Type type=types::ShellCommand );
+        ShellCommand
+          ( QString const& line
+          , types::Position position = types::ShellCommandPosition
+          , types::Type     type     = types::ShellCommandType
+          );
         //virtual void init();
     public:
         virtual ~ShellCommand() {}
-        int            ordinate() const { return this->ordinate_; }
-        types::Type    type    () const { return this->type_;     }
+        types::Position position() const { return this->position_; }
+        void setPosition( types::Position pos ) { this->position_ = pos; }
+        types::Type     type    () const { return this->type_;     }
         //QString const& parm_value( QString const & key ) const;
 
         virtual bool equals( ShellCommand const* rhs) const;
@@ -83,14 +99,14 @@ namespace pbs
     private:
         static ShellCommand* parse( QString const &line);
     private:
-        int          ordinate_;
-        types::Type  type_;
+        types::Position position_;
+        types::Type     type_;
     protected:
-        QString      flag_;
-        QString      value_;
-        Parameters_t parameters_;
-        Features_t   features_;
-        bool         hidden_;
+        QString         flag_;
+        QString         value_;
+        Parameters_t    parameters_;
+        Features_t      features_;
+        bool            hidden_;
     };
  //=============================================================================
     template <class T>

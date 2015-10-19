@@ -11,7 +11,7 @@ macx:
         message("using libssh2 as installed by Homebrew")
     } else {
       # use libssh2 as built by me
-        SSH2_DEP_DIR = "/Users/etijskens/qws/libssh2+dependencies/"
+        SSH2_DEP_DIR = "/Users/etijskens/qws/libssh2_dependencies/"
         LIBS += $${SSH2_DEP_DIR}libssh2/build/lib/libssh2.a
         LIBS += $${SSH2_DEP_DIR}openssl-1.0.2d/build/lib/libssl.a
         LIBS += $${SSH2_DEP_DIR}openssl-1.0.2d/build/lib/libcrypto.a

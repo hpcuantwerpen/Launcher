@@ -16,9 +16,13 @@ namespace pbs
     }
  //-----------------------------------------------------------------------------
     ShellCommand::
-    ShellCommand( QString const& line, int ordinate, types::Type type )
+    ShellCommand
+      ( QString const&  line
+      , types::Position position
+      , types::Type     type
+      )
       : Text(line)
-      , ordinate_(ordinate)
+      , position_(position)
       , type_(type)
     {}
  //-----------------------------------------------------------------------------
@@ -39,7 +43,7 @@ namespace pbs
     bool ShellCommand::
     equals( ShellCommand const* rhs) const
     {
-        if( rhs->type() == types::ShellCommand )
+        if( rhs->type() == types::ShellCommandType )
             return this->text() == rhs->text();
         return false;
     }

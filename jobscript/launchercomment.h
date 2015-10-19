@@ -16,7 +16,11 @@ namespace pbs
         virtual bool equals( ShellCommand const* rhs) const;
         virtual void copyFrom( ShellCommand const* rhs );
     protected:
-        LauncherComment(QString const& line, int ordinate=1, types::Type type=types::LauncherComment);
+        LauncherComment
+        ( QString const& line
+        , types::Position position = types::LauncherCommentPosition
+        , types::Type     type     = types::LauncherCommentType
+        );
         virtual void init();
         static LauncherComment* parse( QString const &line);
     private:

@@ -15,7 +15,11 @@ namespace pbs
         static QString default_value;
         virtual bool equals( ShellCommand const* rhs) const;
     protected:
-        Shebang(QString const& line = default_value, int ordinate=0, types::Type type=types::Shebang);
+        Shebang
+          ( QString const&  line     = default_value
+          , types::Position position = types::ShebangPosition
+          , types::Type     type     = types::ShebangType
+          );
         static Shebang* parse( QString const &line);
     private:
         static QString prefix_;

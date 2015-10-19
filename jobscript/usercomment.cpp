@@ -27,8 +27,8 @@ namespace pbs
     QString UserComment::prefix_ = "#";
  //-----------------------------------------------------------------------------
     UserComment::
-    UserComment(QString const& line, int ordinate, types::Type type)
-      : ShellCommand(line,ordinate,type)
+    UserComment(QString const& line, types::Position position, types::Type type)
+      : ShellCommand(line,position,type)
     {}
  //-----------------------------------------------------------------------------
 }//namespace pbs

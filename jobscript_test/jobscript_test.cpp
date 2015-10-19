@@ -23,27 +23,27 @@ void Jobscript_test::testCase1()
 {
     pbs::ShellCommand* s = nullptr;
     s = pbs::parse("blabla");
-    QVERIFY2(s->type()==pbs::types::ShellCommand, "Failure");
+    QVERIFY2(s->type()==pbs::types::ShellCommandType, "Failure");
     delete s;
     s=nullptr;
 
     s = pbs::parse("blabla#huhhuh");
-    QVERIFY2(s->type()==pbs::types::ShellCommand, "Failure");
+    QVERIFY2(s->type()==pbs::types::ShellCommandType, "Failure");
     delete s;
     s=nullptr;
 
     s = pbs::parse("blabla #huhhuh");
-    QVERIFY2(s->type()==pbs::types::ShellCommand, "Failure");
+    QVERIFY2(s->type()==pbs::types::ShellCommandType, "Failure");
     delete s;
     s=nullptr;
 
     s = pbs::parse("#blabla");
-    QVERIFY2(s->type()==pbs::types::UserComment, "Failure");
+    QVERIFY2(s->type()==pbs::types::UserCommentType, "Failure");
     delete s;
     s=nullptr;
 
     s = pbs::parse("#!blabla");
-    QVERIFY2(s->type()==pbs::types::Shebang, "Failure");
+    QVERIFY2(s->type()==pbs::types::ShebangType, "Failure");
     delete s;
     s=nullptr;
 
@@ -55,7 +55,7 @@ void Jobscript_test::testCase1()
     }
 
     s = pbs::parse("#LAU bla = bla");
-    QVERIFY2(s->type()==pbs::types::LauncherComment, "Failure");
+    QVERIFY2(s->type()==pbs::types::LauncherCommentType, "Failure");
     QVERIFY2(s->parameters()["bla"]=="bla","failure");
     delete s;
     s=nullptr;
@@ -68,7 +68,7 @@ void Jobscript_test::testCase1()
     }
 
     s = pbs::parse("#PBS -W x=nmatchpolicy:y=soep:z=ballekes:exactnode #huh");
-    QVERIFY2(s->type()==pbs::types::PbsDirective, "Failure");
+    QVERIFY2(s->type()==pbs::types::PbsDirectiveType, "Failure");
     delete s;
     s=nullptr;
 }

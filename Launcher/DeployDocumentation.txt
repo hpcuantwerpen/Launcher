@@ -52,27 +52,31 @@ This document gathers information on how to set up a distributable application o
 
 2. Windows 7
 ============
-    2.1 libssh2
-    ============
+    2.1 DEPENDENCIES
+    ================
+    download QT Creator for windows&&mingw
+    download CMake for windows
+    download msys (without mingw) (from http://sourceforge.net/projects/mingw/files/MSYS/Base/msys-core/msys-1.0.11/MSYS-1.0.11.exe/download?use_mirror=garr)
+
     http://report5.blogspot.be/2012/09/how-to-compile-libssh2-for-windows-with.html
+    https://wiki.qt.io/Compiling_OpenSSL_with_MinGW
 
     a) zlib. 
-       downloaded zlib source code from zlib.net, unpack the tarball,  cd into it and type the following commands:
+       downloaded zlib source code from zlib.net, unpack the tarball, build with cmake using the toolchain
+       of the QT Creator above
+       run ming32-make in msys window
 
-        make -f win32/Makefile.gcc
-        make install -f win32/Makefile.gcc BINARY_PATH=/mingw/bin INCLUDE_PATH=/mingw/include LIBRARY_PATH=/mingw/lib
+    b) openssl. instructions modified from https://wiki.qt.io/Compiling_OpenSSL_with_MinGW
+       obtain tarball from https://www.openssl.org/source/
+       execute all compile instructions in MSYS window, make sure the Qt Creator toolchain is in the path.
+       . unpack the tarball
+       . read build-openssl-windows7.sh
+       . modify directories in build-openssl-windows7.sh
+       . execute build-openssl-windows7.sh
+       
+    c) libssh2.
+       obtain source code as 'git clone https://github.com/libssh2/libssh2'
+       build using CMake
+       had to hack FindOpenSSL.cmake
+       and explicitly set SSL_EAY (/path/to/libssl.a) and LIB_EAY (/path/to/libcrypto.a)
 
-       i replaced
-         - make with ming32-make that comes with QT Creator
-         - /mingw/bin with /Users/etijskens/qws/_bin etc..
-
-    b) openssl. 
-       the mentioned http://kemovitra.blogspot.be/2012/09/build-openssl-with-mingw.html no longer exists,
-       neither does the redirection http://go.kblog.us/2012/09/build-openssl-with-mingw.html.
-       Instead, we follow http://stackoverflow.com/questions/9379363/how-to-build-openssl-with-mingw-in-windows.
-       
-       used strawberry perlma
-       to the make commands i added: CXX=/c/Qt/Tools/mingw492_32/g++.exe CC=/c/Qt/Tools/mingw492_32/gcc.exe
-       
-       
-    

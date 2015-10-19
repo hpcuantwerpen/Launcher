@@ -63,16 +63,19 @@ namespace pbs
  //-----------------------------------------------------------------------------
     void
     Script::
-    add(const QString &line, bool hidden )
+    add(const QString &line, bool hidden, types::Position position )
     {
      // Note that directly calling add acts like calling parse() with additive=True
         ShellCommand* p_new_script_line( pbs::parse(line) );
         p_new_script_line->setHidden(hidden);
+        if( position!=types::DefaultPosition ) {
+            p_new_script_line->setPosition(position);
+        }
         p_new_script_line->set_parent( this );
         types::Type new_type = p_new_script_line->type();
         switch(new_type) {
-        case types::ShellCommand:
-        case types::UserComment:
+        case types::ShellCommandType:
+        case types::UserCommentType:
             this->insert_(p_new_script_line);
             break;
         default:
@@ -93,13 +96,13 @@ namespace pbs
     {
         new_line->set_parent( this );
 
-        if( new_line->ordinate() == -1 ) {
+        if( new_line->position() == -1 ) {
             this->lines_.append(new_line);
         } else {
             ScriptLines_t::iterator iter =
                 std::find_if( this->lines_.begin(), this->lines_.end(),
                     [&] ( ShellCommand const* current ) {
-                       return current->ordinate() > new_line->ordinate();
+                       return current->position() > new_line->position();
                     }
                 );
             if( iter==this->lines_.end() ) {
@@ -144,6 +147,7 @@ namespace pbs
         this->set_has_unsaved_changes(false);
     }
  //-----------------------------------------------------------------------------
+#define FINISHED QString("cd $PBS_O_WORKDIR && touch finished.$PBS_JOBID #Launcher needs this to be the LAST line. Do NOT move or delete!")
     void
     Script::
     write( QString const& filepath, bool warn_before_overwrite) const
@@ -165,6 +169,11 @@ namespace pbs
         QFile f(fileinfo.filePath());
         f.open(QIODevice::Truncate|QIODevice::Text|QIODevice::WriteOnly);
         QTextStream out(&f);
+
+        const_cast<Script*>(this)->add( QString(FINISHED), /*hidden=*/false, /*position=*/types::LastPosition );
+         // this line will be removed when reading back in
+         // As the user will never actually see this line, he can also not delete it.
+
         QString const& txt = this->text();
         out << txt;
         non_const_this->filepath_ = new_filepath;
@@ -191,8 +200,8 @@ namespace pbs
 //                    <<sl->text()    .toStdString()<<std::endl
 //                    <<sl->typeName().toStdString()<<std::endl;
                 switch( sl->type() ) {
-                  case types::ShellCommand:
-                  case types::UserComment :
+                  case types::ShellCommandType:
+                  case types::UserCommentType :
                     this->remove_(i);
 //                    std::cout<<"/tdeleted"<<std::endl;
                     break;
@@ -209,8 +218,10 @@ namespace pbs
             ; iter != lines.cend(); ++iter )
         {
             QString const& line = *iter;
-            if( !line.isEmpty() )
+
+            if( !line.isEmpty() && line!=FINISHED ) {// Skip empty lines and the FINISHED ShellCommand
                 this->add(line);
+            }
         }
     }
  //-----------------------------------------------------------------------------
@@ -276,8 +287,8 @@ namespace pbs
         } else {
             ShellCommand* line = this->find_key(key);
             switch(line->type() ) {
-            case(types::LauncherComment):
-            case(types::PbsDirective):
+            case(types::LauncherCommentType):
+            case(types::PbsDirectiveType):
                 if( line->parameters_.add( parms ) ) {
                     line->set_is_modified();
                 }
@@ -297,8 +308,8 @@ namespace pbs
         } else {
             ShellCommand* line = this->find_key(key);
             switch(line->type() ) {
-            case(types::LauncherComment):
-            case(types::PbsDirective):
+            case(types::LauncherCommentType):
+            case(types::PbsDirectiveType):
                 if( line->parameters_.remove( parms ) ) {
                     line->set_is_modified();
                 }
@@ -318,8 +329,8 @@ namespace pbs
         } else {
             ShellCommand* line = this->find_key(key);
             switch(line->type() ) {
-            case(types::LauncherComment):
-            case(types::PbsDirective):
+            case(types::LauncherCommentType):
+            case(types::PbsDirectiveType):
                 if( line->features_.add( features ) ) {
                     line->set_is_modified();
                 }
@@ -339,8 +350,8 @@ namespace pbs
         } else {
             ShellCommand* line = this->find_key(key);
             switch(line->type() ) {
-            case(types::LauncherComment):
-            case(types::PbsDirective):
+            case(types::LauncherCommentType):
+            case(types::PbsDirectiveType):
                 if( line->features_.remove( features ) ) {
                     line->set_is_modified();
                 }
