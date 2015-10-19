@@ -1,22 +1,32 @@
 TEMPLATE = subdirs
 
+#win32:{
+#        DEFINES+= WINVER=0x0501
+#        LIBS += -LC:/Qt/Tools/mingw492_32/i686-w64-mingw32/lib -lws2_32 -lwsock32
+#}
 SUBDIRS +=          \
     toolbox         \
-    toolbox_test    \
     cfg             \
-    cfg_test        \
     Launcher        \
     ssh2tools       \
-    ssh2tools_test  \
-    jobscript       \
-    jobscript_test
+    jobscript
 
-  toolbox_test.depends = toolbox
-      cfg_test.depends = cfg
-     ssh2tools.depends = toolbox
-ssh2tools_test.depends = ssh2tools toolbox
-jobscript_test.depends = jobscript toolbox cfg
-      Launcher.depends = jobscript toolbox cfg ssh2tools
+      cfg.depends = toolbox
+ssh2tools.depends = toolbox
+ Launcher.depends = jobscript toolbox cfg ssh2tools
+
+BUILD_TESTS = 1
+equals(BUILD_TESTS,1) {
+    SUBDIRS +=  toolbox_test    \
+                cfg_test        \
+                ssh2tools_test  \
+                jobscript_test
+
+      toolbox_test.depends = toolbox
+          cfg_test.depends = cfg
+    ssh2tools_test.depends = ssh2tools toolbox
+    jobscript_test.depends = jobscript toolbox cfg
+}
 
 QMAKE_MACOSX_DEPLOYMENT_TARGET = 10.7
 

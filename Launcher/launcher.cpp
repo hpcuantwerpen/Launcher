@@ -21,12 +21,11 @@
     QString Launcher::homePath( QString const& sub )
     {
         QDir home = QDir::home();
-        QString root = QDir::cleanPath( home.filePath("Launcher") );
-        if( sub.isEmpty() ) {
-            return root;
-        } else {
-            return QDir::cleanPath( QDir(root).filePath(sub) );
+        QString result = QDir::cleanPath( home.filePath("Launcher") );
+        if( !sub.isEmpty() ) {
+            result = QDir::cleanPath( QDir(result).filePath(sub) );
         }
+        return result;
     }
  //-----------------------------------------------------------------------------
     void Launcher::readClusterInfo( QString const& clusters_dir )

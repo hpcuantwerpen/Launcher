@@ -8,6 +8,10 @@ message(depend_on_lib.pri : INCLUDEPATH $${INCLUDEPATH})
 DEPENDPATH += $${INCLUDEPATH} # force rebuild if the headers change
 
 unix {_PATH_TO_LIB = $${arg_path}/$${arg_lib}/lib$${arg_lib}.a}
+win32{
+  Debug  {_PATH_TO_LIB = $${arg_path}/$${arg_lib}/debug/lib$${arg_lib}.a}
+  Release{_PATH_TO_LIB = $${arg_path}/$${arg_lib}/release/lib$${arg_lib}.a}
+}
 message(depend_on_lib.pri : library     $${_PATH_TO_LIB})
 LIBS += $${_PATH_TO_LIB}
 PRE_TARGETDEPS += $${_PATH_TO_LIB}
