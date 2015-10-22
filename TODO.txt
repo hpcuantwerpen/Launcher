@@ -5,9 +5,7 @@ TODO LIST
 - LINUX VERSION + INSTALLER
 - add mpi functionality
 
-  see https://mathiasbynens.be/notes/shell-script-mac-apps
-
-- add shortcut on desktop of windows with icon
+- add icon
 
 - disable #PBS -o and -e	
 
