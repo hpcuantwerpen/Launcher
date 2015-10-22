@@ -1,10 +1,21 @@
-echo Copying Launcher.app
+#!/bin/bash
+
+################################################################################
+# process command line arguments
+################################################################################
+if [ -z "$1" ];
+then
+    GIT_BRANCH=master
+else
+    GIT_BRANCH-$1
+fi
 
 ################################################################################
 # retrieve git revision info
 ################################################################################
 cd ~/qws/Launcher
-git describe dev_cpp
+git checkout ${GIT_BRANCH}
+git describe ${GIT_BRANCH} >
 
 ################################################################################
 # build release version:
