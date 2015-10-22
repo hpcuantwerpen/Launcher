@@ -1,29 +1,26 @@
 #!/bin/bash
+#set -e
 
+cd ~/qws/Launcher
 ################################################################################
 # process command line arguments
 ################################################################################
-#branch to checkoutd
-if [ -z "$1" ];
+#branch to checkout
+if [ -n "$1" ];
 then
-    GIT_BRANCH=master
-else
-    GIT_BRANCH-$1
+     git checkout $1
 fi
-
 ################################################################################
 # retrieve git revision info
 ################################################################################
-cd ~/qws/Launcher
-git checkout ${GIT_BRANCH}
-git describe ${GIT_BRANCH}
+./git_revision.sh
 
 ################################################################################
 # build release version:
 ################################################################################
 #cd into build directory
 cd ~/qws/build-Launcher-Desktop_Qt_5_5_0_clang_64bit-Release
-#run qmake
+#run qmake, make
 ~/QtNew/5.5/clang_64/bin/qmake ~/qws/Launcher/Launcher.pro -r -spec macx-clang CONFIG+=x86_64
 make
 
@@ -41,4 +38,36 @@ echo Running macdeployqt
 echo cat qt.conf
 cat ~/qws/build-Launcher-Desktop_Qt_5_5_0_clang_64bit-Release/distribute/macosx/Launcher.app/Contents/resources/qt.conf
 
-. ./rename_dmg.sh
+# rename_dmg
+DMG_HOME=~/qws/build-Launcher-Desktop_Qt_5_5_0_clang_64bit-Release/distribute/macosx/
+cd $DMG_HOME
+rm -f ttt.dmg
+hdiutil convert Launcher.dmg -format UDRW -o ttt.dmg
+mv Launcher.dmg Launcher.0.dmg
+open ttt.dmg
+sleep 20
+#diskutil list (kijk na onder welke /dev/diskX de image gemount is, bvb. disk3)
+diskutil list
+for i in `seq 1 10`;
+do
+        echo $i
+        output=$(diskutil list disk$i | grep /Users/etijskens)
+        if [ -n "$output" ]
+        then
+#            echo ${output}
+#            echo disk$i
+            break
+        fi
+done
+#echo disk${i}
+
+git_revision=$(cat ~/qws/Launcher/revision.txt)
+echo ${git_revision}
+
+diskutil renameVolume /Volumes/:\Users* Launcher-${git_revision}
+sudo rm -rf /Volumes/Launcher/.Trashes /Volumes/Launcher/.fseventsd
+diskutil eject disk$i
+name=Launcher_${git_revision}
+hdiutil convert ttt.dmg -format UDRO -ov -o ${name}.dmg
+
+ls -l

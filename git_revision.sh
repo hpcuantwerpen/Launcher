@@ -1,4 +1,6 @@
 #!/bin/bash
+set -e
+
 revision=$(git describe)
 
 if [ -e "revision.txt" ]
@@ -35,4 +37,4 @@ else
     echo '#endif//LAUNCHER_VERSION_H'     >> Launcher/version.h
 fi
 echo 'done'
-
+exit 0
