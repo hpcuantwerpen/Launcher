@@ -16,4 +16,6 @@ TODO LIST
    
 - add git commit version info to distribution.
 
-- perform a build in the distribution script 
+- perform a build in the distribution script 
+
+- git master->dev_py and dev_cpp->master
