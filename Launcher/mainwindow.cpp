@@ -94,6 +94,7 @@
       , verbosity_(INITIAL_VERBOSITY)
       , pendingRequest_(NoPendingRequest)
     {
+        LOG_CALLER << "\n    version = "<<VERSION;
         ui->setupUi(this);
 
         if( !QFile(this->launcher_.homePath("Launcher.cfg")).exists() )
