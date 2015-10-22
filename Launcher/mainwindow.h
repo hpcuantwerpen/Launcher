@@ -17,6 +17,7 @@
 
 #include <iostream>
 
+#include "version.h"
 
 namespace Ui {
     class MainWindow;

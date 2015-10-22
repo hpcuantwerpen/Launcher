@@ -15,7 +15,7 @@ fi
 ################################################################################
 cd ~/qws/Launcher
 git checkout ${GIT_BRANCH}
-git describe ${GIT_BRANCH} >
+git describe ${GIT_BRANCH}
 
 ################################################################################
 # build release version:

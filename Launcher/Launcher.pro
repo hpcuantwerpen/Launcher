@@ -24,6 +24,7 @@ SOURCES  += main.cpp        \
             job.cpp
 
 HEADERS  += mainwindow.h   \
+            version.h \
             launcher.h \
             clusterinfo.h \
             dataconnector.h \

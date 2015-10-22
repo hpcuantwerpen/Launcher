@@ -52,7 +52,7 @@
 
 
 #define TITLE "Launcher"
-#define VERSION "v0.9"
+
 
 
 
