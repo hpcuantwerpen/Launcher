@@ -53,7 +53,34 @@
 
 #define TITLE "Launcher"
 
+    QString short_version(int level=2)
+    {
+        QString version(VERSION);
+        QRegularExpressionMatch m;
+        QRegularExpression re("^(\\d+)\\.(\\d+)\\.(\\d+)-(\\d+)-([a-z0-9]+)$");
 
+        m = re.match(version);
+        if( m.hasMatch() ) {
+            if( level<2 ) level=2;
+            if( level>5 ) level=5;
+            QString short_version;
+            switch(level) {
+            case 5:
+                short_version = m.captured(0);
+                break;
+            case 4:
+                short_version.prepend(m.captured(4)).prepend('-');
+            case 3:
+                short_version.prepend(m.captured(3)).prepend('.');
+            case 2:
+                short_version.prepend(m.captured(2)).prepend('.')
+                             .prepend(m.captured(1));
+            }
+            return short_version;
+        } else {
+            return QString("version unknown");
+        }
+    }
 
 
  //-----------------------------------------------------------------------------
@@ -73,7 +100,7 @@
         {// This must be the first time after installation...
             this->setupHome();
         }
-        this->setWindowTitle(QString("%1 %2").arg(TITLE).arg(VERSION));
+        this->setWindowTitle(QString("%1 %2").arg(TITLE).arg(short_version(3)));
 
         qsrand( time(nullptr) );
 
