@@ -12,4 +12,8 @@ TODO LIST
 - disable #PBS -o and -e	
 
 - add single job policy
-   #PBS -l naccesspolicy=singlejob
+   #PBS -l naccesspolicy=singlejob
+   
+- add git commit version info to distribution.
+
+- perform a build in the distribution script 
