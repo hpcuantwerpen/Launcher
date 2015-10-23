@@ -5,77 +5,96 @@ def mkdir_p(directory):
         os.makedirs(directory)
 
 def walk_dir_recursive(dir,instdir, level=0):
+    s=''
     for folder,sub_folders,files in os.walk(dir):
-        s = instdir
-        print s
+        s += instdir+'\n'
         for fname in files:
-            s = '    File "${DISTRIBUTION_DIR}\\'
+            s += '    File "${DISTRIBUTION_DIR}\\'
             if level>0:
                 s+=folder
                 s+='\\'
             s+= fname
-            s+='"'
-            print s
+            s+='"\n'
         for fname in sub_folders:
             instdir_fname = copy.copy(instdir)
             instdir_fname+= '\\'
             instdir_fname+= fname
-            walk_dir_recursive(fname,instdir_fname,level=level+1)
-        break
+            s += walk_dir_recursive(fname,instdir_fname,level=level+1)
+        return s
     
-def concatenate_files(output_fname,input_filenames):
-    lines = []
-    for fname in input_filenames:
-        f = open(fname,'r')
-        lines.extend(f.readlines())
-    ofs = open(output_fname,'w+')
+
+
+def file_from_template(filename, template, variables):
+    o = open(filename,'w+')
+    lines = open(template).readlines()
     for line in lines:
-        ofs.write(line)
-    ofs.close()
-       
+        for variable,value in variables.iteritems():
+            line = line.replace(variable,value)
+        o.write(line)
+    o.close()
+    
 if __name__=='__main__':
     cwd = os.getcwd()
     print 'cwd:',cwd
+
+    build_dir  = os.path.abspath( os.path.join('..','..','..','build-Launcher-Desktop_Qt_5_5_0_MinGW_32bit-Release') )
+    source_dir = os.path.abspath( os.path.join('..','..') )
+    build_distribute_win7_dir = os.path.join(build_dir,'distribute','win7')
     
-    os.chdir(  os.path.join('..','..','Launcher') }
+    os.chdir( source_dir )
+    print os.getcwd()
+    #git_revision
+    subprocess.call(['bash', 'git_revision.sh'])
+    #   msys/1.0/bin must be on the path
+    git_revision = open('revision.txt','r').readlines()[0][0:-1]
+    _OUT_FILE_ = 'Launcher-installer-win7-'+git_revision+'.exe'
+
+    #qmake
+    Qt_mingw492_32_bin = 'C:'+os.sep+'Qt'+os.sep+'5.5'+os.sep+'mingw492_32'+os.sep+'bin'
+    qmake_exe = os.path.join(Qt_mingw492_32_bin,'qmake')
+    subprocess.call([qmake_exe, 'Launcher.pro' ,'-r', '-spec', 'win32-g++'])
+    #   qmake must be on the path
 
 
-    subprocess.call(['qmake', 'Launcher.exe'])
-    # qmake must be on the path
-
-    shutil.rmtree   ( os.path.join('..','..','..','build-Launcher-Desktop_Qt_5_5_0_MinGW_32bit-Release','distribute') ) 
-    dir_exe         = os.path.join('..','..','..','build-Launcher-Desktop_Qt_5_5_0_MinGW_32bit-Release','Launcher','release')
-    distribute_win7 = os.path.join('..','..','..','build-Launcher-Desktop_Qt_5_5_0_MinGW_32bit-Release','distribute','win7') 
-    mkdir_p(distribute_win7)
+    #prepare distribution directory
+    shutil.rmtree(build_distribute_win7_dir) 
+    mkdir_p      (build_distribute_win7_dir)
     
-    path_exe = os.path.join(dir_exe,'Launcher.exe')
-    print 'copying:', path_exe
-    shutil.copy(path_exe, distribute_win7)
-    assert os.path.exists(os.path.join(distribute_win7,'Launcher.exe'))
-    shutil.copytree(os.path.join(cwd,'Launcher','clusters'),os.path.join(distribute_win7,'clusters'))
-    assert os.path.exists(os.path.join(distribute_win7,'clusters'))
+    #copy the executable
+    executable_file = os.path.join(build_dir,'Launcher','release','Launcher.exe')
+    print 'copying:', executable_file
+    shutil.copy(executable_file, build_distribute_win7_dir)
+    assert os.path.exists(os.path.join(build_distribute_win7_dir,'Launcher.exe'))
+
+    #copy the clusters directory
+    shutil.copytree(os.path.join(source_dir,'Launcher','clusters'),os.path.join(build_distribute_win7_dir,'clusters'))
+    assert os.path.exists(os.path.join(build_distribute_win7_dir,'clusters'))
         
-    os.chdir(distribute_win7)
+    #windeployqt
+    os.chdir(build_distribute_win7_dir)
     subprocess.call(['windeployqt', 'Launcher.exe'])
     # windeployqt must be on the path
 
-    sys_stdout = sys.stdout
-    sys.stdout = open(os.path.join(cwd,'win7-part1.nsi'), 'w+')
+    shutil.copy2(os.path.join(Qt_mingw492_32_bin,'libgcc_s_dw2-1.dll'),'.')
+
+    #create installer using NSIS
+    source_distribute_win7_dir = os.path.join(source_dir,'distribute','win7')
     
-    print 'Section -MainInstallFolder SEC0000'
-    walk_dir_recursive('.','    SetOutPath $INSTDIR')
-    print '    WriteRegStr HKLM "${REGKEY}\Components" MainInstallFolder 1'  
-    print 'SectionEnd'  
-    
-    sys.stdout.close()
-    sys.stdout = sys_stdout
-    
-    os.chdir(cwd)
-    concatenate_files('win7.nsi', ['win7-part0.nsi','win7-part1.nsi','win7-part2.nsi'])
+    os.chdir(build_distribute_win7_dir)
+    _MAIN_INSTALL_FOLDER_ = 'Section -MainInstallFolder SEC0000\n'
+    _MAIN_INSTALL_FOLDER_+= walk_dir_recursive('.','    SetOutPath $INSTDIR')
+    _MAIN_INSTALL_FOLDER_+= ';    WriteRegStr HKLM "${REGKEY}\Components" MainInstallFolder 1\n'  
+    _MAIN_INSTALL_FOLDER_+= 'SectionEnd\n'  
+ 
+    file_from_template( filename='win7.nsi'
+                      , template=os.path.join(source_distribute_win7_dir,'win7-template.nsi')
+                      , variables={ '$$_OUT_FILE_$$'           :_OUT_FILE_
+                                  , '$$_MAIN_INSTALL_FOLDER_$$':_MAIN_INSTALL_FOLDER_
+                                  }
+                      )
   
     subprocess.call(['makensis', 'win7.nsi'])
     # makensis must be in the path
     
-    shutil.move('Install-Launcher-win7.exe',distribute_win7)
-  
+ 
     print 'done'

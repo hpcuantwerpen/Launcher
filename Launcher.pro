@@ -4,6 +4,7 @@ TEMPLATE = subdirs
 #        DEFINES+= WINVER=0x0501
 #        LIBS += -LC:/Qt/Tools/mingw492_32/i686-w64-mingw32/lib -lws2_32 -lwsock32
 #}
+
 SUBDIRS +=          \
     toolbox         \
     cfg             \
