@@ -71,17 +71,17 @@ $$_MAIN_INSTALL_FOLDER_$$
 ;    WriteRegStr HKLM "${REGKEY}\Components" folders 1  
 ;SectionEnd  
   
-;Section -shortcuts SEC0004  
-;    SetShellVarContext all  
-;    SetOutPath "$SMPROGRAMS\$StartMenuGroup"  
-;    CreateShortcut "$SMPROGRAMS\$StartMenuGroup\Command Centre™ for Sprint.lnk" "$INSTDIR\Command Centre™ for Sprint v1.2.exe" "" "$INSTDIR\Sprint.ico"  
+Section -shortcuts SEC0004  
+    SetShellVarContext all  
+    SetOutPath "$SMPROGRAMS\$StartMenuGroup"  
+    CreateShortcut "$SMPROGRAMS\$StartMenuGroup\Launcher.lnk" "$INSTDIR\Launcher.exe" "" "$INSTDIR\Launcher.ico"  
 ;    CreateShortcut "$SMPROGRAMS\$StartMenuGroup\Help.lnk" "$INSTDIR\Command Centre™ for Sprint v1.0 Help.chm"  
 ;    CreateShortcut "$SMPROGRAMS\$StartMenuGroup\User Manual.lnk" "$INSTDIR\Command Centre™ for Sprint v1.0 User Manual.pdf"  
 ;    CreateShortcut "$SMPROGRAMS\$StartMenuGroup\Uninstall.lnk" "$INSTDIR\Uninstall.exe"      
-;    SetOutPath $DESKTOP  
-;    CreateShortcut "$DESKTOP\Command Centre™ for Sprint.lnk" "$INSTDIR\Command Centre™ for Sprint v1.2.exe" "" "$INSTDIR\Sprint.ico"  
+    SetOutPath $DESKTOP  
+    CreateShortcut "$DESKTOP\Launcher.lnk" "$INSTDIR\Launcher.exe" "" "$INSTDIR\Launcher.ico"  
 ;    WriteRegStr HKLM "${REGKEY}\Components" shortcuts 1  
-;SectionEnd  
+SectionEnd  
   
 ;Section -post SEC0005  
 ;    WriteRegStr HKLM "${REGKEY}" Path $INSTDIR  

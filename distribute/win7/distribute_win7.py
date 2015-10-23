@@ -49,11 +49,18 @@ if __name__=='__main__':
     git_revision = open('revision.txt','r').readlines()[0][0:-1]
     _OUT_FILE_ = 'Launcher-installer-win7-'+git_revision+'.exe'
 
+    
     #qmake
+    os.chdir(build_dir)
     Qt_mingw492_32_bin = 'C:'+os.sep+'Qt'+os.sep+'5.5'+os.sep+'mingw492_32'+os.sep+'bin'
     qmake_exe = os.path.join(Qt_mingw492_32_bin,'qmake')
-    subprocess.call([qmake_exe, 'Launcher.pro' ,'-r', '-spec', 'win32-g++'])
+    subprocess.call([qmake_exe, os.path.join(source_dir,'Launcher.pro') ,'-r', '-spec', 'win32-g++'])
     #   qmake must be on the path
+
+    #make
+    Qt_Tools_mingw492_32_bin = 'C:'+os.sep+'Qt'+os.sep+'\Tools'+os.sep+'mingw492_32'+os.sep+'bin'
+    make_exe = os.path.join(Qt_Tools_mingw492_32_bin,'mingw32-make')
+    subprocess.call([make_exe])
 
 
     #prepare distribution directory
@@ -75,7 +82,8 @@ if __name__=='__main__':
     subprocess.call(['windeployqt', 'Launcher.exe'])
     # windeployqt must be on the path
 
-    shutil.copy2(os.path.join(Qt_mingw492_32_bin,'libgcc_s_dw2-1.dll'),'.')
+    shutil.copy2( os.path.join(source_dir,'Launcher.ico')              ,'.')
+    shutil.copy2( os.path.join(Qt_mingw492_32_bin,'libgcc_s_dw2-1.dll'),'.')
 
     #create installer using NSIS
     source_distribute_win7_dir = os.path.join(source_dir,'distribute','win7')

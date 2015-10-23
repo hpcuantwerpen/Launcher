@@ -1684,8 +1684,11 @@ void MainWindow::setupHome()
  // see http://stackoverflow.com/questions/4515602/how-to-get-executable-name-in-qt
     QString applicationFilePath = QCoreApplication::applicationFilePath();
     QDir dir = QFileInfo( applicationFilePath ).absoluteDir();
+#ifdef Q_OS_WIN
+    QString path_to_clusters = dir.absoluteFilePath("clusters");
+#else
     QString path_to_clusters = dir.absoluteFilePath("../Resources/clusters");
-
+#endif
     Log() << QString("\n    Copying cluster info files from '%1'.").arg(path_to_clusters).C_STR();
     dir = QDir(path_to_clusters, "*.info");
     if( dir.entryInfoList().size()==0 ) {
