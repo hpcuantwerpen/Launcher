@@ -17,6 +17,7 @@ namespace ssh2
 
         void setLoginNode( QString const& loginNode );
 
+        QString username() const { return QString( username_.c_str() ); }
         bool setUsername( QString const& username );
          // returns true for non empty username
          // Automatically clears the private/public key pair and the passphrase.

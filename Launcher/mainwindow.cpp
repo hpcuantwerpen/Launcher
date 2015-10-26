@@ -1612,8 +1612,8 @@ void MainWindow::refreshJobs( JobList const& joblist )
         QString cmd = QString("qstat -u ").append(username);
         this->sshSession_.execute( cmd );
         if( !this->sshSession_.qout().isEmpty() ) {
-            text.append( cmd ).append('\n');
-            text.append( this->sshSession_.qout() );
+            text.append("\n>>> ").append( cmd )
+                .append( this->sshSession_.qout() );
         }
     }
     this->ui->wNotFinished->setText( text);

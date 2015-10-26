@@ -1,19 +1,15 @@
 TODO LIST
-- make a installable application for mac
-- add icon
-- WINDOWS VERSION + INSTALLER
-- LINUX VERSION + INSTALLER
+
 - add mpi functionality
 
-- add icon
+- add checkpointing
 
-- disable #PBS -o and -e	
+- add hello world example
 
-- add single job policy
-   #PBS -l naccesspolicy=singlejob
-   
-- add git commit version info to distribution.
+- store system commands in a cluster .info file and put them in a map
 
-- perform a build in the distribution script 
+- add icon to mac application
 
-- git master->dev_py and dev_cpp->master
+- when is a job finished?
+  (when finished.<jobid> exists in the remote directory) and ( (the job is in stat, marked as completed) or (the job is not in stat) ) 
+

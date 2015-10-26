@@ -292,7 +292,7 @@ namespace ssh2
 #ifdef QT_DEBUG
                             1;
 #else
-                            0;
+                            1;
 #endif
  //-----------------------------------------------------------------------------
     void Session::exec_( QString const & command_line, QString* qout, QString* qerr )

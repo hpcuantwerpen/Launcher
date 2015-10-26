@@ -7,7 +7,7 @@
  //-----------------------------------------------------------------------------
     Job::
     Job
-      (QString const& job_id
+      ( QString const& job_id
       , QString const& local_location
       , QString const& remote_location
       , QString const& subfolder
@@ -76,18 +76,46 @@
           * become impossible to judge whether the file is there because the job
           * is finished, or whether it is a left over from an older run that was
           * not cleaned up
+
+mn01.hopper.antwerpen.vsc:
+                                                                                  Req'd    Req'd       Elap
+Job ID                  Username    Queue    Jobname          SessID  NDS   TSK   Memory   Time    S   Time
+----------------------- ----------- -------- ---------------- ------ ----- ------ ------ --------- - ---------
+128279.mn.hopper.antwe  vsc20170    q1h      a_simple_job        --      1     20    --   01:00:00 Q       --
           */
-            try {
+            try
+            {// Test for the existence fo finished.<jobid>
+             // The job cannot be finished if finished.<jobid> does not exist.
                 QString cmd = QString("ls ")
                     .append( this->remote_location_ )
                     .append('/' ).append(this->subfolder_)
                     .append('/' ).append(this->jobname_)
-                    .append('/' ).append(this->jobname_).append(".o").append( this->short_id() );
+                    .append("/finished.").append( this->short_id() );
                 int rv = Job::sshSession->execute(cmd);
                 bool is_finished = ( rv==0 );
-                if( is_finished )
-                    this->status_ = Job::Finished;
-                return is_finished;
+                if( !is_finished ) {
+                    return false;
+                }
+             // It is possible but rare that finished.<jobid> exists, but the
+             // epilogue is still running. To make sure:
+             // Check the output of qstat -u username
+                cmd = QString("qstat -u ").append( Job::sshSession->username() );
+                rv = Job::sshSession->execute(cmd);
+                QStringList qstat_lines = Job::sshSession->qout().split('\n',QString::SkipEmptyParts);
+                for ( QStringList::const_iterator iter=qstat_lines.cbegin()
+                    ; iter!=qstat_lines.cend(); ++iter ) {
+                    if( iter->startsWith(this->job_id_)) {
+                        if ( iter->at(101)=='C' ) {
+                            this->status_ = Job::Finished;
+                            return true;
+                        } else {
+                            return false;
+                        }
+                    }
+                }
+             // it is no longer in qstat so it must be finished.
+                this->status_ = Job::Finished;
+                return true;
             } catch( std::runtime_error& e ) {
                 std::cout << e.what() << std::endl;
             }

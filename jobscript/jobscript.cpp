@@ -141,9 +141,10 @@ namespace pbs
         QString text = in.readAll();
         this->parse( text );
 
-     // this avoid that the script sets unsaved changes to true after composing
+     // this avoids that the script sets unsaved changes to true after composing
      // the script's text from its lines
         this->text();
+
         this->set_has_unsaved_changes(false);
     }
  //-----------------------------------------------------------------------------
@@ -172,7 +173,7 @@ namespace pbs
 
         const_cast<Script*>(this)->add( QString(FINISHED), /*hidden=*/false, /*position=*/types::LastPosition );
          // this line will be removed when reading back in
-         // As the user will never actually see this line, he can also not delete it.
+         // the user only see this line if he opens the file with another editor.
 
         QString const& txt = this->text();
         out << txt;
