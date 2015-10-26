@@ -41,7 +41,7 @@ public:
 
 private slots:
     void about();
-    void hello();
+    void verbose_logging();
 
     void on_wCluster_currentIndexChanged(const QString &arg1);
 
@@ -192,10 +192,13 @@ private:
     ssh2::Session sshSession_;
     QMap<QString,QString> remote_env_vars_;
     int verbosity_;
+
     QAction *aboutAction_;
+    QAction *verboseAction_;
+
     QMenu *helpMenu_;
-    QAction *helloAction_;
     QMenu *extraMenu_;
+
     enum PendingRequest {
         NoPendingRequest=0
       , NodesAndCoresPerNode

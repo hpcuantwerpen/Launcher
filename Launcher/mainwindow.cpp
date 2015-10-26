@@ -269,18 +269,19 @@
     void MainWindow::createActions()
     {
         aboutAction_ = new QAction(tr("&About"), this);
-        connect(aboutAction_, SIGNAL(triggered()), this, SLOT(about()));
+        connect( aboutAction_, SIGNAL(triggered()), this, SLOT( about() ) );
 
-        helloAction_ = new QAction(tr("&Hello"), this);
-        connect(helloAction_, SIGNAL(triggered()), this, SLOT(hello()));
+        verboseAction_ = new QAction(tr("Verbose logging"), this);
+        connect( verboseAction_, SIGNAL(triggered()), this, SLOT( verbose_logging() ) );
     }
+
 
     void MainWindow::createMenus()
     {
         helpMenu_ = menuBar()->addMenu("&Help");
         helpMenu_->addAction(aboutAction_);
         extraMenu_ = menuBar()->addMenu("&Extra");
-        extraMenu_ ->addAction(helloAction_);
+        extraMenu_ ->addAction(verboseAction_);
     }
 
     void MainWindow::about()
@@ -293,9 +294,10 @@
         QMessageBox::about(this,TITLE,msg);
     }
 
-    void MainWindow::hello()
+
+    void MainWindow::verbose_logging()
     {
-        this->statusBar()->showMessage("hello");
+        this->verbosity_ = ( this->verboseAction_->isChecked() ? 2 : 0 );
     }
 
     QString
