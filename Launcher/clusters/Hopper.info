@@ -8,3 +8,6 @@ login_nodes [ login.hpc.uantwerpen.be
             , login4-hopper.uantwerpen.be
             ]
 walltime_limit [1w]
+remote_commands [ wrapper     , "bash --login --noprofile -c '. /etc/profile; %1'"
+                , module_avail, "bash --login --noprofile -c '. /etc/profile; module -t av 2>&1 1>/dev/null | grep -v antwerpen | sort -f'"
+                ]

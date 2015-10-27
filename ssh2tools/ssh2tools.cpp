@@ -937,4 +937,27 @@ namespace ssh2
         return result;
     }
  //-----------------------------------------------------------------------------
+    int ExecuteRemoteCommand::execute(QString& cmd, const QString &arg1, const QString &arg2 ) const
+    {
+        if( cmd.startsWith("__") )
+        {// this is a command key, get the corresponding command
+            cmd = this->remote_commands_->value(cmd);
+            if( cmd.isEmpty() )
+                throw_<InexistingRemoteCommand>("RemoteCommand corresponding to '%1' was not found.",cmd);
+        } else {
+            QString wrapper = this->remote_commands_->value("wrapper");
+            if( !wrapper.isEmpty() )
+            {// wrap the command
+                cmd = wrapper.arg(cmd);
+            }
+        }
+        if( !arg1.isEmpty() ) {
+            cmd = cmd.arg(arg1);
+            if( !arg2.isEmpty() ) {
+                cmd = cmd.arg(arg2);
+            }
+        }
+        return this->ssh2_session_->execute(cmd);
+    }
+ //-----------------------------------------------------------------------------
 }// namespace ssh2

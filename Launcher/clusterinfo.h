@@ -111,6 +111,7 @@
         ClusterInfo( QString const& filename );
         ClusterInfo( ClusterInfo const& rhs );
         ClusterInfo& operator=( ClusterInfo const& rhs );
+        void set_default_remote_commands();
 
         QString const& name() const {
             return name_;
@@ -127,8 +128,12 @@
         QStringList const& loginNodes() const {
             return this->login_nodes_;
         }
+        QMap<QString,QString> const* remote_commands() const {
+            return &remote_commands_;
+        }
 
         typedef QMap<QString,NodesetInfo> Nodesets_t;
+        typedef QMap<QString,QString> RemoteCommands_t;
 
     private:
         QString name_;
@@ -136,6 +141,7 @@
         QStringList login_nodes_;
         int walltime_limit_; //in seconds
         QString defaultNodeset_;
+        RemoteCommands_t remote_commands_;
     };
  //=============================================================================
     int nSecondsPerUnit( QChar const unit );
@@ -162,7 +168,7 @@
        QString remainder_;
        QString token_;
        QRegularExpressionMatch m_;
-       QRegularExpression keyword_, list_begin_, list_end_, list_sep_, word_, action_, number_, walltime_;
+       QRegularExpression keyword_, list_begin_, list_end_, list_sep_, word_, action_, number_, walltime_, remote_cmd_;
        ClusterInfo* clusterInfo_;
 //       QRegularExpression *re_;
        typedef QMap<QString,List_t> Raw_t;

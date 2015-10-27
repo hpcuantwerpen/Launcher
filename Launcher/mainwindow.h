@@ -135,18 +135,23 @@ public:
     NodesetInfo const& nodesetInfo() const;
     ClusterInfo const& clusterInfo() const;
 
-//    QString signature( QString const& sig ) const;
-
-    template <class T>
-    QString signature( T arg1 ) const {
-        QString s;
-        s.append( QString("    arg1 = %1\n").arg(arg1) );
-        return s;
-    }
+//    template <class T>
+//    QString signature( T arg1 ) const {
+//        QString s;
+//        s.append( QString("    arg1 = %1\n").arg(arg1) );
+//        return s;
+//    }
 
     void storeResetValues();
     QString check_script_unsaved_changes();
     void refreshJobs( JobList const& joblist );
+
+    bool isFinished( Job const& job ) const;
+     // check if the job is finished and update status_
+    bool retrieve( Job const& job, bool local, bool vsc_data);
+     // retrieve the job (if finished) and update status_
+    void retrieveAll( bool local, bool vsc_data ) const;
+
 
     void      clusterDependencies( bool updateWidgets );
     void      nodesetDependencies( bool updateWidgets );
@@ -191,6 +196,7 @@ private:
 
     ssh2::Session sshSession_;
     QMap<QString,QString> remote_env_vars_;
+    ssh2::ExecuteRemoteCommand execute_remote_command_;
     int verbosity_;
 
     QAction *aboutAction_;

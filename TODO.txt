@@ -2,14 +2,17 @@ TODO LIST
 
 - add mpi functionality
 
-- add checkpointing
+- add checkpointing of jobs
 
 - add hello world example
+
+- time out to ssh2 connection (5s, then "cannot reach login.hpc.uantwerpen.be" message)
 
 - store system commands in a cluster .info file and put them in a map
 
 - add icon to mac application
 
+DONE
 - when is a job finished?
   (when finished.<jobid> exists in the remote directory) and ( (the job is in stat, marked as completed) or (the job is not in stat) ) 
 

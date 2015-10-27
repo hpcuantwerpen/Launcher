@@ -4,6 +4,7 @@
 #include <QFile>
 #include <QTextStream>
 #include <cmath>
+#include <cassert>
 
  //-----------------------------------------------------------------------------
  // NodesetInfo
@@ -153,6 +154,7 @@
       , action_     ("^([+-]{[^}]*})(.*)" , QRegularExpression::DotMatchesEverythingOption )
       , number_     ("^(\\d+)(.*)"        , QRegularExpression::DotMatchesEverythingOption )
       , walltime_   ("^(\\d+[smhdw])(.*)" , QRegularExpression::DotMatchesEverythingOption )
+      , remote_cmd_ ("^\"(.*?)\"(.*)"          , QRegularExpression::DotMatchesEverythingOption )
       , clusterInfo_(nullptr)
     {}
  //-----------------------------------------------------------------------------
@@ -204,7 +206,7 @@
             for( int i=0; i<list.size(); ++i)             {
                 this->clusterInfo_->login_nodes_.append( list.at(i).toString() );
             }
-        }{
+        }{//walltime_limit
             List_t const& list = this->rawClusterInfo_["walltime_limit"];
             QString walltime_limit = list.at(0).toString();
             QChar unit = walltime_limit.right(1).at(0);
@@ -212,6 +214,44 @@
             int s = nSecondsPerUnit(unit);
             num*=s;
             this->clusterInfo_->walltime_limit_ = num;
+        }{//remote_commands
+            List_t const& list = this->rawClusterInfo_["remote_commands"];
+            assert(list.size()%2==0);
+         // If there is a wrapper, wrap all default commands.
+         // loop a first time over the list and apply the wrapper. Leave all
+         // other entries alone.
+            for ( List_t::const_iterator iter = list.cbegin()
+                ; iter!=list.cend(); ++iter )
+            {
+                if( iter->toString()=="wrapper" )
+                {
+                    QString wrapper = (++iter)->toString();
+                 // wrap the default remote commands
+                    for ( ClusterInfo::RemoteCommands_t::iterator itr2 = this->clusterInfo_->remote_commands_.begin()
+                        ; itr2!=this->clusterInfo_->remote_commands_.end(); ++itr2  )
+                    {
+                        itr2.value() = wrapper.arg(itr2.value());
+                    }
+                 // insert the wrapper in the remote commands
+                    this->clusterInfo_->remote_commands_["wrapper"] = wrapper;
+                 // break out of the for loop
+                    break;
+                }
+            }
+         // loop over the list a second time to insert all the clusters remote commands,
+         // but skip the wrapper.
+            for ( List_t::const_iterator iter = list.cbegin()
+                ; iter!=list.cend(); ++iter )
+            {
+                if( iter->toString()!="wrapper" ) {
+                    QString key("__"); // a prefix to distinguish keys from commands
+                            key.append(iter->toString());
+                    QString val( (++iter)->toString() );
+                    this->clusterInfo_->remote_commands_[key] = val;
+                } else {
+                    ++iter;
+                }
+            }
         }
     }
  //-----------------------------------------------------------------------------
@@ -305,6 +345,11 @@
                QVariant word = this->token();
                list.append(word);
            }
+           else if( this->match_(this->remote_cmd_) )
+           {// item is a remote command
+               QVariant word = this->token();
+               list.append(word);
+           }
         // read separator
            if( !this->match_(this->list_sep_) )
            {// read list end
@@ -318,8 +363,14 @@
  //-----------------------------------------------------------------------------
     ClusterInfo::ClusterInfo( QString const& filename )
     {
+        this->set_default_remote_commands();
         ClusterInfoReader rdr;
         rdr.read(filename,this);
+    }
+ //-----------------------------------------------------------------------------
+    void ClusterInfo::set_default_remote_commands()
+    {
+//        this->remote_commands_["__module_avail"] = "module avail -t";
     }
  //-----------------------------------------------------------------------------
     ClusterInfo::ClusterInfo( ClusterInfo const& rhs )
