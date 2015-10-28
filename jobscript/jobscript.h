@@ -67,9 +67,13 @@ namespace pbs
 
         virtual QString toString( int verbose=0, bool refresh=false );
 
+        bool touch_finished_found() const {
+            return touch_finished_found_;
+        }
     private:
         ScriptLines_t lines_;
         QString filepath_;
+        bool touch_finished_found_;
         void insert_(ShellCommand* sc);
         void remove_( int i );
     };

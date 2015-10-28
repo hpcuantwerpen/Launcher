@@ -215,7 +215,7 @@
             num*=s;
             this->clusterInfo_->walltime_limit_ = num;
         }{//remote_commands
-            List_t const& list = this->rawClusterInfo_["remote_commands"];
+           List_t const& list = this->rawClusterInfo_["remote_commands"];
             assert(list.size()%2==0);
          // If there is a wrapper, wrap all default commands.
          // loop a first time over the list and apply the wrapper. Leave all
@@ -223,14 +223,17 @@
             for ( List_t::const_iterator iter = list.cbegin()
                 ; iter!=list.cend(); ++iter )
             {
-                if( iter->toString()=="wrapper" )
+                QString item = iter->toString();
+                if( item=="wrapper" )
                 {
                     QString wrapper = (++iter)->toString();
                  // wrap the default remote commands
                     for ( ClusterInfo::RemoteCommands_t::iterator itr2 = this->clusterInfo_->remote_commands_.begin()
                         ; itr2!=this->clusterInfo_->remote_commands_.end(); ++itr2  )
                     {
-                        itr2.value() = wrapper.arg(itr2.value());
+                        QString cmd = itr2.value();
+                        cmd = wrapper.arg(cmd);
+                        itr2.value() = cmd;
                     }
                  // insert the wrapper in the remote commands
                     this->clusterInfo_->remote_commands_["wrapper"] = wrapper;
@@ -238,18 +241,16 @@
                     break;
                 }
             }
-         // loop over the list a second time to insert all the clusters remote commands,
+         // loop over the list a second time to insert all the cluster's remote commands,
          // but skip the wrapper.
             for ( List_t::const_iterator iter = list.cbegin()
                 ; iter!=list.cend(); ++iter )
             {
-                if( iter->toString()!="wrapper" ) {
-                    QString key("__"); // a prefix to distinguish keys from commands
-                            key.append(iter->toString());
-                    QString val( (++iter)->toString() );
-                    this->clusterInfo_->remote_commands_[key] = val;
-                } else {
-                    ++iter;
+                QString key =    iter ->toString();
+                QString cmd = (++iter)->toString();
+                if( key!="wrapper" ) {
+                    key.prepend("__"); // a prefix to distinguish keys from commands
+                    this->clusterInfo_->remote_commands_[key] = cmd;
                 }
             }
         }
@@ -370,15 +371,16 @@
  //-----------------------------------------------------------------------------
     void ClusterInfo::set_default_remote_commands()
     {
-//        this->remote_commands_["__module_avail"] = "module avail -t";
+        this->remote_commands_["__module_avail"] = "module -t av 2>&1";
     }
  //-----------------------------------------------------------------------------
     ClusterInfo::ClusterInfo( ClusterInfo const& rhs )
       : name_(rhs.name_)
-      ,  nodesets_(rhs.nodesets_)
+      , nodesets_(rhs.nodesets_)
       , login_nodes_(rhs.login_nodes_)
       , walltime_limit_(rhs.walltime_limit_)
       , defaultNodeset_(rhs.defaultNodeset_)
+      , remote_commands_(rhs.remote_commands_)
     {}
 //-----------------------------------------------------------------------------
     ClusterInfo& ClusterInfo::operator=( ClusterInfo const& rhs )
@@ -388,6 +390,7 @@
         login_nodes_ = rhs.login_nodes_;
         walltime_limit_ = rhs.walltime_limit_;
         defaultNodeset_ = rhs.defaultNodeset_;
+        remote_commands_ = rhs.remote_commands_;
         return *this;
     }
 

@@ -742,6 +742,19 @@ p, li { white-space: pre-wrap; }
           </layout>
          </widget>
         </item>
+        <item>
+         <spacer name="verticalSpacer">
+          <property name="orientation">
+           <enum>Qt::Vertical</enum>
+          </property>
+          <property name="sizeHint" stdset="0">
+           <size>
+            <width>20</width>
+            <height>40</height>
+           </size>
+          </property>
+         </spacer>
+        </item>
        </layout>
       </widget>
       <widget class="QWidget" name="wScriptPage">
@@ -956,6 +969,13 @@ p, li { white-space: pre-wrap; }
            <widget class="QCheckBox" name="wCheckCopyToVscData">
             <property name="text">
              <string>Copy results to $VSC_DATA</string>
+            </property>
+           </widget>
+          </item>
+          <item row="3" column="1">
+           <widget class="QPushButton" name="wClearSelection">
+            <property name="text">
+             <string>Clear selection</string>
             </property>
            </widget>
           </item>

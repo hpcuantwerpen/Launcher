@@ -5,6 +5,7 @@
 #include <QComboBox>
 #include <QDoubleSpinBox>
 #include <QLineEdit>
+#include <QTextEdit>
 #include <QCheckBox>
 #include <QPalette>
 #include <QMap>
@@ -127,6 +128,12 @@ private slots:
 
     void on_wSingleJob_toggled(bool checked);
 
+    void on_wNotFinished_selectionChanged();
+
+    void on_wFinished_selectionChanged();
+
+    void on_wClearSelection_clicked();
+
 public:
     void setupHome();
     void setIgnoreSignals( bool ignore=true );
@@ -184,6 +191,11 @@ public:
 
     void createActions();
     void createMenus();
+
+    QString selectedJob( QTextEdit* qTextEdit );
+    void clearSelection( QTextEdit* qTextEdit );
+    void deleteJob( QString const& jobid ); // from joblist
+
 private:
     Ui::MainWindow *ui;
     Launcher launcher_;
@@ -210,6 +222,8 @@ private:
       , NodesAndCoresPerNode
       , CoresAndGbPerCore
     } pendingRequest_;
+
+    QString selected_job_;
 };
 
 

@@ -26,6 +26,7 @@ public:
       , int            status
       );
     Job( QString const& string );
+     // construct Job object from JobList string in config
 
     QString toString() const;
     QString toStringFormatted() const;

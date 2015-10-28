@@ -1,5 +1,7 @@
 TODO LIST
 
+- cut off log file
+
 - add mpi functionality
 
 - add checkpointing of jobs
@@ -12,7 +14,17 @@ TODO LIST
 
 - add icon to mac application
 
-DONE
+DONE (reverse chronological order)
+2015-10-28
+- bug fix: from retrieve page to script page script is not shown
+- bug fix: sftp_get_dir cannot handle remote environment variables, replace $VSC_xxx in joblist
+- bug fix: save on page script not working for commands added
+- bug fix: delete selected job not working
+- bug fix: touch finished.<jobid> not automatically added to existing scripts, when they are not modified.
+- bug fix: test for finished.<jobid> requires long id, not just the number
+- bug fix: reload not working
+- make remote commands insensitive to user environment.
 - when is a job finished?
   (when finished.<jobid> exists in the remote directory) and ( (the job is in stat, marked as completed) or (the job is not in stat) ) 
+
 
