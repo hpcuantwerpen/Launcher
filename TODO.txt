@@ -1,5 +1,8 @@
 TODO LIST
 
+- update mechanism for .info files
+  ?pick up most recent version from cluster itself?
+
 - cut off log file
 
 - add mpi functionality
