@@ -3,11 +3,10 @@
 #include <iostream>
 
  //-----------------------------------------------------------------------------
-    ssh2::Session* Job::sshSession = nullptr;
  //-----------------------------------------------------------------------------
     Job::
     Job
-      (QString const& job_id
+      ( QString const& job_id
       , QString const& local_location
       , QString const& remote_location
       , QString const& subfolder
@@ -64,63 +63,6 @@
        return this->job_id_.left(dot_at);
     }
  //-----------------------------------------------------------------------------
-    bool Job::isFinished() const
-    {
-        if( this->status_ == Job::Submitted )
-        {// test if the file pbs.sh.o<short_id> exists, if so, the job is finished.
-
-         /* TODO make sure this also works if the #PBS -o redirect_stdout is used
-          * and pbs.sh.oXXXXXX is replaced by redirect_stdout.
-          * On second thought NOT a good idea. If this option is exposed to the
-          * user he will probably use it to put a fixed file name and it will
-          * become impossible to judge whether the file is there because the job
-          * is finished, or whether it is a left over from an older run that was
-          * not cleaned up
-          */
-            try {
-                QString cmd = QString("ls ")
-                    .append( this->remote_location_ )
-                    .append('/' ).append(this->subfolder_)
-                    .append('/' ).append(this->jobname_)
-                    .append('/' ).append(this->jobname_).append(".o").append( this->short_id() );
-                int rv = Job::sshSession->execute(cmd);
-                bool is_finished = ( rv==0 );
-                if( is_finished )
-                    this->status_ = Job::Finished;
-                return is_finished;
-            } catch( std::runtime_error& e ) {
-                std::cout << e.what() << std::endl;
-            }
-            return false; // never reached, but keep the compiler happy
-        } else {
-            return true;
-        }
-    }
- //-----------------------------------------------------------------------------
-    bool Job::retrieve( bool local, bool vsc_data ) const
-    {
-        if( this->status()==Job::Retrieved ) return true;
-
-        if( local )
-        {
-            QString target = this-> local_job_folder();
-            QString source = this->remote_job_folder();
-            this->sshSession->sftp_get_dir(target,source);
-            this->status_ = Job::Retrieved;
-        }
-        if( vsc_data && this->remote_location_!="$VSC_DATA")
-        {
-            QString cmd = QString("mkdir -p ").append( this->vsc_data_job_parent_folder() );
-            int rc = this->sshSession->execute(cmd);
-            if( rc ) {/*keep compiler happy (rc unused variable)*/}
-            cmd = QString("cp -rv ").append( this->remote_job_folder() )
-                                    .append(" ").append( this->vsc_data_job_parent_folder() );
-            rc = this->sshSession->execute(cmd);
-            this->status_ = Job::Retrieved;
-        }
-        return this->status()==Job::Retrieved;
-    }
- //-----------------------------------------------------------------------------
     QString Job::local_job_folder() const {
         QString result = this->append_subfolder_jobname_( QString(this->local_location_) );
         return result;
@@ -142,15 +84,14 @@
  //-----------------------------------------------------------------------------
     QString Job::remote_job_folder() const {
         QString remote_location = this->remote_location_;
-        if( remote_location.startsWith('$') ) {
-            remote_location = this->sshSession->get_env( remote_location );
-        }
+//        if( remote_location.startsWith('$') ) {
+//            remote_location = this->sshSession->get_env( remote_location );
+//        }
         QString result = this->append_subfolder_jobname_(remote_location);
         return result;
     }
  //-----------------------------------------------------------------------------
-    QString Job::vsc_data_job_parent_folder() const {
-        QString vsc_data = this->sshSession->get_env("$VSC_DATA");
+    QString Job::vsc_data_job_parent_folder(QString const& vsc_data) const {
         QString result = this->append_subfolder_(vsc_data);
         return result;
     }
@@ -186,7 +127,7 @@
     QStringList JobList::toStringList(unsigned select ) const
     {
         QStringList strings;
-        for ( JobList_t::const_iterator iter=this->job_list_.cbegin()
+        for ( List_t::const_iterator iter=this->job_list_.cbegin()
             ; iter!=this->job_list_.cend(); ++iter )
         {
             if( ( select & iter->status() ) == iter->status() ) {
@@ -199,7 +140,7 @@
     QString JobList::toString(unsigned select ) const
     {
         QString string;
-        for ( JobList_t::const_iterator iter=this->job_list_.cbegin()
+        for ( List_t::const_iterator iter=this->job_list_.cbegin()
             ; iter!=this->job_list_.cend(); ++iter )
         {
             if( ( select & iter->status() ) == iter->status() ) {
@@ -209,18 +150,9 @@
         return string;
     }
  //-----------------------------------------------------------------------------
-    void JobList::retrieveAll( bool local, bool vsc_data ) const
-    {
-        for ( JobList_t::const_iterator iter=this->job_list_.cbegin()
-            ; iter!=job_list_.cend(); ++iter )
-        {
-            iter->retrieve( local, vsc_data );
-        }
-    }
- //-----------------------------------------------------------------------------
     Job const* JobList::operator[]( QString const& job_id ) const
     {
-        for ( JobList_t::const_iterator iter=this->job_list_.cbegin()
+        for ( List_t::const_iterator iter=this->job_list_.cbegin()
             ; iter!=job_list_.cend(); ++iter )
         {
             if( iter->long_id()==job_id )
@@ -229,11 +161,3 @@
         return nullptr;
     }
  //-----------------------------------------------------------------------------
-    void JobList::update() const
-    {
-        for ( JobList_t::const_iterator iter=this->job_list_.cbegin()
-            ; iter!=job_list_.cend(); ++iter )
-        {
-            iter->isFinished();
-        }
-    }

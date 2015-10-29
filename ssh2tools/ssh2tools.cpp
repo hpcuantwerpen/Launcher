@@ -24,6 +24,21 @@
 #include <QFileInfo>
 #include <QTextStream>
 
+#define LOG(VERBOSIITY) \
+    QString _msg_("\n\n[ ssh2::Session::%1, %2, %3 ]");\
+    _msg_ = _msg_.arg(__func__).arg(__FILE__).arg(__LINE__);\
+    Log(VERBOSIITY) << INFO << _msg_.toStdString()
+ // no terminating ';', hence can be used as
+ //     LOG(1) << message << another_message;
+ // caveat: because the macro has three stmts, this does NOT work
+ //     if( condition )
+ //         LOG(1) << "blablabla";
+ // (compiler error undefined variable _msg_)
+ // but this does:
+ //     if( condition ) {
+ //         LOG(1) << "blablabla";
+ //     }
+
 static int waitsocket(int socket_fd, LIBSSH2_SESSION *session)
 {
     struct timeval timeout;
@@ -292,7 +307,7 @@ namespace ssh2
 #ifdef QT_DEBUG
                             1;
 #else
-                            0;
+                            1;
 #endif
  //-----------------------------------------------------------------------------
     void Session::exec_( QString const & command_line, QString* qout, QString* qerr )
@@ -395,12 +410,13 @@ namespace ssh2
     int Session::execute( QString const& cmd )
     {
         try {
-            if( Session::verbose )
-                Log(1) << "\nRemote execution of \n    command  : '" << cmd.C_STR() << "'";
-
+            if( Session::verbose ) {
+                LOG(1) << "\nRemote execution of \n    command  : '" << cmd.C_STR() << "'";
+            }
             this->exec_( cmd, &this->qout_, &this->qerr_ );
 
-            if( Session::verbose || this->cmd_exit_code_ ) {
+            if( Session::verbose || this->cmd_exit_code_ )
+            {
                 Log(1) <<   "    exit code: " << this->cmd_exit_code_;
                 if( this->cmd_exit_signal_ )
                 Log(1) << "\n    exit signal: " << this->cmd_exit_signal_;
@@ -919,6 +935,29 @@ namespace ssh2
         this->execute(cmd);
         QString result = this->qout().trimmed();
         return result;
+    }
+ //-----------------------------------------------------------------------------
+    int ExecuteRemoteCommand::execute(QString& cmd, const QString &arg1, const QString &arg2 ) const
+    {
+        if( cmd.startsWith("__") )
+        {// this is a command key, get the corresponding command
+            cmd = this->remote_commands_->value(cmd);
+            if( cmd.isEmpty() )
+                throw_<InexistingRemoteCommand>("RemoteCommand corresponding to '%1' was not found.",cmd);
+        } else {
+            QString wrapper = this->remote_commands_->value("wrapper");
+            if( !wrapper.isEmpty() )
+            {// wrap the command
+                cmd = wrapper.arg(cmd);
+            }
+        }
+        if( !arg1.isEmpty() ) {
+            cmd = cmd.arg(arg1);
+            if( !arg2.isEmpty() ) {
+                cmd = cmd.arg(arg2);
+            }
+        }
+        return this->ssh2_session_->execute(cmd);
     }
  //-----------------------------------------------------------------------------
 }// namespace ssh2

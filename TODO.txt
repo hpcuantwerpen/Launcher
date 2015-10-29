@@ -1,19 +1,33 @@
 TODO LIST
-- make a installable application for mac
-- add icon
-- WINDOWS VERSION + INSTALLER
-- LINUX VERSION + INSTALLER
+
+- update mechanism for .info files
+  ?pick up most recent version from cluster itself?
+
+- cut off log file
+
 - add mpi functionality
 
-- add icon
+- add checkpointing of jobs
 
-- disable #PBS -o and -e	
+- add hello world example
 
-- add single job policy
-   #PBS -l naccesspolicy=singlejob
-   
-- add git commit version info to distribution.
+- time out to ssh2 connection (5s, then "cannot reach login.hpc.uantwerpen.be" message)
 
-- perform a build in the distribution script 
+- store system commands in a cluster .info file and put them in a map
 
-- git master->dev_py and dev_cpp->master
+- add icon to mac application
+
+DONE (reverse chronological order)
+2015-10-28
+- bug fix: from retrieve page to script page script is not shown
+- bug fix: sftp_get_dir cannot handle remote environment variables, replace $VSC_xxx in joblist
+- bug fix: save on page script not working for commands added
+- bug fix: delete selected job not working
+- bug fix: touch finished.<jobid> not automatically added to existing scripts, when they are not modified.
+- bug fix: test for finished.<jobid> requires long id, not just the number
+- bug fix: reload not working
+- make remote commands insensitive to user environment.
+- when is a job finished?
+  (when finished.<jobid> exists in the remote directory) and ( (the job is in stat, marked as completed) or (the job is not in stat) ) 
+
+

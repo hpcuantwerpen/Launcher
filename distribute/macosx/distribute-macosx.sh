@@ -71,3 +71,5 @@ name=Launcher_${git_revision}
 hdiutil convert ttt.dmg -format UDRO -ov -o ${name}.dmg
 
 ls -l
+
+cp ${DMG_HOME}/${name} ~/Dropbox

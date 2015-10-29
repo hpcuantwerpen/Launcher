@@ -23,6 +23,7 @@ namespace pbs
       , cfg::Config const& config
       )
       : Text( QString() )
+      , touch_finished_found_(false)
     {
         this->filepath_ = filepath;
      // create default lines. which store dummy parameters
@@ -141,13 +142,15 @@ namespace pbs
         QString text = in.readAll();
         this->parse( text );
 
-     // this avoid that the script sets unsaved changes to true after composing
+     // this avoids that the script sets unsaved changes to true after composing
      // the script's text from its lines
         this->text();
+
         this->set_has_unsaved_changes(false);
     }
  //-----------------------------------------------------------------------------
-#define FINISHED QString("cd $PBS_O_WORKDIR && touch finished.$PBS_JOBID #Launcher needs this to be the LAST line. Do NOT move or delete!")
+    #define FINISHED QString("touch $PBS_O_WORKDIR/finished.$PBS_JOBID #Launcher needs this to be the LAST line. Do NOT move or delete!")
+ //-----------------------------------------------------------------------------
     void
     Script::
     write( QString const& filepath, bool warn_before_overwrite) const
@@ -172,7 +175,7 @@ namespace pbs
 
         const_cast<Script*>(this)->add( QString(FINISHED), /*hidden=*/false, /*position=*/types::LastPosition );
          // this line will be removed when reading back in
-         // As the user will never actually see this line, he can also not delete it.
+         // the user only see this line if he opens the file with another editor.
 
         QString const& txt = this->text();
         out << txt;
@@ -218,7 +221,9 @@ namespace pbs
             ; iter != lines.cend(); ++iter )
         {
             QString const& line = *iter;
-
+            if( line==FINISHED ) {
+                touch_finished_found_ = true;
+            }
             if( !line.isEmpty() && line!=FINISHED ) {// Skip empty lines and the FINISHED ShellCommand
                 this->add(line);
             }

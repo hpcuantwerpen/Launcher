@@ -91,6 +91,7 @@
       , ui(new Ui::MainWindow)
       , ignoreSignals_(false)
       , previousPage_(0)
+      , execute_remote_command_(&this->sshSession_)
       , verbosity_(INITIAL_VERBOSITY)
       , pendingRequest_(NoPendingRequest)
     {
@@ -269,10 +270,10 @@
     void MainWindow::createActions()
     {
         aboutAction_ = new QAction(tr("&About"), this);
-        connect(aboutAction_, SIGNAL(triggered()), this, SLOT(about()));
+        connect( aboutAction_, SIGNAL(triggered()), this, SLOT( about() ) );
 
-        helloAction_ = new QAction(tr("&Hello"), this);
-        connect(helloAction_, SIGNAL(triggered()), this, SLOT(hello()));
+        verboseAction_ = new QAction(tr("Verbose logging"), this);
+        connect( verboseAction_, SIGNAL(triggered()), this, SLOT( verbose_logging() ) );
     }
 
     void MainWindow::createMenus()
@@ -280,7 +281,7 @@
         helpMenu_ = menuBar()->addMenu("&Help");
         helpMenu_->addAction(aboutAction_);
         extraMenu_ = menuBar()->addMenu("&Extra");
-        extraMenu_ ->addAction(helloAction_);
+        extraMenu_ ->addAction(verboseAction_);
     }
 
     void MainWindow::about()
@@ -293,9 +294,10 @@
         QMessageBox::about(this,TITLE,msg);
     }
 
-    void MainWindow::hello()
+
+    void MainWindow::verbose_logging()
     {
-        this->statusBar()->showMessage("hello");
+        this->verbosity_ = ( this->verboseAction_->isChecked() ? 2 : 0 );
     }
 
     QString
@@ -501,7 +503,6 @@
  //------------------------------------------------------------------------------
     void MainWindow::clusterDependencies( bool updateWidgets )
     {// act on config items only...
-
         {
             IgnoreSignals ignoreSignals( this );
             QString cluster = this->getConfigItem("wCluster")->value().toString();
@@ -521,8 +522,10 @@
             this->walltimeUnitDependencies(updateWidgets);
 
             this->sshSession_.setLoginNode( clusterInfo.loginNodes()[0] );
+            this->execute_remote_command_.set_remote_commands( clusterInfo.remote_commands() );
         }
-     // try to authenticate to refresh the list available modules
+     // try to authenticate to refresh the list of available modules and the
+     // remote file locations $VSC_DATA and $VSC_SCRATCH
         this->on_wAuthenticate_clicked();
     }
  //-----------------------------------------------------------------------------
@@ -823,23 +826,25 @@ void MainWindow::on_wRequestCores_clicked()
     this->pendingRequest_ = NoPendingRequest;
 }
 
-void MainWindow::on_wPages_currentChanged(int index)
+void MainWindow::on_wPages_currentChanged(int index_current_page)
 {
-    LOG_AND_CHECK_IGNORESIGNAL( QString().setNum(index) );
+    LOG_AND_CHECK_IGNORESIGNAL( QString().setNum(index_current_page) );
 
-    Log(1) << QString("\n    changing tab %1->%2: ").arg(this->previousPage_).arg(index).C_STR();
-    switch (index) {
+    this->selected_job_.clear();
+
+    Log(1) << QString("\n    changing tab %1->%2: ").arg(this->previousPage_).arg(index_current_page).C_STR();
+    switch (index_current_page) {
     case 0:
         if( this->previousPage_==1 )
         {// read the script from wScript
-            QString text = this->ui->wScript->toPlainText();
             if( this->launcher_.script.has_unsaved_changes() ) {
+                QString text = this->ui->wScript->toPlainText();
                 this->launcher_.script.parse( text, false );
             }
         }
         break;
     case 1:        
-        if( this->previousPage_==0)
+        //if( this->previousPage_==0)
         {
             switch( this->pendingRequest_ ) {
               case NodesAndCoresPerNode:
@@ -864,7 +869,7 @@ void MainWindow::on_wPages_currentChanged(int index)
         break;
     case 2:
         {
-            if( !Job::sshSession ) Job::sshSession = &this->sshSession_;
+//            if( !Job::sshSession ) Job::sshSession = &this->sshSession_;
 
             bool ok = this->isUserAuthenticated();
             if( !ok ) {
@@ -880,7 +885,7 @@ void MainWindow::on_wPages_currentChanged(int index)
     default:
         break;
     }
-    this->previousPage_ = index;
+    this->previousPage_ = index_current_page;
 }
 
 void MainWindow::on_wEnforceNNodes_toggled(bool checked)
@@ -1158,8 +1163,10 @@ void MainWindow::on_wAuthenticate_clicked()
         if( this->remote_env_vars_.contains(qs) ) {
             this->ui->wRemote->setToolTip( this->remote_env_vars_[qs] );
         }
-        this->sshSession_.execute( QString("module avail -t") );
-        QStringList modules = this->sshSession_.qerr().split("\n");
+        //this->sshSession_.execute( this->getRemoteCommand("module_avail") );
+        QString cmd("__module_avail");
+        this->execute_remote_command_(cmd);
+        QStringList modules = this->sshSession_.qout().split("\n");
         this->ui->wSelectModule->clear();
         this->ui->wSelectModule->addItems(modules);
 
@@ -1189,17 +1196,102 @@ void MainWindow::on_wAuthenticate_clicked()
     this->setIgnoreSignals(false);
 }
 
+bool MainWindow::isFinished( Job const& job ) const
+{
+    if( job.status_ == Job::Submitted )
+    {// test if the file pbs.sh.o<short_id> exists, if so, the job is finished.
+
+     /* TODO make sure this also works if the #PBS -o redirect_stdout is used
+      * and pbs.sh.oXXXXXX is replaced by redirect_stdout.
+      * On second thought NOT a good idea. If this option is exposed to the
+      * user he will probably use it to put a fixed file name and it will
+      * become impossible to judge whether the file is there because the job
+      * is finished, or whether it is a left over from an older run that was
+      * not cleaned up
+
+mn01.hopper.antwerpen.vsc:
+                                                                                 Req'd    Req'd       Elap
+Job ID                  Username    Queue    Jobname          SessID  NDS   TSK   Memory   Time    S   Time
+----------------------- ----------- -------- ---------------- ------ ----- ------ ------ --------- - ---------
+128279.mn.hopper.antwe  vsc20170    q1h      a_simple_job        --      1     20    --   01:00:00 Q       --
+      */
+        try
+        {// Test for the existence fo finished.<jobid>
+         // The job cannot be finished if finished.<jobid> does not exist.
+            QString cmd = QString("ls ")
+                .append( job.remote_location_ )
+                .append('/' ).append(job.subfolder_)
+                .append('/' ).append(job.jobname_)
+                .append("/finished.").append( job.long_id() );
+            int rv = this->execute_remote_command_(cmd);
+            bool is_finished = ( rv==0 );
+            if( !is_finished ) {
+                return false;
+            }
+         // It is possible but rare that finished.<jobid> exists, but the
+         // epilogue is still running. To make sure:
+         // Check the output of qstat -u username
+            cmd = QString("qstat -u %1");
+            rv = this->execute_remote_command_( cmd, this->sshSession_.username() );
+            QStringList qstat_lines = this->sshSession_.qout().split('\n',QString::SkipEmptyParts);
+            for ( QStringList::const_iterator iter=qstat_lines.cbegin()
+                ; iter!=qstat_lines.cend(); ++iter ) {
+                if( iter->startsWith(job.job_id_)) {
+                    if ( iter->at(101)=='C' ) {
+                        job.status_ = Job::Finished;
+                        return true;
+                    } else {
+                        return false;
+                    }
+                }
+            }
+         // it is no longer in qstat so it must be finished.
+            job.status_ = Job::Finished;
+            return true;
+        } catch( std::runtime_error& e ) {
+            std::cout << e.what() << std::endl;
+        }
+        return false; // never reached, but keep the compiler happy
+    } else {
+        return true;
+    }
+}
+
+bool MainWindow::retrieve( Job const& job, bool local, bool vsc_data )
+{
+    if( job.status()==Job::Retrieved ) return true;
+
+    if( local )
+    {
+        QString target = job. local_job_folder();
+        QString source = job.remote_job_folder();
+        this->sshSession_.sftp_get_dir(target,source);
+        job.status_ = Job::Retrieved;
+    }
+    if( vsc_data && job.remote_location_!="$VSC_DATA")
+    {
+        QString cmd = QString("mkdir -p %1");
+        QString vsc_data_destination = job.vsc_data_job_parent_folder(this->remote_env_vars_["$VSC_DATA"]);
+        int rc = this->execute_remote_command_( cmd, vsc_data_destination );
+        if( rc ) {/*keep compiler happy (rc unused variable)*/}
+        cmd = QString("cp -rv %1 %2");
+        rc = this->execute_remote_command_( cmd, job.remote_job_folder(), vsc_data_destination );
+        job.status_ = Job::Retrieved;
+    }
+    return job.status()==Job::Retrieved;
+}
+
 void MainWindow::resolveRemoteFileLocations_()
 {
-   for( int i=0; i<this->ui->wRemote->count(); ++i ) {
-       QString qs = this->ui->wRemote->itemText(i);
-       QString cmd = QString("echo ").append( qs );
-       try {
-           this->sshSession_.execute(cmd);
-           this->remote_env_vars_[qs] = this->sshSession_.qout().trimmed();
-       } catch(std::runtime_error &e ) {
-
-       }
+    this->remote_env_vars_.clear();
+    for ( int i=0; i<this->ui->wRemote->count(); ++i ) {
+        QString qs = this->ui->wRemote->itemText(i);
+        QString cmd("echo %1");
+        try {
+            this->execute_remote_command_( cmd, qs );
+            this->remote_env_vars_[qs] = this->sshSession_.qout().trimmed();
+        } catch(std::runtime_error &e )
+        {}
    }
 }
 
@@ -1252,7 +1344,6 @@ void MainWindow::on_wSubfolderButton_clicked()
     this->ui->wSubfolder2->setToolTip(this->remote_subfolder() );
     this->ui->wJobname   ->setToolTip("");
     this->ui->wJobname2  ->setToolTip("");
-
 }
 
 void MainWindow::on_wJobnameButton_clicked()
@@ -1422,15 +1513,7 @@ void MainWindow::on_wRemote_currentIndexChanged(const QString &arg1)
     LOG_AND_CHECK_IGNORESIGNAL( arg1 );
 
     this->getConfigItem("wRemote")->set_value(arg1);
-    if( this->isUserAuthenticated() ) {
-        QString qout;
-        QString cmd = QString("echo ").append(arg1);
-        this->sshSession_.execute( cmd );
-    }
 
-    if( !this->remote_env_vars_.contains(arg1) && this->isUserAuthenticated() ) {
-        this->resolveRemoteFileLocations_();
-    }
     QString tooltip = arg1;
     if( this->remote_env_vars_.contains(arg1) ) {
         tooltip = this->remote_env_vars_[arg1];
@@ -1458,8 +1541,8 @@ void MainWindow::on_wReload_clicked()
     LOG_AND_CHECK_IGNORESIGNAL(NO_ARGUMENT);
 
     QString script_file = QString( this->local_subfolder_jobname() ).append("/pbs.sh");
-    QDir qDir(script_file);
-    if( !qDir.exists() ) {
+    QFileInfo qFileInfo(script_file);
+    if( !qFileInfo.exists() ) {
         this->statusBar()->showMessage("No job script found, hence not loaded.");
     } else {
         QMessageBox::StandardButton answer =
@@ -1475,8 +1558,11 @@ void MainWindow::on_wSubmit_clicked()
 {
     LOG_AND_CHECK_IGNORESIGNAL(NO_ARGUMENT);
 
-    QString filepath = QString( this->local_subfolder_jobname() ).append("/pbs.sh");
-    if( this->launcher_.script.has_unsaved_changes() ) {
+    if(  this->launcher_.script.has_unsaved_changes()
+     || !this->launcher_.script.touch_finished_found()
+      )
+    {
+        QString filepath = QString( this->local_subfolder_jobname() ).append("/pbs.sh");
         if( !this->saveJobscript(filepath) ) {
             return;
         }
@@ -1490,8 +1576,8 @@ void MainWindow::on_wSubmit_clicked()
     {
         QMessageBox::Button answer = QMessageBox::question(this,TITLE,"OK to erase remote job folder?");
         if( answer==QMessageBox::Yes ) {
-                cmd = QString("rm -rf ").append( this->remote_subfolder_jobname() );
-            this->sshSession_.execute(cmd);
+            cmd = QString("rm -rf %1/*");
+            this->execute_remote_command_( cmd, this->remote_subfolder_jobname() );
             this->statusBar()->showMessage("Erased remote job folder.");
         } else {
             this->statusBar()->showMessage("Remote job folder not erased.");
@@ -1499,17 +1585,18 @@ void MainWindow::on_wSubmit_clicked()
     }
     this->sshSession_.sftp_put_dir( this->local_subfolder_jobname(), this->remote_subfolder_jobname(), true );
 
-    cmd = QString("cd ")
-          .append( this->remote_subfolder_jobname() )
-          .append(" && qsub pbs.sh");
-    this->sshSession_.execute(cmd);
+    cmd = QString("cd %1 && qsub pbs.sh");
+    this->execute_remote_command_( cmd, this->remote_subfolder_jobname() );
     QString job_id = this->sshSession_.qout().trimmed();
     this->statusBar()->showMessage(QString("Job submitted: %1").arg(job_id));
     cfg::Item* ci_job_list = this->getConfigItem("job_list");
     if( ci_job_list->value().type()==QVariant::Invalid )
         ci_job_list->set_value_and_type( QStringList() );
     QStringList job_list = ci_job_list->value().toStringList();
-    Job job( job_id, this->ui->wLocal->text(), this->ui->wRemote->currentText(), this->ui->wSubfolder->text(), this->ui->wJobname->text(), Job::Submitted );
+    QString remote = this->ui->wRemote->currentText();
+    if( remote.startsWith('$') )
+        remote = this->remote_env_vars_[remote];
+    Job job( job_id, this->ui->wLocal->text(), remote, this->ui->wSubfolder->text(), this->ui->wJobname->text(), Job::Submitted );
     job_list.append( job.toString() );
     ci_job_list->set_value( job_list );
 }
@@ -1531,56 +1618,73 @@ void MainWindow::on_wRefresh_clicked()
     this->refreshJobs(joblist);
 }
 
-void MainWindow::on_wRetrieveSelectedJob_clicked()
+QString MainWindow::selectedJob( QTextEdit* qTextEdit )
 {
-    LOG_AND_CHECK_IGNORESIGNAL(NO_ARGUMENT);
-
-    QString selection ;
+    QString selection;
     while( true )
     {
-        QTextCursor cursor = this->ui->wFinished->textCursor();
+        QTextCursor cursor = qTextEdit->textCursor();
         cursor.select(QTextCursor::LineUnderCursor);
         selection = cursor.selectedText();
-        if( !selection.startsWith(">>> ") ) {
+        if( selection.startsWith(">>> ") ) {
+            qTextEdit->setTextCursor(cursor);
+            break;
+        } else {
             int bn = cursor.blockNumber(); // = line number, starts at line 0, which is empty
             if( bn==0 ) {
                 this->statusBar()->showMessage("No job Selected");
-                return;
+                return selection;
             }
             cursor.movePosition( QTextCursor::Up);
-            this->ui->wFinished->setTextCursor(cursor);
-        } else {
-            this->ui->wFinished->setTextCursor(cursor);
-            break;
+            qTextEdit->setTextCursor(cursor);
         }
     }
     selection = selection.mid(4);
     //this->statusBar()->showMessage(selection);
+    return selection;
+}
+
+void MainWindow::clearSelection( QTextEdit* qTextEdit )
+{
+    QTextCursor cursor = qTextEdit->textCursor();
+    cursor.movePosition( QTextCursor::Start);
+    qTextEdit->setTextCursor(cursor);
+}
+
+void MainWindow::on_wRetrieveSelectedJob_clicked()
+{
+    LOG_AND_CHECK_IGNORESIGNAL(NO_ARGUMENT);
+
+    if( this->selected_job_.isEmpty() ) {
+        this->statusBar()->showMessage("Nothing selected.");
+        return;
+    }
 
     cfg::Item* ci_joblist = this->getConfigItem("job_list");
     JobList joblist( ci_joblist->value().toStringList() );
-    Job const* job = joblist[selection];
+    Job const* job = joblist[this->selected_job_];
     if( !job ) {
-        this->statusBar()->showMessage( QString("job not found: %1").arg(selection) );
+        this->statusBar()->showMessage( QString("job not found: %1").arg(this->selected_job_) );
         return;
     }
     if( job->status()==Job::Retrieved ) {
-        this->statusBar()->showMessage( QString("Job allready retrieved: %1").arg(selection) );
+        this->statusBar()->showMessage( QString("Job allready retrieved: %1").arg(this->selected_job_) );
         return;
     }
     if( job->status()==Job::Submitted ) {
-        this->statusBar()->showMessage( QString("Job not finished: %1").arg(selection) );
+        this->statusBar()->showMessage( QString("Job not finished: %1").arg(this->selected_job_) );
         return;
     }
 
-    this->statusBar()->showMessage( QString("Retrieving job : %1").arg(selection) );
+    this->statusBar()->showMessage( QString("Retrieving job : %1").arg(this->selected_job_) );
 
     bool toDesktop = this->ui->wCheckCopyToDesktop->isChecked();
     bool toVscData = this->ui->wCheckCopyToVscData->isChecked();
-    if( job->retrieve( toDesktop, toVscData ) ) {
+    if( this->retrieve( *job, toDesktop, toVscData ) ) {
         ci_joblist->set_value( joblist.toStringList( Job::Submitted | Job::Finished ) );
         this->refreshJobs(joblist);
     }
+    this->selected_job_.clear();
 }
 
 void MainWindow::on_wRetrieveAllJobs_clicked()
@@ -1593,7 +1697,11 @@ void MainWindow::on_wRetrieveAllJobs_clicked()
     bool toDesktop = this->ui->wCheckCopyToDesktop->isChecked();
     bool toVscData = this->ui->wCheckCopyToVscData->isChecked();
 
-    joblist.retrieveAll( toDesktop, toVscData );
+    for ( JobList::const_iterator iter=joblist.cbegin()
+        ; iter!=joblist.cend(); ++iter )
+    {
+        this->retrieve( *iter, toDesktop, toVscData );
+    }
 
     QStringList list = joblist.toStringList( Job::Submitted | Job::Finished );
     ci_joblist->set_value( list );
@@ -1602,18 +1710,22 @@ void MainWindow::on_wRetrieveAllJobs_clicked()
 
 void MainWindow::refreshJobs( JobList const& joblist )
 {
-    joblist.update(); // first check for finished jobs
+    for ( JobList::const_iterator iter=joblist.cbegin()
+        ; iter!=joblist.cend(); ++iter )
+    {
+        this->isFinished(*iter);
+    }
 
     this->ui->wFinished->setText( joblist.toString(Job::Finished) );
 
     QString text = joblist.toString(Job::Submitted);
     QString username = this->ui->wUsername->text();
     if( !username.isEmpty() ) {
-        QString cmd = QString("qstat -u ").append(username);
-        this->sshSession_.execute( cmd );
+        QString cmd = QString("qstat -u %1");
+        this->execute_remote_command_( cmd, username );
         if( !this->sshSession_.qout().isEmpty() ) {
-            text.append( cmd ).append('\n');
-            text.append( this->sshSession_.qout() );
+            text.append("\n>>> ").append( cmd )
+                .append( this->sshSession_.qout() );
         }
     }
     this->ui->wNotFinished->setText( text);
@@ -1621,21 +1733,48 @@ void MainWindow::refreshJobs( JobList const& joblist )
     this->ui->wRetrieved->setText( joblist.toString(Job::Retrieved) );
 
     this->getConfigItem("job_list")->set_value( joblist.toStringList(Job::Submitted|Job::Finished) );
+
+    this->selected_job_.clear();
+}
+
+void MainWindow::deleteJob( QString const& jobid )
+{
+    cfg::Item* ci_job_list = this->getConfigItem("job_list");
+    QStringList job_list = ci_job_list->value().toStringList();
+    for( int i=0; i<job_list.size(); ++i ) {
+        if( job_list[i].startsWith(jobid) )
+        {
+            Job job(job_list[i]);
+         // remove local job folder
+            if( this->ui->wCheckDeleteLocalJobFolder->isChecked() ) {
+                QDir qDir( job.local_job_folder() );
+                qDir.removeRecursively();
+                this->statusBar()->showMessage(QString("Removed: ").append( job.local_job_folder() ) );
+            }
+         // remove remote jobfolder
+            if( this->ui->wCheckDeleteRemoteJobFolder->isChecked() ) {
+                QString cmd = QString("rm -rf %1");
+                this->execute_remote_command_( cmd, job.remote_job_folder() );
+                this->statusBar()->showMessage(QString("Removed: ").append( job.remote_job_folder() ) );
+            }
+         // remove from job list
+            job_list.removeAt(i);
+            this->refreshJobs(job_list);
+            break;
+        }
+    }
 }
 
 void MainWindow::on_wDeleteSelectedJob_clicked()
 {
     LOG_AND_CHECK_IGNORESIGNAL(NO_ARGUMENT);
-    if( this->ui->wCheckDeleteLocalJobFolder->isChecked() ) {
-        QDir qDir( this->local_subfolder_jobname() );
-        qDir.removeRecursively();
-        this->statusBar()->showMessage(QString("Removed: ").append( this->local_subfolder_jobname() ) );
+
+    if( this->selected_job_.isEmpty() ) {
+        this->statusBar()->showMessage("Nothing Selected.");
+        return;
     }
-    if( this->ui->wCheckDeleteRemoteJobFolder->isChecked() ) {
-        QString cmd = QString("rm -rf ").append( this->remote_subfolder_jobname() );
-        this->sshSession_.execute(cmd);
-        this->statusBar()->showMessage(QString("Removed: ").append( this->remote_subfolder_jobname() ) );
-    }
+    this->deleteJob( this->selected_job_ );
+    this->selected_job_.clear();
 }
 
 void MainWindow::on_wCheckCopyToDesktop_toggled(bool checked)
@@ -1781,13 +1920,50 @@ void MainWindow::on_wReload2_clicked()
 void MainWindow::on_wSave2_clicked()
 {
     LOG_AND_CHECK_IGNORESIGNAL(NO_ARGUMENT);
-    Log(1) <<"\n    Forwarding to on_wSave_clicked()";
-    this->on_wSave_clicked();
+    if( this->launcher_.script.has_unsaved_changes() ) {
+        Log(1) <<"\n    parsing script text";
+        QString text = this->ui->wScript->toPlainText();
+        this->launcher_.script.parse( text, false );
+        Log(1) <<"\n    Forwarding to on_wSave_clicked()";
+        this->on_wSave_clicked();
+    }
 }
 
 void MainWindow::on_wSubmit2_clicked()
 {
     LOG_AND_CHECK_IGNORESIGNAL(NO_ARGUMENT);
+    Log(1) <<"\n    Forwarding to on_wSave2_clicked()";
+    this->on_wSave2_clicked();
     Log(1) <<"\n    Forwarding to on_wSubmit_clicked()";
     this->on_wSubmit_clicked();
+}
+
+void MainWindow::on_wNotFinished_selectionChanged()
+{
+    LOG_AND_CHECK_IGNORESIGNAL(NO_ARGUMENT);
+
+    IGNORE_SIGNALS_UNTIL_END_OF_SCOPE;
+    this->selected_job_ = this->selectedJob( this->ui->wNotFinished );
+    this->statusBar()->showMessage( QString("Selected job ").append( this->selected_job_ ) );
+}
+
+void MainWindow::on_wFinished_selectionChanged()
+{
+    LOG_AND_CHECK_IGNORESIGNAL(NO_ARGUMENT);
+
+    IGNORE_SIGNALS_UNTIL_END_OF_SCOPE;
+    this->selected_job_ = this->selectedJob( this->ui->wFinished );
+    this->statusBar()->showMessage( QString("Selected job ").append( this->selected_job_ ) );
+}
+
+void MainWindow::on_wClearSelection_clicked()
+{
+    if( this->selected_job_.isEmpty() ) {
+        this->statusBar()->showMessage("Nothing selected.");
+    } else {
+        this->clearSelection( this->ui->wFinished    );
+        this->clearSelection( this->ui->wNotFinished );
+        this->selected_job_.clear();
+        this->statusBar()->showMessage("Selection cleared.");
+    }
 }

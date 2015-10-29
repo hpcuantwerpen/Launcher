@@ -5,6 +5,7 @@
 #include <QComboBox>
 #include <QDoubleSpinBox>
 #include <QLineEdit>
+#include <QTextEdit>
 #include <QCheckBox>
 #include <QPalette>
 #include <QMap>
@@ -41,7 +42,7 @@ public:
 
 private slots:
     void about();
-    void hello();
+    void verbose_logging();
 
     void on_wCluster_currentIndexChanged(const QString &arg1);
 
@@ -127,6 +128,12 @@ private slots:
 
     void on_wSingleJob_toggled(bool checked);
 
+    void on_wNotFinished_selectionChanged();
+
+    void on_wFinished_selectionChanged();
+
+    void on_wClearSelection_clicked();
+
 public:
     void setupHome();
     void setIgnoreSignals( bool ignore=true );
@@ -135,18 +142,23 @@ public:
     NodesetInfo const& nodesetInfo() const;
     ClusterInfo const& clusterInfo() const;
 
-//    QString signature( QString const& sig ) const;
-
-    template <class T>
-    QString signature( T arg1 ) const {
-        QString s;
-        s.append( QString("    arg1 = %1\n").arg(arg1) );
-        return s;
-    }
+//    template <class T>
+//    QString signature( T arg1 ) const {
+//        QString s;
+//        s.append( QString("    arg1 = %1\n").arg(arg1) );
+//        return s;
+//    }
 
     void storeResetValues();
     QString check_script_unsaved_changes();
     void refreshJobs( JobList const& joblist );
+
+    bool isFinished( Job const& job ) const;
+     // check if the job is finished and update status_
+    bool retrieve( Job const& job, bool local, bool vsc_data);
+     // retrieve the job (if finished) and update status_
+    void retrieveAll( bool local, bool vsc_data ) const;
+
 
     void      clusterDependencies( bool updateWidgets );
     void      nodesetDependencies( bool updateWidgets );
@@ -179,6 +191,11 @@ public:
 
     void createActions();
     void createMenus();
+
+    QString selectedJob( QTextEdit* qTextEdit );
+    void clearSelection( QTextEdit* qTextEdit );
+    void deleteJob( QString const& jobid ); // from joblist
+
 private:
     Ui::MainWindow *ui;
     Launcher launcher_;
@@ -191,16 +208,22 @@ private:
 
     ssh2::Session sshSession_;
     QMap<QString,QString> remote_env_vars_;
+    ssh2::ExecuteRemoteCommand execute_remote_command_;
     int verbosity_;
+
     QAction *aboutAction_;
+    QAction *verboseAction_;
+
     QMenu *helpMenu_;
-    QAction *helloAction_;
     QMenu *extraMenu_;
+
     enum PendingRequest {
         NoPendingRequest=0
       , NodesAndCoresPerNode
       , CoresAndGbPerCore
     } pendingRequest_;
+
+    QString selected_job_;
 };
 
 

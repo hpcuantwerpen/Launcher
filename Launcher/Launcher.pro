@@ -12,7 +12,10 @@ greaterThan(QT_MAJOR_VERSION, 4): QT += widgets
 TARGET = Launcher
 TEMPLATE = app
 
-#CONFIG   += c++11 //common.pri
+macx {
+	ICON = ../Launcher.icns
+}
+
 CONFIG   -= console
 
 QMAKE_CXXFLAGS += -Wno-format-security
@@ -33,9 +36,8 @@ HEADERS  += mainwindow.h   \
 
 FORMS    += mainwindow.ui
 
-# The order below matters! In cygwin we get undefined references to functions
-# in libtoolbox.a which are referenced in libjobscript.a if toolbox comes
-# before jobscript.
+# The order below matters!  undefined references may appear if wrong
+# e.g in libtoolbox.a (referenced in libjobscript.a) if toolbox comes before jobscript.
 arg_path = ..
 arg_lib  = cfg
 include(../depend_on_lib.pri)

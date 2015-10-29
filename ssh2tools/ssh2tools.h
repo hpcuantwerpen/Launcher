@@ -5,6 +5,7 @@
 #include <toolbox.h>
 
 #include <QString>
+#include <QMap>
 
 namespace ssh2
 {//=============================================================================
@@ -17,6 +18,7 @@ namespace ssh2
 
         void setLoginNode( QString const& loginNode );
 
+        QString username() const { return QString( username_.c_str() ); }
         bool setUsername( QString const& username );
          // returns true for non empty username
          // Automatically clears the private/public key pair and the passphrase.
@@ -73,12 +75,14 @@ namespace ssh2
         //void print( std::ostream& ostrm = std::cout ) const;
         QString toString() const;
 
-        int execute( QString const& cmd );
+        int execute(QString const& cmd );
          /* Remotely execute the command cmd.
           * Output (stdout and stderr) is copied to the QString s returned
           * by qout() and qerr().
           * Throws if sth went wrong, also if the command returned a nonzero
-          * exit code
+          * exit code.
+          * if wrap is true, the remote command is wrapped by the wrapper entry
+          * in the cluster's .info file.
           */
         QString const& qout() const {
             return this->qout_;
@@ -121,7 +125,7 @@ namespace ssh2
         QString get_env( QString const& env) ;
          /* Get the value of a remote environment variable
           */
-    private:
+     private:
         int sock_;
         LIBSSH2_SESSION *session_;
         static bool isInitializedLibssh_;
@@ -152,6 +156,40 @@ namespace ssh2
     SUBCLASS_EXCEPTION( RemoteExecutionFailed, std::runtime_error )
     SUBCLASS_EXCEPTION( FileOpenError        , std::runtime_error )
     SUBCLASS_EXCEPTION( SshOpenError         , std::runtime_error )
+
+    SUBCLASS_EXCEPTION( InexistingRemoteCommand, std::runtime_error )
+ //=============================================================================
+
+    typedef QMap<QString,QString> RemoteCommands_t;
+
+    class ExecuteRemoteCommand 
+    {
+    public:
+        ExecuteRemoteCommand( Session* ssh2_session )
+          : ssh2_session_(ssh2_session)
+          , remote_commands_(nullptr)
+        {}
+        void set_remote_commands( RemoteCommands_t const* remote_commands ) {
+            this->remote_commands_ = remote_commands;
+        }
+        int execute( QString& cmd, QString const& arg1=QString(), QString const& arg2=QString() ) const;
+         /* - If cmd starts with '__" it is treated as a key to the remote_commands_ map.
+          *   InexistingRemoteCommand is thrown if the key is not found,
+          * - Otherwise, the command is wrapped, if remote_commands_ contains a wrapper
+          *   entry. (no warning is given if no wrapper is found).
+          * - Next, If the arguments are not null, they are pasted into the command.
+          * - Finally, the command is executed and the return code is returned.
+          *   Output can be retrieved from the ssh2_session_
+          * note that cmd is a QString&, not a QString const&, on return it contains
+          * the command that was actually executed.
+          */
+        int operator() ( QString& cmd, QString const& arg1=QString(), QString const& arg2=QString() ) const {
+            return this->execute( cmd, arg1, arg2 );
+        }
+    private:
+        Session* ssh2_session_;
+        RemoteCommands_t const* remote_commands_;
+    };
  //=============================================================================
 }// namespace ssh2
 
