@@ -79,7 +79,7 @@ if __name__=='__main__':
         
     #windeployqt
     os.chdir(build_distribute_win7_dir)
-    subprocess.call(['windeployqt', 'Launcher.exe'])
+    subprocess.call(['windeployqt', '--no-translations', 'Launcher.exe'])
     # windeployqt must be on the path
 
     shutil.copy2( os.path.join(source_dir,'Launcher.ico')              ,'.')

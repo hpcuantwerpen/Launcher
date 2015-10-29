@@ -3,6 +3,7 @@
 # Project created by QtCreator 2015-07-01T12:18:37
 #
 #-------------------------------------------------
+include(../common.pri)
 
 QT       += core gui
 
@@ -11,7 +12,7 @@ greaterThan(QT_MAJOR_VERSION, 4): QT += widgets
 TARGET = Launcher
 TEMPLATE = app
 
-CONFIG   += c++11
+#CONFIG   += c++11 //common.pri
 CONFIG   -= console
 
 QMAKE_CXXFLAGS += -Wno-format-security
