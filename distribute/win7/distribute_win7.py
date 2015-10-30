@@ -104,5 +104,8 @@ if __name__=='__main__':
     subprocess.call(['makensis', 'win7.nsi'])
     # makensis must be in the path
     
+    shutil.copy2(_OUT_FILE_,'e:Dropbox')
+    
+    print '\nCopied', _OUT_FILE_, 'to e:Dropbox (host_etijskens //vboxsrv)'
  
-    print 'done'
+    print '\ndone'
