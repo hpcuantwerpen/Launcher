@@ -1,8 +1,14 @@
 TODO LIST
 
+- win32 version
+- windows 8 version
+- windows 10 version
+- linux version
 - update mechanism for .info files
   ?pick up most recent version from cluster itself?
 
+- wall time format two digits? ‘.’ instead of ‘,’
+- select jobname possible without subfolder?
 - cut off log file
 
 - add mpi functionality
@@ -16,6 +22,7 @@ TODO LIST
 - store system commands in a cluster .info file and put them in a map
 
 - add icon to mac application
+  https://iconverticons.com/online/
 
 DONE (reverse chronological order)
 2015-10-28

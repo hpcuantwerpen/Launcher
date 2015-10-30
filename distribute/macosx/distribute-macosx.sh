@@ -72,4 +72,5 @@ hdiutil convert ttt.dmg -format UDRO -ov -o ${name}.dmg
 
 ls -l
 
-cp ${DMG_HOME}/${name} ~/Dropbox
+echo "cp ${DMG_HOME}${name}.dmg ~/Dropbox"
+cp ${DMG_HOME}${name}.dmg ~/Dropbox
