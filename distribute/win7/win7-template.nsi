@@ -5,7 +5,7 @@ Name "Launcher"
 !define VERSION 0.1  
 !define COMPANY CalcUA
 !define URL https://www.uantwerpen.be/calcua
-!define DISTRIBUTION_DIR  C:\Users\etijskens\qws\build-Launcher-Desktop_Qt_5_5_0_MinGW_32bit-Release\distribute\win7
+!define DISTRIBUTION_DIR  $$_DISTRIBUTION_DIR_$$
   
 # MUI Symbol Definitions  
 ;!define MUI_ICON "resources\Common files\Small Instrument Software 1.0.ico"  

@@ -1,4 +1,4 @@
-import os,shutil,subprocess,copy,sys
+import os,shutil,subprocess,copy,sys,platform
 
 def mkdir_p(directory):
     if not os.path.isdir(directory):
@@ -37,7 +37,7 @@ if __name__=='__main__':
     cwd = os.getcwd()
     print 'cwd:',cwd
 
-    build_dir  = os.path.abspath( os.path.join('..','..','..','build-Launcher-Desktop_Qt_5_5_0_MinGW_32bit-Release') )
+    build_dir  = os.path.abspath( os.path.join('..','..','..','build-Launcher-Desktop_Qt_5_5_1_MinGW_32bit-Release') )
     source_dir = os.path.abspath( os.path.join('..','..') )
     build_distribute_win7_dir = os.path.join(build_dir,'distribute','win7')
     
@@ -47,7 +47,7 @@ if __name__=='__main__':
     subprocess.call(['bash', 'git_revision.sh'])
     #   msys/1.0/bin must be on the path
     git_revision = open('revision.txt','r').readlines()[0][0:-1]
-    _OUT_FILE_ = 'Launcher-installer-win7-'+git_revision+'.exe'
+    _OUT_FILE_ = 'Launcher-installer-win7-'+platform.architecture()[0]+'-'+git_revision+'.exe'
 
     
     #qmake
@@ -64,6 +64,7 @@ if __name__=='__main__':
 
 
     #prepare distribution directory
+    mkdir_p      (build_distribute_win7_dir)
     shutil.rmtree(build_distribute_win7_dir) 
     mkdir_p      (build_distribute_win7_dir)
     
@@ -94,15 +95,20 @@ if __name__=='__main__':
     _MAIN_INSTALL_FOLDER_+= ';    WriteRegStr HKLM "${REGKEY}\Components" MainInstallFolder 1\n'  
     _MAIN_INSTALL_FOLDER_+= 'SectionEnd\n'  
  
+    _DISTRIBUTION_DIR_=build_distribute_win7_dir 
+    
     file_from_template( filename='win7.nsi'
                       , template=os.path.join(source_distribute_win7_dir,'win7-template.nsi')
                       , variables={ '$$_OUT_FILE_$$'           :_OUT_FILE_
                                   , '$$_MAIN_INSTALL_FOLDER_$$':_MAIN_INSTALL_FOLDER_
+                                  , '$$_DISTRIBUTION_DIR_$$'   :_DISTRIBUTION_DIR_
                                   }
                       )
   
     subprocess.call(['makensis', 'win7.nsi'])
     # makensis must be in the path
     
+    print os.path.join(build_distribute_win7_dir,_OUT_FILE_), '>', os.path.join('E:','Dropbox')
+    shutil.copy2( os.path.join(build_distribute_win7_dir,_OUT_FILE_), os.path.join('E:','Dropbox') )
  
     print 'done'
