@@ -178,7 +178,7 @@ public:
      // get config item by name and create it (empty) if it does not exist
     template <class T>
     cfg::Item* getConfigItem( QString const& name, T default_value );
-     // as above but sets a default value if the item did not exist before.
+     // as above but sets a default value (and type) if the item did not exist before.
 
     QString local_subfolder();
     QString local_subfolder_jobname();

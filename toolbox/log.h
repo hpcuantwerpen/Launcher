@@ -3,6 +3,7 @@
 
 #include <string>
 #include <fstream>
+#include <QFileInfo>
 
 class Log;
 
@@ -29,7 +30,12 @@ public:
      * The default level acts as a log file, unless Log::verbosity is negative.
      */
     ~Log();
-
+    static qint64 log_size();
+     /* return size of log file in bytes.
+      */
+    static void clear();
+     /* clear the log file.
+      */
     static int verbosity;
      /* -1 = no logging (silent)
       */

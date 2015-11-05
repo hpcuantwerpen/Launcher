@@ -81,8 +81,6 @@ namespace ssh2
           * by qout() and qerr().
           * Throws if sth went wrong, also if the command returned a nonzero
           * exit code.
-          * if wrap is true, the remote command is wrapped by the wrapper entry
-          * in the cluster's .info file.
           */
         QString const& qout() const {
             return this->qout_;

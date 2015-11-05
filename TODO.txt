@@ -1,15 +1,19 @@
 TODO LIST
-
+- bug fix: authentication lost after
+  ls /scratch/antwerpen/201/vsc20170/jobs/hello_world/finished.130650.mn.hopper.antwerpen.vsc
+  ?because the command fails...because the job is not finished yet
+  ?bash wrapper not installed
+- fix compile time warnings on macosx
 - win32 version
 - windows 8 version
 - windows 10 version
 - linux version
+
+- script syntax highlighting
+
 - update mechanism for .info files
   ?pick up most recent version from cluster itself?
 
-- wall time format two digits? ‘.’ instead of ‘,’
-- select jobname possible without subfolder?
-- cut off log file
 
 - add mpi functionality
 
@@ -25,6 +29,22 @@ TODO LIST
   https://iconverticons.com/online/
 
 DONE (reverse chronological order)
+2015-11-05
+
+- cut off log file
+2015-11-04
+- bug fix: git revision of pure tag leads to version unknown.
+- bug fix: mkdir -p fails : ssh2::Session::autoOpen not set
+- set local file location by default to ~/Launcher
+      subfolder to [~/Launcher/]jobs
+      job_name to hello_world_example
+- bug fix: select jobname possible without subfolder?
+  > QDir::cleanPath(...) added to test whether selections are indeed descendents of subfolder, resp. local file location.
+
+2015-10-30
+- wall time format has now two decimals to avoid confusion: 1,000 hours = 1 hour and not 1000 hours
+- windows 7 64bit distribution working
+
 2015-10-28
 - bug fix: from retrieve page to script page script is not shown
 - bug fix: sftp_get_dir cannot handle remote environment variables, replace $VSC_xxx in joblist

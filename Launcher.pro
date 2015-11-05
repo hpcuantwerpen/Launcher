@@ -29,5 +29,5 @@ equals(BUILD_TESTS,1) {
     jobscript_test.depends = jobscript toolbox cfg
 }
 
-QMAKE_MACOSX_DEPLOYMENT_TARGET = 10.7
+QMAKE_MACOSX_DEPLOYMENT_TARGET = 10.10
 

@@ -78,7 +78,7 @@
             }
             return short_version;
         } else {
-            return QString("version unknown");
+            return QString(VERSION);
         }
     }
 
@@ -97,6 +97,8 @@
     {
         LOG_CALLER << "\n    version = "<<VERSION;
         ui->setupUi(this);
+
+        ssh2::Session::autoOpen = true;
 
         if( !QFile(this->launcher_.homePath("Launcher.cfg")).exists() )
         {// This must be the first time after installation...
@@ -151,7 +153,7 @@
             this->getConfigItem("wNotifyBegin", false );
             this->getConfigItem("wNotifyEnd"  , false );
         }
-        ci = this->getConfigItem("wJobname", QString() );
+//        ci = this->getConfigItem("wJobname", QString() );
 
         dc::DataConnectorBase::config = &(this->launcher_.config);
         dc::DataConnectorBase::script = &(this->launcher_.script);
@@ -197,19 +199,36 @@
         bool can_authenticate = !this->getConfigItem("wUsername")->value().toString().isEmpty();
         this->ui->wAuthenticate->setEnabled( can_authenticate );
 
+     //=====================================
+     // wRemote/wLocal/wSubfolder/wJobname
+     // wRemote
         ci = this->getConfigItem("wRemote");
         if( !ci->isInitialized() ) {
             ci->set_choices( QStringList({"$VSC_SCRATCH","$VSC_DATA"}) );
             ci->set_value("$VSC_SCRATCH");
         }
         this->data_.append( dc::newDataConnector( this->ui->wRemote, "wRemote", "") );
-
+     // wLocal
         ci = this->getConfigItem("wLocal");
         if( !ci->isInitialized() ) {
-            this->getConfigItem("wJobname"  )->set_value_and_type("");
-            this->getConfigItem("wSubFolder")->set_value_and_type("");
-            ci                               ->set_value_and_type("");
+            ci                               ->set_value_and_type( this->launcher_.homePath() );
+            this->getConfigItem("wSubfolder")->set_value_and_type("jobs");
+            this->getConfigItem("wJobname"  )->set_value_and_type("hello_world");
         }
+        this->data_.append( dc::newDataConnector( this->ui->wLocal, "wLocal", "") );
+     // Subfolder
+        QString value = this->getConfigItem("wSubfolder")->value().toString();
+        if( !value.isEmpty() ) {
+            this->ui->wSubfolder ->setText(value);
+            this->ui->wSubfolder2->setText(value);
+        }
+     // wJobname
+        value = this->getConfigItem("wJobname")->value().toString();
+        if( !value.isEmpty() ) {
+            this->ui->wJobname ->setText(value);
+            this->ui->wJobname2->setText(value);
+        }
+
      // verify existence of local file location (if present) and set tooltips
         QString local_subfolder_jobname = this->local_subfolder_jobname();
         this->ui->wSubfolder ->setToolTip( this-> local_subfolder() );
@@ -996,7 +1015,12 @@ bool MainWindow::getPrivatePublicKeyPair()
     start_in = this->launcher_.homePath();
 #endif
     QString private_key;
-    QMessageBox::StandardButton answer = QMessageBox::question(this,TITLE,"You must provide a PRIVATE key file.\n Continue?", QMessageBox::Ok|QMessageBox::No,QMessageBox::Ok);
+    QString msg("You must provide a PRIVATE key file (openssh format).\n");
+#ifdef Q_OS_MAC// Q_OS_WIN
+    msg+="[Windows users should be aware that PuTTY keys are NOT in openssh format. Consult the VSC website for how to convert your PuTTY keys.]\n";
+#endif
+    msg+="Continue?";
+    QMessageBox::StandardButton answer = QMessageBox::question(this, TITLE, msg, QMessageBox::Ok|QMessageBox::No,QMessageBox::Ok);
     if( answer==QMessageBox::Ok ) {
         private_key = QFileDialog::getOpenFileName( this, "Select your PRIVATE key file:", start_in );
         if( !QFileInfo( private_key ).exists() ) {
@@ -1328,8 +1352,11 @@ void MainWindow::on_wSubfolderButton_clicked()
         QMessageBox::warning( this, TITLE, "No directory selected.");
         return;
     }
+    folder = QDir::cleanPath(folder);
     if( !folder.startsWith(parent) ) {
-        QMessageBox::critical( this, TITLE, QString("The selected directory is not inside '%1.").arg(parent) );
+        QMessageBox::critical( this, TITLE, QString("The selected folder is not a subfolder of '%1'. "
+                                                    "You must change the local file location to a folder "
+                                                    "that is at least one level above this folder.").arg(parent) );
         return;
     }
     this->statusBar()->clearMessage();
@@ -1365,8 +1392,11 @@ void MainWindow::on_wJobnameButton_clicked()
         QMessageBox::warning( this, TITLE, "No directory selected.");
         return;
     }
+    selected = QDir::cleanPath(selected);
     if( !selected.startsWith(parent) ) {
-        QMessageBox::critical( this, TITLE, QString("The selected directory is not inside '%1.").arg(parent) );
+        QMessageBox::critical( this, TITLE, QString("The selected directory is not a subdirectory of '%1'. "
+                                                    "You must change the Subfolder to a folder that is at "
+                                                    "least one level above this folder.").arg(parent) );
         return;
     }
     this->statusBar()->clearMessage();
@@ -1804,51 +1834,104 @@ void MainWindow::on_wCheckDeleteRemoteJobFolder_toggled(bool checked)
 SUBCLASS_EXCEPTION(BadLauncherHome,std::runtime_error)
 SUBCLASS_EXCEPTION(BadDistribution,std::runtime_error)
 
+QString copy_folder_recursively( QString const& source, QString const& destination, int level=1 )
+{
+    QDir().mkpath(destination);
+    QString log_msg = QString("\n      ").append(destination);
+    QDir qdir(source);
+    QFileInfoList qfileinfolist = qdir.entryInfoList();
+ // loop over files
+    for ( QFileInfoList::ConstIterator iter=qfileinfolist.cbegin()
+        ; iter!=qfileinfolist.cend(); ++iter )
+    {
+        if( iter->isFile() ) {
+            log_msg.append("\n      ");
+            for( int i=1; i<=level; ++i ) { log_msg.append("  "); }
+            log_msg.append(iter->fileName());
+
+            QString tmp = iter->absoluteFilePath();
+            QFile qFile( tmp );
+            tmp = QString(destination).append('/').append( iter->fileName() );
+            qFile.copy( tmp );
+        }
+    }
+ // loop over folders
+    for ( QFileInfoList::ConstIterator iter=qfileinfolist.cbegin()
+        ; iter!=qfileinfolist.cend(); ++iter )
+    {
+        if( iter->isDir() ) {
+            QString folder = iter->fileName();
+            if( folder!="." && folder!=".." ) {
+                log_msg.append( copy_folder_recursively( QString(source     ).append('/').append(folder)
+                                                       , QString(destination).append('/').append(folder)
+                                                       , level+1 )
+                              );
+            }
+        }
+    }
+    return log_msg;
+}
+
+
 void MainWindow::setupHome()
 {
  // create standard paths
-    LOG_CALLER <<"\n    creating standard paths ";
-    QDir launcher_home( this->launcher_.homePath() );
-    QStringList folders({"clusters","jobs"});
-    for ( QStringList::const_iterator iter=folders.cbegin()
-        ; iter!=folders.cend(); ++iter )
-    {
-        if( !launcher_home.mkpath(*iter) ) {
-            throw_<BadLauncherHome>("Cannot create directory '%1'.", launcher_home.absoluteFilePath(*iter) );
-        }
-        Log() << QString("\n        ").append( this->launcher_.homePath(*iter)).C_STR();
-    }
+//    LOG_CALLER <<"\n    creating standard paths ";
+//    QDir launcher_home( this->launcher_.homePath() );
+//    QStringList folders({"clusters","jobs"});
+//    for ( QStringList::const_iterator iter=folders.cbegin()
+//        ; iter!=folders.cend(); ++iter )
+//    {
+//        if( !launcher_home.mkpath(*iter) ) {
+//            throw_<BadLauncherHome>("Cannot create directory '%1'.", launcher_home.absoluteFilePath(*iter) );
+//        }
+//        Log() << QString("\n        ").append( this->launcher_.homePath(*iter)).C_STR();
+//    }
 
  // get the location of the application and derive the location of the clusters info files.
  // see http://stackoverflow.com/questions/4515602/how-to-get-executable-name-in-qt
     QString applicationFilePath = QCoreApplication::applicationFilePath();
     QDir dir = QFileInfo( applicationFilePath ).absoluteDir();
-#ifdef Q_OS_WIN
-    QString path_to_clusters = dir.absoluteFilePath("clusters");
-#else
-    QString path_to_clusters = dir.absoluteFilePath("../Resources/clusters");
-#endif
-    Log() << QString("\n    Copying cluster info files from '%1'.").arg(path_to_clusters).C_STR();
-    dir = QDir(path_to_clusters, "*.info");
-    if( dir.entryInfoList().size()==0 ) {
-        QMessageBox::Button answer = QMessageBox::question(this,TITLE,"Your Launcher distribution has no clusters .info files.\nClick OK to select a clusters directory on your local file system, or Cancel to abort.", QMessageBox::Ok|QMessageBox::Cancel,QMessageBox::Cancel);
-        if( answer==QMessageBox::Ok) {
-            dir = QDir( this->get_path_to_clusters() );
-        } else {
-            throw_<NoClustersFound>("Aborting on user request.");
-        }
-    }
-    QFileInfoList clusters = dir.entryInfoList();
-    QString destination = this->launcher_.homePath("clusters");
-    for ( QFileInfoList::ConstIterator iter=clusters.cbegin()
-        ; iter!=clusters.cend(); ++iter )
+    QStringList folders = {"clusters","jobs"};
+    QStringList path_to_folders;
+    for ( QStringList::const_iterator iter = folders.cbegin()
+        ; iter!=folders.cend(); ++iter )
     {
-        Log() << QString("\n        ").append( iter->fileName() ).C_STR();
-        QString tmp = iter->absoluteFilePath();
-        QFile qFile( tmp );
-        tmp = QString(destination).append('/').append( iter->fileName() );
-        qFile.copy( tmp );
+        path_to_folders.append(
+#ifdef Q_OS_WIN
+                                dir.absoluteFilePath(*iter)
+#else
+                                QDir::cleanPath( dir.absoluteFilePath(QString("../Resources/").append(*iter) ) )
+#endif
+                              );
     }
+    Log() << "\n    Copying standard folders.";
+    for ( int i=0; i<folders.size(); ++i )
+    {
+        Log() << copy_folder_recursively( path_to_folders[i], this->launcher_.homePath( folders[i] ) ).C_STR();
+    }
+//        QString const& path = *iter;
+//        Log() << QString("\n    Copying cluster info files from '%1'.").arg(path).C_STR();
+//        dir = QDir(path, "*.info");
+//    if( dir.entryInfoList().size()==0 ) {
+//        QMessageBox::Button answer = QMessageBox::question(this,TITLE,"Your Launcher distribution has no clusters .info files.\nClick OK to select a clusters directory on your local file system, or Cancel to abort.", QMessageBox::Ok|QMessageBox::Cancel,QMessageBox::Cancel);
+//        if( answer==QMessageBox::Ok) {
+//            dir = QDir( this->get_path_to_clusters() );
+//        } else {
+//            throw_<NoClustersFound>("Aborting on user request.");
+//        }
+//    }
+//    QFileInfoList clusters = dir.entryInfoList();
+//    QString destination = this->launcher_.homePath("clusters");
+//    for ( QFileInfoList::ConstIterator iter=clusters.cbegin()
+//        ; iter!=clusters.cend(); ++iter )
+//    {
+//        Log() << QString("\n        ").append( iter->fileName() ).C_STR();
+//        QString tmp = iter->absoluteFilePath();
+//        QFile qFile( tmp );
+//        tmp = QString(destination).append('/').append( iter->fileName() );
+//        qFile.copy( tmp );
+//    }
 }
 
 QString MainWindow::get_path_to_clusters()

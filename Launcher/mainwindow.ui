@@ -7,7 +7,7 @@
     <x>0</x>
     <y>0</y>
     <width>920</width>
-    <height>611</height>
+    <height>667</height>
    </rect>
   </property>
   <property name="sizePolicy">
@@ -386,7 +386,7 @@ p, li { white-space: pre-wrap; }
                 </sizepolicy>
                </property>
                <property name="decimals">
-                <number>3</number>
+                <number>2</number>
                </property>
               </widget>
              </item>
@@ -603,6 +603,9 @@ p, li { white-space: pre-wrap; }
                  </property>
                  <item>
                   <widget class="QPushButton" name="wLocalFileLocationButton">
+                   <property name="toolTip">
+                    <string>&lt;html&gt;&lt;head/&gt;&lt;body&gt;&lt;p&gt;Use 'File location' together with 'Subfolder' to organise your jobs. Your job scripts are prepared in a local directory and executed in the corresponding remote directory. The directory structure is kept identical on the local and remote file location. &lt;/p&gt;&lt;/body&gt;&lt;/html&gt;</string>
+                   </property>
                    <property name="text">
                     <string>File location</string>
                    </property>
@@ -633,6 +636,9 @@ p, li { white-space: pre-wrap; }
                  </property>
                  <item>
                   <widget class="QPushButton" name="wSubfolderButton">
+                   <property name="toolTip">
+                    <string>&lt;html&gt;&lt;head/&gt;&lt;body&gt;&lt;p&gt;Use 'Subfolder' together with 'File location' to organise your jobs. 'Subfolder' must be a descendant (possibly several levels deep) of the local 'File location'. When the job is submitted this directory will also be created in the selected remote 'File location'. &lt;/p&gt;&lt;/body&gt;&lt;/html&gt;</string>
+                   </property>
                    <property name="text">
                     <string>Subfolder</string>
                    </property>
@@ -670,6 +676,9 @@ p, li { white-space: pre-wrap; }
                  </property>
                  <item>
                   <widget class="QPushButton" name="wJobnameButton">
+                   <property name="toolTip">
+                    <string>&lt;html&gt;&lt;head/&gt;&lt;body&gt;&lt;p&gt;A directory with this name will be created in subfolder. When you save your script it will be stored in the job script file pbs.sh. When you submit, your job will be executed in directory &amp;lt;&lt;span style=&quot; font-weight:600; font-style:italic;&quot;&gt;remote &lt;/span&gt;&lt;span style=&quot; font-style:italic;&quot;&gt;file location&lt;/span&gt;&amp;gt;/&amp;lt;&lt;span style=&quot; font-style:italic;&quot;&gt;subfolder&lt;/span&gt;&amp;gt;/&amp;lt;&lt;span style=&quot; font-style:italic;&quot;&gt;jobname&lt;/span&gt;&amp;gt;. You can copy the results back to &amp;lt;&lt;span style=&quot; font-weight:600;&quot;&gt;l&lt;/span&gt;&lt;span style=&quot; font-weight:600; font-style:italic;&quot;&gt;ocal&lt;/span&gt;&lt;span style=&quot; font-style:italic;&quot;&gt; file location&lt;/span&gt;&amp;gt;/&amp;lt;&lt;span style=&quot; font-style:italic;&quot;&gt;subfolder&lt;/span&gt;&amp;gt;/&amp;lt;&lt;span style=&quot; font-style:italic;&quot;&gt;jobname&lt;/span&gt;&amp;gt; on the retrieve page when the job is finished, for back up or post-processing.&lt;/p&gt;&lt;/body&gt;&lt;/html&gt;</string>
+                   </property>
                    <property name="text">
                     <string>Job name</string>
                    </property>
