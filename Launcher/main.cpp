@@ -18,7 +18,13 @@ int main(int argc, char *argv[])
             throw_<std::runtime_error>("aiaiaiaiaiaaaaai");
         }
 
+
         Log::filename = Launcher::homePath("Launcher.log").toStdString();
+#ifdef QT_DEBUG
+     // always clear the log file
+        Log::clear();
+        Log() << "Log file cleared (debug version running).";
+#else
         qint64 const max_size_kB = 512;
         qint64 log_size_kB = Log::log_size()/1024;
         if( log_size_kB > max_size_kB )
@@ -35,6 +41,7 @@ int main(int argc, char *argv[])
                 Log() << "Log file cleared.";
             }
         }
+#endif
         Log()
             << "\n================================================================================"
             << "\nLauncher started " << toolbox::now().toStdString().c_str()

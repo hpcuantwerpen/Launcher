@@ -75,6 +75,7 @@ namespace ssh2
     Session::Session()
       : sock_(-1)
       , session_(nullptr)
+      , isAuthenticated_(false)
     {}
  //-----------------------------------------------------------------------------
     bool Session::isInitializedLibssh_ = false;
@@ -101,6 +102,7 @@ namespace ssh2
         this->private_key_.clear();
         this-> public_key_.clear();
         this-> passphrase_.clear();
+        this->isAuthenticated_ = false;
 
         if( this->username_.empty() ) {
             if( must_throw ) { throw_<std::runtime_error>("Refused to set public/private key pair without username."); }
@@ -131,6 +133,7 @@ namespace ssh2
  //-----------------------------------------------------------------------------
     bool Session::setPassphrase( QString const & passphrase, bool must_throw )
     {
+        this->isAuthenticated_ = false;
         if( this->username_.empty() ) {
             if( must_throw ) { throw_<std::runtime_error>("Refused to set password without username."); }
             else             { return false; }
@@ -149,6 +152,7 @@ namespace ssh2
         if( this->isOpen() ) {
             return;
         }
+        this->isAuthenticated_ = false;
         if( this->login_node_.empty() ) {
             throw_<MissingLoginNode>("Authentication error: Missing login node.");
         }
@@ -282,6 +286,7 @@ namespace ssh2
                     ) == LIBSSH2_ERROR_EAGAIN
                  );
             if( rv==0 ) {
+                this->isAuthenticated_ = true;
                 return;
             }
             this->close();
@@ -411,13 +416,13 @@ namespace ssh2
     {
         try {
             if( Session::verbose ) {
-                LOG(1) << "\nRemote execution of \n    command  : '" << cmd.C_STR() << "'";
+                LOG(1) << "\nRemote execution of \n    command    : '" << cmd.C_STR() << "'";
             }
             this->exec_( cmd, &this->qout_, &this->qerr_ );
 
             if( Session::verbose || this->cmd_exit_code_ )
             {
-                Log(1) <<   "    exit code: " << this->cmd_exit_code_;
+                Log(1) << "\n    exit code  : " << this->cmd_exit_code_;
                 if( this->cmd_exit_signal_ )
                 Log(1) << "\n    exit signal: " << this->cmd_exit_signal_;
                 if( !this->qout().isEmpty() ) {
@@ -543,7 +548,7 @@ namespace ssh2
     }
 #endif//#ifdef SCP
  //-----------------------------------------------------------------------------
-    void
+    size_t
     Session::
     sftp_put_file
       ( QString const&  q_local_filepath
@@ -570,7 +575,7 @@ namespace ssh2
         LIBSSH2_SFTP *sftp_session;
         LIBSSH2_SFTP_HANDLE *sftp_handle;
         FILE *fh_local;
-        char mem[1000];
+        char mem[512];
         struct timeval timeout;
         fd_set fd;
 
@@ -614,6 +619,7 @@ namespace ssh2
 
         size_t nread;
         char *ptr;
+/*
         do {
             nread = fread(mem, 1, sizeof(mem), fh_local);
             if(nread <= 0) {// end of file
@@ -622,8 +628,8 @@ namespace ssh2
             ptr = mem;
             do {// write data in a loop until we block
                 rc = libssh2_sftp_write( sftp_handle, ptr, nread );
-                ptr += rc;
-                nread -= nread;
+                ptr   += rc;
+                nread -= rc;
             } while( rc >= 0 );
 
             if( rc != LIBSSH2_ERROR_EAGAIN ) {// error or end of file
@@ -642,6 +648,46 @@ namespace ssh2
                 throw_<std::runtime_error>("SFTP upload timed out: &1", rc );
             }
         } while( 1 );
+*/
+/*
+        do {
+            nread = fread(mem, 1, sizeof(mem), fh_local);
+            if (nread <= 0) {
+                // end of file
+                break;
+            }
+            ptr = mem;
+
+            do {
+                // write data in a loop until we block
+                rc = libssh2_sftp_write(sftp_handle, ptr, nread);
+
+                if(rc < 0)
+                    break;
+                ptr += rc;
+                nread -= rc;
+            } while (nread);
+
+        } while (rc > 0);
+*/
+        size_t total = 0;
+        do {
+            nread = fread(mem, 1, sizeof(mem), fh_local);
+            if (nread <= 0) {// end of file
+                break;
+            }
+            total += nread;
+            ptr = mem;
+            do {// write data in a loop until we block
+                while( ( rc = libssh2_sftp_write(sftp_handle, ptr, nread)) == LIBSSH2_ERROR_EAGAIN ) {
+                    waitsocket(sock_, session_);
+                }
+                if(rc < 0)
+                    break;
+                ptr   += rc;
+                nread -= rc;
+            } while (nread);
+        } while (rc > 0);
 
         if( Session::verbose > 1 )
             fprintf(stderr, "SFTP upload done!\n");
@@ -651,9 +697,10 @@ namespace ssh2
         if(Session::autoClose) {
             this->close();
         }
+        return total;
     }
  //-----------------------------------------------------------------------------
-    void
+    size_t
     Session::
     sftp_get_file
       ( QString const&  q_local_filepath
@@ -718,6 +765,7 @@ namespace ssh2
         if( Session::verbose > 1 ) {
             fprintf(stderr, "libssh2_sftp_open() is done, now receive data!\n");
         }
+        size_t total = 0;
         do {
             do
             {// read in a loop until we block
@@ -728,6 +776,7 @@ namespace ssh2
                  // write(2, mem, rc);
                  // write to temporary storage area
                     fwrite( mem, rc, 1, fh_local );
+                    total +=rc;
                 }
             } while( rc > 0 );
 
@@ -753,6 +802,7 @@ namespace ssh2
         fclose(fh_local);
 
         libssh2_sftp_shutdown(sftp_session);
+        return total;
     }
  //-----------------------------------------------------------------------------
     bool
@@ -889,6 +939,7 @@ namespace ssh2
         this->private_key_.clear();
         this-> public_key_.clear();
         this-> passphrase_.clear();
+        this->isAuthenticated_= false;
     }
  //-----------------------------------------------------------------------------
     Session::

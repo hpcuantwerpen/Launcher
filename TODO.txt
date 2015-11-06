@@ -3,7 +3,11 @@ TODO LIST
   ls /scratch/antwerpen/201/vsc20170/jobs/hello_world/finished.130650.mn.hopper.antwerpen.vsc
   ?because the command fails...because the job is not finished yet
   ?bash wrapper not installed
+
+- the config file is in fact a session configuration
+
 - fix compile time warnings on macosx
+
 - win32 version
 - windows 8 version
 - windows 10 version
@@ -13,7 +17,7 @@ TODO LIST
 
 - update mechanism for .info files
   ?pick up most recent version from cluster itself?
-
+  if that is feasible, we might provide a link to the newest Launcher version as well.
 
 - add mpi functionality
 
@@ -29,9 +33,13 @@ TODO LIST
   https://iconverticons.com/online/
 
 DONE (reverse chronological order)
-2015-11-05
+2015-11-06
+- bug fix: the user can select the output of the qstat -u command as if it was a job,
+  because it started also with ">>>"
 
+2015-11-05ß
 - cut off log file
+
 2015-11-04
 - bug fix: git revision of pure tag leads to version unknown.
 - bug fix: mkdir -p fails : ssh2::Session::autoOpen not set

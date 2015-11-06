@@ -2,10 +2,10 @@
 #LAU generated_on = 2015-11-4:15:29:48
 #LAU user =  
 #LAU cluster = Hopper
-#LAU nodeset = Hopper-thin-nodes (58 Gb/node; 20 cores/node)
+#LAU nodeset = Hopper-thin-nodes (58 GB/node; 20 cores/node)
 #LAU n_cores = 20
-#LAU Gb_per_core = 2.9
-#LAU Gb_total = 58
+#LAU GB_per_core = 2.9
+#LAU GB_total = 58
 #LAU local_folder = unknown
 #LAU remote_folder = unknown
 #PBS -l nodes=1:ppn=20

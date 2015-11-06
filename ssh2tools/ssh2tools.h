@@ -63,6 +63,11 @@ namespace ssh2
          /* returns true if the session was successfully opened, and is ready to
           * execute commands (exec())
           */
+        bool isAuthenticated() const { return this->isAuthenticated_; }
+         /* returns true if the session was successfully opened, and is ready to
+          * execute commands (exec())
+          */
+
         void close( bool keep_libssh_init=true );
         void reset();
          // close and clear authentication members
@@ -94,10 +99,10 @@ namespace ssh2
          /* scp file transfer of a single file, local >> remote.
           */
 #endif
-        void sftp_put_file( QString const&  local_filepath
-                          , QString const& remote_filepath );
-        void sftp_get_file( QString const&  local_filepath
-                          , QString const& remote_filepath );
+        size_t sftp_put_file( QString const&  local_filepath
+                            , QString const& remote_filepath );
+        size_t sftp_get_file( QString const&  local_filepath
+                            , QString const& remote_filepath );
          /* sftp file transfer of a single file,
           *  - put implies local >> remote
           *  - get implies remote >> local
@@ -139,6 +144,7 @@ namespace ssh2
         int   cmd_exit_code_;
         char* cmd_exit_signal_;
         int bytecount_[2];
+        bool isAuthenticated_;
     private:
         void exec_( QString const& command_line
                   , QString* qout=nullptr

@@ -29,12 +29,12 @@ namespace pbs
      // create default lines. which store dummy parameters
         this->add( Shebang::default_value );
         this->add( QString("#LAU  generated_on = %1").arg( toolbox::now() ) );
-        this->add( QString("#LAU          user = %1").arg( cfg_get_str(config,"wUsername"   ,"unknown") ) );
+//      this->add( QString("#LAU          user = %1").arg( cfg_get_str(config,"wUsername"   ,"unknown") ) );
         this->add( QString("#LAU       cluster = %1").arg( cfg_get_str(config,"wCluster"    ,"unknown") ) );
         this->add( QString("#LAU       nodeset = %1").arg( cfg_get_str(config,"wNodeset"    ,"unknown") ) );
         this->add( QString("#LAU       n_cores = %1").arg( cfg_get_str(config,"wNCores"     ,"unknown") ) );
-        this->add( QString("#LAU   Gb_per_core = %1").arg( cfg_get_str(config,"wGbPerCore"  ,"unknown") ) );
-        this->add( QString("#LAU      Gb_total = %1").arg( cfg_get_str(config,"wGbTotal"    ,"unknown") ) );
+        this->add( QString("#LAU   GB_per_core = %1").arg( cfg_get_str(config,"wGbPerCore"  ,"unknown") ) );
+        this->add( QString("#LAU      GB_total = %1").arg( cfg_get_str(config,"wGbTotal"    ,"unknown") ) );
         this->add( QString("#LAU  local_folder = %1").arg( cfg_get_str(config,"localFolder" ,"unknown") ) );
         this->add( QString("#LAU remote_folder = %1").arg( cfg_get_str(config,"remoteFolder","unknown") ) );
 

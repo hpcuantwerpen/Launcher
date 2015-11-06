@@ -192,6 +192,8 @@ public:
     void createActions();
     void createMenus();
 
+    void activateAuthenticateButton( bool activate, QString const& inactive_button_text="authenticate..." );
+
     QString selectedJob( QTextEdit* qTextEdit );
     void clearSelection( QTextEdit* qTextEdit );
     void deleteJob( QString const& jobid ); // from joblist

@@ -95,7 +95,7 @@
       , verbosity_(INITIAL_VERBOSITY)
       , pendingRequest_(NoPendingRequest)
     {
-        LOG_CALLER << "\n    version = "<<VERSION;
+        LOG_CALLER << "\n    Running Launcher version = "<<VERSION;
         ui->setupUi(this);
 
         ssh2::Session::autoOpen = true;
@@ -104,8 +104,11 @@
         {// This must be the first time after installation...
             this->setupHome();
         }
+#ifdef QT_DEBUG
+        this->setWindowTitle(QString("%1 %2").arg(TITLE).arg(VERSION));
+#else
         this->setWindowTitle(QString("%1 %2").arg(TITLE).arg(short_version(3)));
-
+#endif
         qsrand( time(nullptr) );
 
      // read the cfg::Config object from file
@@ -189,15 +192,15 @@
         this->data_.append( dc::newDataConnector( this->ui->wNNodes        , "wNNodes"        , "nodes"      ) );
         this->data_.append( dc::newDataConnector( this->ui->wNCoresPerNode , "wNCoresPerNode" , "ppn"        ) );
         this->data_.append( dc::newDataConnector( this->ui->wNCores        , "wNCores"        , "n_cores"    ) );
-        this->data_.append( dc::newDataConnector( this->ui->wGbPerCore     , "wGbPerCore"     , "Gb_per_core") );
-        this->data_.append( dc::newDataConnector( this->ui->wGbTotal       , "wGbTotal"       , "Gb_total"   ) );
+        this->data_.append( dc::newDataConnector( this->ui->wGbPerCore     , "wGbPerCore"     , "GB_per_core") );
+        this->data_.append( dc::newDataConnector( this->ui->wGbTotal       , "wGbTotal"       , "GB_total"   ) );
         this->data_.append( dc::newDataConnector( this->ui->wWalltime      , "wWalltime"      , ""           ) );
 
         this->storeResetValues();
 
-        this->data_.append( dc::newDataConnector( this->ui->wUsername, "wUsername", "user" ) );
+        this->data_.append( dc::newDataConnector( this->ui->wUsername, "wUsername", "" ) );
         bool can_authenticate = !this->getConfigItem("wUsername")->value().toString().isEmpty();
-        this->ui->wAuthenticate->setEnabled( can_authenticate );
+        this->activateAuthenticateButton( can_authenticate );
 
      //=====================================
      // wRemote/wLocal/wSubfolder/wJobname
@@ -284,6 +287,9 @@
 
         createActions();
         createMenus();
+#ifdef QT_DEBUG
+        this->verbosity_= 2;
+#endif
     }
 
     void MainWindow::createActions()
@@ -888,8 +894,6 @@ void MainWindow::on_wPages_currentChanged(int index_current_page)
         break;
     case 2:
         {
-//            if( !Job::sshSession ) Job::sshSession = &this->sshSession_;
-
             bool ok = this->isUserAuthenticated();
             if( !ok ) {
                 QMessageBox::warning(this,TITLE,"Since you are not authenticated, you have no access to the remote host. Remote functionality on this tab is disabled.");
@@ -1054,7 +1058,8 @@ void MainWindow::on_wUsername_editingFinished()
 {
     LOG_AND_CHECK_IGNORESIGNAL(NO_ARGUMENT);
 
-    QString username = validateUsername( this->ui->wUsername->text() );
+    QString username = this->ui->wUsername->text().trimmed();
+    username = validateUsername( username );
 
     if( username.isEmpty() )
     {// not a valid username
@@ -1065,15 +1070,32 @@ void MainWindow::on_wUsername_editingFinished()
      // and forget the keys in the config file
         this->getConfigItem("privateKey")->set_value( QString() );
         this->getConfigItem("publicKey" )->set_value( QString() );
-     // deactivate the authenticate button
-        this->ui->wAuthenticate->setText("authenticate...");
-        this->ui->wAuthenticate->setEnabled(false);
+        this->activateAuthenticateButton(false);
     } else
     {// valid username
         this->ui->wUsername->setPalette( QApplication::palette(this->ui->wUsername) );
         cfg::Item* user = this->getConfigItem("wUsername");
-        if( user->value().toString() != username )
-        {// this is a new username, different from current config value
+        if( user->value().toString() == username )
+        {// username is the same as in the config, hence it has not changed!
+            if( this->isUserAuthenticated() )
+            {// User is still authenticated, there is little to be done.
+                this->activateAuthenticateButton(false,"authenticated");
+                return;
+            } else
+            {// Authentication needed
+                this->sshSession_.setUsername(username);
+             // set private/public key pair from config
+                if( this->sshSession_.setPrivatePublicKeyPair
+                        ( this->getConfigItem("privateKey")->value().toString()
+                        , this->getConfigItem("publicKey" )->value().toString()
+                        , false
+                        )
+                  ) {
+                    this->statusBar()->showMessage("Private/public key pair found in config file.");
+                }
+            }
+        } else
+        {// this is a new username, different from current config value:
          // store in config
             user->set_value(username);
          // clear config values for private/public key pair
@@ -1081,30 +1103,28 @@ void MainWindow::on_wUsername_editingFinished()
             this->getConfigItem("publicKey" )->set_value( QString() );
          // set the username for the ssh session
             this->sshSession_.setUsername(username);
-         // activate the authenticate button
-            this->ui->wAuthenticate->setText("authenticate...");
-            this->ui->wAuthenticate->setEnabled(true);
-        } else
-        {// username is the same as in the config
-            this->sshSession_.setUsername(username);
-         // set private/public key pair from config
-            this->sshSession_.setPrivatePublicKeyPair
-                    ( this->getConfigItem("privateKey")->value().toString()
-                    , this->getConfigItem("publicKey" )->value().toString()
-                    , false
-                    );
-         // activate the authenticate button
-            this->ui->wAuthenticate->setText("authenticate...");
-            this->ui->wAuthenticate->setEnabled(true);
         }
+        this->activateAuthenticateButton(true);
         this->statusBar()->showMessage("Ready to authenticate");
     }
 }
 
 bool MainWindow::isUserAuthenticated() const
 {
-    return this->ui->wAuthenticate->text() == "authenticated";
+    return this->sshSession_.isAuthenticated();
 }
+
+void MainWindow::activateAuthenticateButton (bool activate, QString const& inactive_button_text )
+{
+    if( activate ) {
+        this->ui->wAuthenticate->setText("authenticate...");
+        this->ui->wAuthenticate->setEnabled(true);
+    } else {
+        this->ui->wAuthenticate->setText(inactive_button_text);
+        this->ui->wAuthenticate->setEnabled(false);
+    }
+}
+
 
 void MainWindow::on_wAuthenticate_clicked()
 {
@@ -1122,9 +1142,7 @@ void MainWindow::on_wAuthenticate_clicked()
             QString username = /*dc::*/validateUsername( this->ui->wUsername->text() );
             if( username.isEmpty() ) {
                 this->statusBar()->showMessage("Invalid username");
-             // deactivate the authenticate button
-                this->ui->wAuthenticate->setText("authenticate...");
-                this->ui->wAuthenticate->setEnabled(false);
+                this->activateAuthenticateButton(false,"authenticate...");
                 break;
             }
             this->sshSession_.setUsername( username );
@@ -1175,8 +1193,7 @@ void MainWindow::on_wAuthenticate_clicked()
             break;
         }
      // success
-        this->ui->wAuthenticate->setText("authenticated");
-        this->ui->wAuthenticate->setEnabled(false);
+        this->activateAuthenticateButton(false,"authenticated");
         this->statusBar()->showMessage("Authentication succeeded.");
         this->getConfigItem("privateKey")->set_value( this->sshSession_.privateKey() );
         this->getConfigItem("publicKey" )->set_value( this->sshSession_. publicKey() );
@@ -1187,7 +1204,6 @@ void MainWindow::on_wAuthenticate_clicked()
         if( this->remote_env_vars_.contains(qs) ) {
             this->ui->wRemote->setToolTip( this->remote_env_vars_[qs] );
         }
-        //this->sshSession_.execute( this->getRemoteCommand("module_avail") );
         QString cmd("__module_avail");
         this->execute_remote_command_(cmd);
         QStringList modules = this->sshSession_.qout().split("\n");
@@ -1297,10 +1313,12 @@ bool MainWindow::retrieve( Job const& job, bool local, bool vsc_data )
         QString cmd = QString("mkdir -p %1");
         QString vsc_data_destination = job.vsc_data_job_parent_folder(this->remote_env_vars_["$VSC_DATA"]);
         int rc = this->execute_remote_command_( cmd, vsc_data_destination );
-        if( rc ) {/*keep compiler happy (rc unused variable)*/}
-        cmd = QString("cp -rv %1 %2");
+
+        cmd = QString("cp -rv %1 %2"); // -r : recursive, -v : verbose
         rc = this->execute_remote_command_( cmd, job.remote_job_folder(), vsc_data_destination );
         job.status_ = Job::Retrieved;
+
+        if( rc ) {/*keep compiler happy (rc unused variable)*/}
     }
     return job.status()==Job::Retrieved;
 }
@@ -1309,11 +1327,11 @@ void MainWindow::resolveRemoteFileLocations_()
 {
     this->remote_env_vars_.clear();
     for ( int i=0; i<this->ui->wRemote->count(); ++i ) {
-        QString qs = this->ui->wRemote->itemText(i);
+        QString env = this->ui->wRemote->itemText(i);
         QString cmd("echo %1");
         try {
-            this->execute_remote_command_( cmd, qs );
-            this->remote_env_vars_[qs] = this->sshSession_.qout().trimmed();
+            this->execute_remote_command_( cmd, env );
+            this->remote_env_vars_[env] = this->sshSession_.qout().trimmed();
         } catch(std::runtime_error &e )
         {}
    }
@@ -1424,8 +1442,11 @@ void MainWindow::lookForJobscript( QString const& job_folder)
     if( QFile::exists(script_file) ) {
         QMessageBox::StandardButton answer =
             QMessageBox::question(this, TITLE
-                                 , QString("The local job directory '%1' already contains a job script 'pbs.sh'.\nDo you want to load it?")
+                                 , QString("The local job directory '%1' already contains a job script 'pbs.sh'.\n"
+                                           "Do you want to load it?")
                                       .arg( job_folder )
+                                 , QMessageBox::Yes|QMessageBox::No
+                                 , QMessageBox::Yes
                                  );
         if( answer == QMessageBox::Yes ) {
             this->loadJobscript(script_file);
@@ -1441,22 +1462,47 @@ void MainWindow::lookForJobscript( QString const& job_folder)
 
 bool MainWindow::loadJobscript( QString const& filepath )
 {
-    this->launcher_.script.read(filepath);
- // the order is important!
-    QStringList first({"wCluster","wNodeset","wNNodes", "wNCoresPerNode"}) ;
+    Log(1) << QString("\n    loading job script '%1'.").arg(filepath).C_STR();
     try
     {
+        Log(1) << "\n    reading the job script ... ";
+        this->launcher_.script.read(filepath);
+        Log(1) << "done";
+    } catch( std::runtime_error& e ) {
+        QString msg = QString("An error occurred while reading the jobscript '%1'.\n Error:\n")
+                         .arg( filepath )
+                      .append( e.what() )
+                      .append("\n\nEdit the script to correct it, then press 'Save' and 'Reload'.");
+        Log() << msg.C_STR();
+        QMessageBox::critical(this,TITLE,msg);
+    }
+
+    try
+    {
+     // the order is important!
+        Log(1) << "\n    Setting gui elements from job script ... ";
+        QStringList first({"wCluster","wNodeset","wNNodes", "wNCoresPerNode"}) ;
         for(QStringList::const_iterator iter = first.cbegin(); iter!=first.cend(); ++iter ) {
+            Log(1) << QString( "\n      %1 :").arg(*iter).C_STR();
             dc::DataConnectorBase* dataConnector = this->getDataConnector(*iter);
             if( dataConnector->value_script_to_config() ) {
                 dataConnector->value_config_to_widget();
+                Log(1) << "ok";
+            } else {
+                Log(1) << "unchanged (=ok)";
             }
         }
      // do the same for all other DataConnectors, for which the order does not matter.
      // the items in first are visited twice, but the second time has no effect.
-        for( QList<dc::DataConnectorBase*>::Iterator iter = this->data_.begin(); iter!=this->data_.end(); ++iter ) {
+        for( QList<dc::DataConnectorBase*>::Iterator iter = this->data_.begin(); iter!=this->data_.end(); ++iter )
+        {
+            Log(1) << QString( "\n      %1 :").arg( (*iter)->name() ).C_STR();
+
             if( (*iter)->value_script_to_config() ) {
                 (*iter)->value_config_to_widget();
+                Log(1) << "ok";
+            } else {
+                Log(1) << "unchanged (=ok)";
             }
         }
      // a few special cases:
@@ -1474,14 +1520,15 @@ bool MainWindow::loadJobscript( QString const& filepath )
     }
     catch( std::runtime_error& e )
     {
-        Log() << QString("ERROR: in 'void MainWindow:: loadJobscript( QString const& filepath /*=%1*/)'\n")
-                        .arg(filepath).C_STR()
-              << e.what()
-              ;
+        QString msg = QString("An error occurred while updating the Launcher GUI from jobscript '%1'.\n Error:\n")
+                         .arg( filepath )
+                      .append( e.what() )
+                      .append("\n\nEdit the script to correct it, then press 'Save' and 'Reload'.");
+        Log() << msg.C_STR();
+        QMessageBox::critical(this,TITLE,msg);
         return false;
     }
  // read from file, hence no unsaved changes sofar
-//    this->launcher_.script.set_has_unsaved_changes(false);
     return true;
 }
 
@@ -1513,7 +1560,7 @@ bool MainWindow::saveJobscript( QString const& filepath )
     }
     this->statusBar()->showMessage( QString("Job script saved: '%1'").arg(filepath) );
  // just saved, hence no unsaved changes yet.
- //   this->launcher_.script.set_has_unsaved_changes(false);
+    this->launcher_.script.set_has_unsaved_changes(false);
     this->check_script_unsaved_changes();
     return true;
 }
@@ -1575,8 +1622,10 @@ void MainWindow::on_wReload_clicked()
     if( !qFileInfo.exists() ) {
         this->statusBar()->showMessage("No job script found, hence not loaded.");
     } else {
-        QMessageBox::StandardButton answer =
-                QMessageBox::question( this, TITLE, "Unsaved changes to the current job script will be lost on reloading. Continue?");
+        QMessageBox::StandardButton answer = QMessageBox::Yes;
+        if( this->launcher_.script.has_unsaved_changes() ) {
+            answer = QMessageBox::question( this, TITLE, "Unsaved changes to the current job script will be lost on reloading. Continue?");
+        }
         if( answer==QMessageBox::Yes ) {
             this->loadJobscript(script_file);
             this->statusBar()->showMessage("job script reloaded.");
@@ -1604,7 +1653,7 @@ void MainWindow::on_wSubmit_clicked()
     QString cmd;
     if( this->ui->wEmptyRemoteFolder->isChecked() )
     {
-        QMessageBox::Button answer = QMessageBox::question(this,TITLE,"OK to erase remote job folder?");
+        QMessageBox::Button answer = QMessageBox::question(this,TITLE,"OK to erase remote job folder contents?");
         if( answer==QMessageBox::Yes ) {
             cmd = QString("rm -rf %1/*");
             this->execute_remote_command_( cmd, this->remote_subfolder_jobname() );
@@ -1754,8 +1803,9 @@ void MainWindow::refreshJobs( JobList const& joblist )
         QString cmd = QString("qstat -u %1");
         this->execute_remote_command_( cmd, username );
         if( !this->sshSession_.qout().isEmpty() ) {
-            text.append("\n>>> ").append( cmd )
-                .append( this->sshSession_.qout() );
+            text.append("\n--- ").append( cmd ).append( this->sshSession_.qout() );
+             // using '---' rather than '>>>' avoids that the user can
+             // select the output of qstat as if it was a job entry.
         }
     }
     this->ui->wNotFinished->setText( text);
@@ -1777,19 +1827,24 @@ void MainWindow::deleteJob( QString const& jobid )
             Job job(job_list[i]);
          // remove local job folder
             if( this->ui->wCheckDeleteLocalJobFolder->isChecked() ) {
+                QString msg = QString("Removing: ").append( job.local_job_folder() ).append(" ... ");
+                this->statusBar()->showMessage(msg);
                 QDir qDir( job.local_job_folder() );
                 qDir.removeRecursively();
-                this->statusBar()->showMessage(QString("Removed: ").append( job.local_job_folder() ) );
+                this->statusBar()->showMessage(msg.append("done"));
             }
          // remove remote jobfolder
             if( this->ui->wCheckDeleteRemoteJobFolder->isChecked() ) {
+                QString msg = QString("Removing: ").append( job.remote_job_folder() ).append(" ... ");
+                this->statusBar()->showMessage(msg);
                 QString cmd = QString("rm -rf %1");
                 this->execute_remote_command_( cmd, job.remote_job_folder() );
-                this->statusBar()->showMessage(QString("Removed: ").append( job.remote_job_folder() ) );
+                this->statusBar()->showMessage( msg.append("done") );
             }
          // remove from job list
             job_list.removeAt(i);
             this->refreshJobs(job_list);
+            this->statusBar()->showMessage( QString("Job %1 removed.").arg(jobid) );
             break;
         }
     }
@@ -1998,6 +2053,11 @@ void MainWindow::on_wReload2_clicked()
     }
     QString text = this->launcher_.script.text();
     this->ui->wScript->setText(text);
+ // no unsaved changes since read from file, but the above iteration over DataConnectors
+ // requires that it is explicitly reset.
+    this->launcher_.script.set_has_unsaved_changes(false);
+    this->check_script_unsaved_changes();
+
 }
 
 void MainWindow::on_wSave2_clicked()
