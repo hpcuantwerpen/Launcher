@@ -1,11 +1,9 @@
 TODO LIST
-- bug fix: authentication lost after
-  ls /scratch/antwerpen/201/vsc20170/jobs/hello_world/finished.130650.mn.hopper.antwerpen.vsc
-  ?because the command fails...because the job is not finished yet
-  ?bash wrapper not installed
-
+- add deleteAll button
 - the config file is in fact a session configuration
-
+  Things would probably be more practical if we had a session configuration file
+  (selectable by user) and a Launcher config file
+- templates: could be implemented as session config files
 - fix compile time warnings on macosx
 
 - win32 version
@@ -23,17 +21,21 @@ TODO LIST
 
 - add checkpointing of jobs
 
-- add hello world example
 
 - time out to ssh2 connection (5s, then "cannot reach login.hpc.uantwerpen.be" message)
 
-- store system commands in a cluster .info file and put them in a map
 
 - add icon to mac application
   https://iconverticons.com/online/
 
 DONE (reverse chronological order)
+2015-11-07
+- bug fix: sftp_put_dir writes only one memory block (mem)
 2015-11-06
+- add hello world example
+- bug fix: authentication lost after
+  after authenticate, wUsername gets focus again and generates another on_wUsername_EditingFinished event
+  wich accidentally called ssh2::Session::reset()
 - bug fix: the user can select the output of the qstat -u command as if it was a job,
   because it started also with ">>>"
 

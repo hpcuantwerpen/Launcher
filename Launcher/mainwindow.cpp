@@ -1819,6 +1819,9 @@ void MainWindow::refreshJobs( JobList const& joblist )
 
 void MainWindow::deleteJob( QString const& jobid )
 {
+    QString msg = QString("Removing job : ").append(jobid).append(" ... ");
+    this->statusBar()->showMessage(msg);
+
     cfg::Item* ci_job_list = this->getConfigItem("job_list");
     QStringList job_list = ci_job_list->value().toStringList();
     for( int i=0; i<job_list.size(); ++i ) {
@@ -1845,9 +1848,10 @@ void MainWindow::deleteJob( QString const& jobid )
             job_list.removeAt(i);
             this->refreshJobs(job_list);
             this->statusBar()->showMessage( QString("Job %1 removed.").arg(jobid) );
-            break;
+            return;
         }
     }
+    this->statusBar()->showMessage( msg.append(" ... not found.") );
 }
 
 void MainWindow::on_wDeleteSelectedJob_clicked()
@@ -2087,7 +2091,9 @@ void MainWindow::on_wNotFinished_selectionChanged()
 
     IGNORE_SIGNALS_UNTIL_END_OF_SCOPE;
     this->selected_job_ = this->selectedJob( this->ui->wNotFinished );
-    this->statusBar()->showMessage( QString("Selected job ").append( this->selected_job_ ) );
+    if( !this->selected_job_.isEmpty() ) {
+        this->statusBar()->showMessage( QString("Selected job ").append( this->selected_job_ ) );
+    }
 }
 
 void MainWindow::on_wFinished_selectionChanged()

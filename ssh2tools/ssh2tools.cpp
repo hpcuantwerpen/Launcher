@@ -576,8 +576,6 @@ namespace ssh2
         LIBSSH2_SFTP_HANDLE *sftp_handle;
         FILE *fh_local;
         char mem[512];
-        struct timeval timeout;
-        fd_set fd;
 
         fh_local = fopen( local_filepath.c_str(), "rb");
         if( !fh_local ) {
@@ -619,64 +617,12 @@ namespace ssh2
 
         size_t nread;
         char *ptr;
-/*
-        do {
-            nread = fread(mem, 1, sizeof(mem), fh_local);
-            if(nread <= 0) {// end of file
-                break;
-            }
-            ptr = mem;
-            do {// write data in a loop until we block
-                rc = libssh2_sftp_write( sftp_handle, ptr, nread );
-                ptr   += rc;
-                nread -= rc;
-            } while( rc >= 0 );
-
-            if( rc != LIBSSH2_ERROR_EAGAIN ) {// error or end of file
-                break;
-            }
-
-            timeout.tv_sec = 10;
-            timeout.tv_usec = 0;
-
-            FD_ZERO(&fd);
-            FD_SET(this->sock_, &fd);
-
-         // wait for readable or writeable
-            rc = select(this->sock_+1, &fd, &fd, NULL, &timeout);
-            if( rc <= 0 ) {// negative is error, 0 is timeout
-                throw_<std::runtime_error>("SFTP upload timed out: &1", rc );
-            }
-        } while( 1 );
-*/
-/*
-        do {
-            nread = fread(mem, 1, sizeof(mem), fh_local);
-            if (nread <= 0) {
-                // end of file
-                break;
-            }
-            ptr = mem;
-
-            do {
-                // write data in a loop until we block
-                rc = libssh2_sftp_write(sftp_handle, ptr, nread);
-
-                if(rc < 0)
-                    break;
-                ptr += rc;
-                nread -= rc;
-            } while (nread);
-
-        } while (rc > 0);
-*/
         size_t total = 0;
         do {
             nread = fread(mem, 1, sizeof(mem), fh_local);
             if (nread <= 0) {// end of file
                 break;
             }
-            total += nread;
             ptr = mem;
             do {// write data in a loop until we block
                 while( ( rc = libssh2_sftp_write(sftp_handle, ptr, nread)) == LIBSSH2_ERROR_EAGAIN ) {
@@ -687,6 +633,7 @@ namespace ssh2
                 ptr   += rc;
                 nread -= rc;
             } while (nread);
+            total += nread;
         } while (rc > 0);
 
         if( Session::verbose > 1 )
@@ -727,9 +674,7 @@ namespace ssh2
         LIBSSH2_SFTP       * sftp_session;
         LIBSSH2_SFTP_HANDLE* sftp_handle;
         FILE *fh_local;
-        char mem[1000];
-        struct timeval timeout;
-        fd_set fd;
+        char mem[512];
 
         fh_local = fopen( local_filepath.c_str(), "wb");
         if(!fh_local) {
@@ -770,31 +715,28 @@ namespace ssh2
             do
             {// read in a loop until we block
                 rc = libssh2_sftp_read( sftp_handle, mem, sizeof(mem) );
-//                fprintf(stderr, "libssh2_sftp_read returned %d\n", rc);
-                if( rc > 0 )
-                {// write to stderr
-                 // write(2, mem, rc);
-                 // write to temporary storage area
+                if( rc > 0 ) {
                     fwrite( mem, rc, 1, fh_local );
                     total +=rc;
                 }
             } while( rc > 0 );
-
-            if( rc != LIBSSH2_ERROR_EAGAIN ) {
+            if( rc == LIBSSH2_ERROR_EAGAIN ) {
+                waitsocket(sock_, session_);
+            } else {
                 break; // error or end of file
             }
 
-            timeout.tv_sec = 10;
-            timeout.tv_usec = 0;
+//            timeout.tv_sec = 10;
+//            timeout.tv_usec = 0;
 
-            FD_ZERO( &fd );
-            FD_SET( this->sock_, &fd );
+//            FD_ZERO( &fd );
+//            FD_SET( this->sock_, &fd );
 
-         // wait for readable or writeable
-            rc = select( this->sock_+1, &fd, &fd, NULL, &timeout );
-            if( rc <= 0 ) {// negative is error, 0 is timeout
-                throw_<std::runtime_error>("SFTP download timed out: %1", rc );
-            }
+//         // wait for readable or writeable
+//            rc = select( this->sock_+1, &fd, &fd, NULL, &timeout );
+//            if( rc <= 0 ) {// negative is error, 0 is timeout
+//                throw_<std::runtime_error>("SFTP download timed out: %1", rc );
+//            }
         } while (1);
 
         libssh2_sftp_close(sftp_handle);
