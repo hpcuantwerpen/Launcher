@@ -6,6 +6,7 @@
 #ifdef Q_OS_WIN
     #include <windows.h>
     #include <ws2tcpip.h>
+    #define gai_strerror gai_strerrorA
 #else
     #include <sys/types.h>
     #include <sys/socket.h>
@@ -25,7 +26,7 @@
 #include <QTextStream>
 
 #define LOG(VERBOSIITY) \
-    QString _msg_("\n\n[ ssh2::Session::%1, %2, %3 ]");\
+    QString _msg_("\n[ ssh2::Session::%1, %2, %3 ]");\
     _msg_ = _msg_.arg(__func__).arg(__FILE__).arg(__LINE__);\
     Log(VERBOSIITY) << INFO << _msg_.toStdString()
  // no terminating ';', hence can be used as
@@ -76,6 +77,7 @@ namespace ssh2
       : sock_(-1)
       , session_(nullptr)
       , isAuthenticated_(false)
+      , execute_remote_command(this)
     {}
  //-----------------------------------------------------------------------------
     bool Session::isInitializedLibssh_ = false;
@@ -175,11 +177,7 @@ namespace ssh2
         hints.ai_socktype = SOCK_STREAM;
 
         if( (rv=getaddrinfo( this->login_node_.c_str(), "22", &hints, &servinfo )) != 0 ) {
-          #ifdef Q_OS_WIN
-            throw_<std::runtime_error>("getaddrinfo[%1] : %2", rv, gai_strerrorA(rv) ); // required on windows 7?
-          #else
-            throw_<std::runtime_error>("getaddrinfo[%1] : %2", rv, gai_strerror(rv) );
-          #endif
+            throw_<NoAddrInfo>("getaddrinfo[%1] : %2", rv, gai_strerror(rv) );
         }
      // loop through all the results and connect to the first we can
         for( p=servinfo; p!=NULL; p=p->ai_next)
@@ -198,7 +196,7 @@ namespace ssh2
         if( p==NULL)
         {// looped off the end of the list with no connection
             freeaddrinfo(servinfo); // all done with this structure
-            throw_<std::runtime_error>("Failed to connect.");
+            throw_<ConnectTimedOut>("Failed to connect.");
         }
      // libssh2 stuff...
         if( !Session::isInitializedLibssh_ )
@@ -775,7 +773,7 @@ namespace ssh2
         }
 
         QString cmd = QString("mkdir -p ").append(remote_dirpath);
-        this->execute(cmd);
+        this->execute_remote_command(cmd);
 
         for ( QFileInfoList::const_iterator iter=qFileInfoListLocal.cbegin()
             ; iter!=qFileInfoListLocal.cend(); ++iter )
@@ -819,7 +817,7 @@ namespace ssh2
                       .append(" && ls -1F");
                          // ls -1F : -1 puts every item on a new line,
                          //          -F adds a trailing / to directories
-        int rc = this->execute(cmd);
+        int rc = this->execute_remote_command(cmd);
         if( rc ) {
             if( must_throw ) {
                 throw_<FileOpenError>("Remote directory does not exist: '%1'.",remote_dirpath);
@@ -925,7 +923,7 @@ namespace ssh2
         QString cmd("echo ");
         if( !env.startsWith('$') ) cmd.append('$');
         cmd.append(env);
-        this->execute(cmd);
+        this->execute_remote_command(cmd);
         QString result = this->qout().trimmed();
         return result;
     }

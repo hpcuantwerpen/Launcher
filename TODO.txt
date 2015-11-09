@@ -1,9 +1,15 @@
 TODO LIST
+- add a dummy entry at the beginning of the module list
+- intercept “internet connection but no vpn”
+
 - add deleteAll button
+
 - the config file is in fact a session configuration
   Things would probably be more practical if we had a session configuration file
   (selectable by user) and a Launcher config file
+
 - templates: could be implemented as session config files
+
 - fix compile time warnings on macosx
 
 - win32 version
@@ -21,14 +27,17 @@ TODO LIST
 
 - add checkpointing of jobs
 
-
-- time out to ssh2 connection (5s, then "cannot reach login.hpc.uantwerpen.be" message)
-
-
 - add icon to mac application
   https://iconverticons.com/online/
 
 DONE (reverse chronological order)
+==================================
+2015-11-09
+- make ExecuteRemoteCommand a member of ssh2::Session instead of of MainWindow
+  in this way the commands executed by sftp_get/put_file/dir can be wrapped too.
+- intercept “no internet connection”
+
+
 2015-11-07
 - bug fix: sftp_put_dir writes only one memory block (mem)
 2015-11-06

@@ -91,7 +91,6 @@
       , ui(new Ui::MainWindow)
       , ignoreSignals_(false)
       , previousPage_(0)
-      , execute_remote_command_(&this->sshSession_)
       , verbosity_(INITIAL_VERBOSITY)
       , pendingRequest_(NoPendingRequest)
     {
@@ -547,7 +546,7 @@
             this->walltimeUnitDependencies(updateWidgets);
 
             this->sshSession_.setLoginNode( clusterInfo.loginNodes()[0] );
-            this->execute_remote_command_.set_remote_commands( clusterInfo.remote_commands() );
+            this->sshSession_.execute_remote_command.set_remote_commands( clusterInfo.remote_commands() );
         }
      // try to authenticate to refresh the list of available modules and the
      // remote file locations $VSC_DATA and $VSC_SCRATCH
@@ -1125,13 +1124,13 @@ void MainWindow::activateAuthenticateButton (bool activate, QString const& inact
     }
 }
 
-
 void MainWindow::on_wAuthenticate_clicked()
 {
     LOG_AND_CHECK_IGNORESIGNAL(NO_ARGUMENT);
 
     this->setIgnoreSignals();
     int max_attempts = 3;
+    bool no_connection = false;
     int attempts = max_attempts;
     while( attempts )
     {
@@ -1139,7 +1138,7 @@ void MainWindow::on_wAuthenticate_clicked()
             this->sshSession_.open();
         }
         catch( ssh2::MissingUsername& e ) {
-            QString username = /*dc::*/validateUsername( this->ui->wUsername->text() );
+            QString username = validateUsername( this->ui->wUsername->text() );
             if( username.isEmpty() ) {
                 this->statusBar()->showMessage("Invalid username");
                 this->activateAuthenticateButton(false,"authenticate...");
@@ -1179,6 +1178,26 @@ void MainWindow::on_wAuthenticate_clicked()
             --attempts;
             continue;
         }
+        catch( ssh2::NoAddrInfo &e ) {
+            QString msg= QString("Could not getaddrinfo for %1.").arg( this->sshSession_.loginNode() );
+            this->statusBar()->showMessage(msg);
+            QMessageBox::warning( this,TITLE,msg.append("\n  . Check your internet connection."
+                                                        "\n  . Check the availability of the cluster."
+                                                        ) );
+
+            no_connection=true;
+            break;
+        }
+        catch( ssh2::ConnectTimedOut &e ) {
+            QString msg= QString("Could not reach  %1.").arg( this->ui->wCluster->currentText() );
+            this->statusBar()->showMessage(msg);
+            QMessageBox::warning( this,TITLE,msg.append("\n  . Check your internet connection."
+                                                        "\n  . Check your VPN connection if you are outside the university."
+                                                        "\n  . Check the availability of the cluster."
+                                                        ) );
+            no_connection=true;
+            break;
+        }
         catch( std::runtime_error& e ) {
             QString msg( e.what() );
             if( msg.startsWith("getaddrinfo[8] :") ) {
@@ -1205,8 +1224,9 @@ void MainWindow::on_wAuthenticate_clicked()
             this->ui->wRemote->setToolTip( this->remote_env_vars_[qs] );
         }
         QString cmd("__module_avail");
-        this->execute_remote_command_(cmd);
+        this->sshSession_.execute_remote_command(cmd);
         QStringList modules = this->sshSession_.qout().split("\n");
+        modules.prepend("--- select a module below ---");
         this->ui->wSelectModule->clear();
         this->ui->wSelectModule->addItems(modules);
 
@@ -1216,19 +1236,24 @@ void MainWindow::on_wAuthenticate_clicked()
         break;
     }
     if( attempts==0 )
-    {// remove the keys from the config and the session - maybe they were wrong
+    {// after 3 unsuccesfull attempts to authenticate, we remove the keys from the config
+     // and the session: they are probably wrong
         this->sshSession_.setUsername( this->getConfigItem("wUsername")->value().toString() );
         this->getConfigItem("privateKey")->set_value( QString() );
         this->getConfigItem("publicKey" )->set_value( QString() );
-        this->statusBar()->showMessage( QString("Authentication failed: %1 failed attempts to provide passphrase.").arg(max_attempts) );
+        this->statusBar()->showMessage( QString("Authentication failed: %1 failed attempts to provide passphrase.")
+                                           .arg(max_attempts)
+                                      );
     }
-    if( !this->isUserAuthenticated() ) {
+    if( no_connection )
+    {// attempt to obtain cluster modules from config file, to enable the user to work offline.
         QString modules_cluster = QString("modules_").append(this->getConfigItem("wCluster")->value().toString() );
         QStringList modules = this->getConfigItem(modules_cluster)->choices_as_QStringList();
         if( modules.isEmpty() ) {
             this->statusBar()->showMessage("List of modules not available for current cluster ");
         } else {
             this->ui->wSelectModule->clear();
+            this->ui->wSelectModule->addItems({"--- select a module below ---"});
             this->ui->wSelectModule->addItems(modules);
             this->statusBar()->showMessage("Using List of modules from a previous session. Authenticate to update it.");
         }
@@ -1263,7 +1288,7 @@ Job ID                  Username    Queue    Jobname          SessID  NDS   TSK 
                 .append('/' ).append(job.subfolder_)
                 .append('/' ).append(job.jobname_)
                 .append("/finished.").append( job.long_id() );
-            int rv = this->execute_remote_command_(cmd);
+            int rv = this->sshSession_.execute_remote_command(cmd);
             bool is_finished = ( rv==0 );
             if( !is_finished ) {
                 return false;
@@ -1272,7 +1297,7 @@ Job ID                  Username    Queue    Jobname          SessID  NDS   TSK 
          // epilogue is still running. To make sure:
          // Check the output of qstat -u username
             cmd = QString("qstat -u %1");
-            rv = this->execute_remote_command_( cmd, this->sshSession_.username() );
+            rv = this->sshSession_.execute_remote_command( cmd, this->sshSession_.username() );
             QStringList qstat_lines = this->sshSession_.qout().split('\n',QString::SkipEmptyParts);
             for ( QStringList::const_iterator iter=qstat_lines.cbegin()
                 ; iter!=qstat_lines.cend(); ++iter ) {
@@ -1312,10 +1337,10 @@ bool MainWindow::retrieve( Job const& job, bool local, bool vsc_data )
     {
         QString cmd = QString("mkdir -p %1");
         QString vsc_data_destination = job.vsc_data_job_parent_folder(this->remote_env_vars_["$VSC_DATA"]);
-        int rc = this->execute_remote_command_( cmd, vsc_data_destination );
+        int rc = this->sshSession_.execute_remote_command( cmd, vsc_data_destination );
 
         cmd = QString("cp -rv %1 %2"); // -r : recursive, -v : verbose
-        rc = this->execute_remote_command_( cmd, job.remote_job_folder(), vsc_data_destination );
+        rc = this->sshSession_.execute_remote_command( cmd, job.remote_job_folder(), vsc_data_destination );
         job.status_ = Job::Retrieved;
 
         if( rc ) {/*keep compiler happy (rc unused variable)*/}
@@ -1330,7 +1355,7 @@ void MainWindow::resolveRemoteFileLocations_()
         QString env = this->ui->wRemote->itemText(i);
         QString cmd("echo %1");
         try {
-            this->execute_remote_command_( cmd, env );
+            this->sshSession_.execute_remote_command( cmd, env );
             this->remote_env_vars_[env] = this->sshSession_.qout().trimmed();
         } catch(std::runtime_error &e )
         {}
@@ -1656,7 +1681,7 @@ void MainWindow::on_wSubmit_clicked()
         QMessageBox::Button answer = QMessageBox::question(this,TITLE,"OK to erase remote job folder contents?");
         if( answer==QMessageBox::Yes ) {
             cmd = QString("rm -rf %1/*");
-            this->execute_remote_command_( cmd, this->remote_subfolder_jobname() );
+            this->sshSession_.execute_remote_command( cmd, this->remote_subfolder_jobname() );
             this->statusBar()->showMessage("Erased remote job folder.");
         } else {
             this->statusBar()->showMessage("Remote job folder not erased.");
@@ -1665,7 +1690,7 @@ void MainWindow::on_wSubmit_clicked()
     this->sshSession_.sftp_put_dir( this->local_subfolder_jobname(), this->remote_subfolder_jobname(), true );
 
     cmd = QString("cd %1 && qsub pbs.sh");
-    this->execute_remote_command_( cmd, this->remote_subfolder_jobname() );
+    this->sshSession_.execute_remote_command( cmd, this->remote_subfolder_jobname() );
     QString job_id = this->sshSession_.qout().trimmed();
     this->statusBar()->showMessage(QString("Job submitted: %1").arg(job_id));
     cfg::Item* ci_job_list = this->getConfigItem("job_list");
@@ -1801,7 +1826,7 @@ void MainWindow::refreshJobs( JobList const& joblist )
     QString username = this->ui->wUsername->text();
     if( !username.isEmpty() ) {
         QString cmd = QString("qstat -u %1");
-        this->execute_remote_command_( cmd, username );
+        this->sshSession_.execute_remote_command( cmd, username );
         if( !this->sshSession_.qout().isEmpty() ) {
             text.append("\n--- ").append( cmd ).append( this->sshSession_.qout() );
              // using '---' rather than '>>>' avoids that the user can
@@ -1841,7 +1866,7 @@ void MainWindow::deleteJob( QString const& jobid )
                 QString msg = QString("Removing: ").append( job.remote_job_folder() ).append(" ... ");
                 this->statusBar()->showMessage(msg);
                 QString cmd = QString("rm -rf %1");
-                this->execute_remote_command_( cmd, job.remote_job_folder() );
+                this->sshSession_.execute_remote_command( cmd, job.remote_job_folder() );
                 this->statusBar()->showMessage( msg.append("done") );
             }
          // remove from job list
@@ -2022,8 +2047,8 @@ void MainWindow::on_wSelectModule_currentIndexChanged(const QString &arg1)
 {
     LOG_AND_CHECK_IGNORESIGNAL( arg1 )
 
-    if( arg1.startsWith('/') ) {
-
+    if( arg1.startsWith("---") )
+    {// ignore this dummy entry...
     } else {
         QTextCursor cursor;
         if( this->ui->wScript->find("cd $PBS_O_WORKDIR") ) {

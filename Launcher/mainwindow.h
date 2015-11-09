@@ -210,7 +210,6 @@ private:
 
     ssh2::Session sshSession_;
     QMap<QString,QString> remote_env_vars_;
-    ssh2::ExecuteRemoteCommand execute_remote_command_;
     int verbosity_;
 
     QAction *aboutAction_;
