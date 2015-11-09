@@ -6,7 +6,7 @@
 #ifdef Q_OS_WIN
     #include <windows.h>
     #include <ws2tcpip.h>
-    #define gai_strerror gai_strerrorA
+    #define ssh2_gai_strerror gai_strerrorA
 #else
     #include <sys/types.h>
     #include <sys/socket.h>
@@ -15,6 +15,7 @@
     #include <unistd.h>
     #include <netdb.h>
     #define closesocket close
+    #define ssh2_gai_strerror gai_strerror
 #endif
 
 
@@ -177,7 +178,7 @@ namespace ssh2
         hints.ai_socktype = SOCK_STREAM;
 
         if( (rv=getaddrinfo( this->login_node_.c_str(), "22", &hints, &servinfo )) != 0 ) {
-            throw_<NoAddrInfo>("getaddrinfo[%1] : %2", rv, gai_strerror(rv) );
+            throw_<NoAddrInfo>("getaddrinfo[%1] : %2", rv, ssh2_gai_strerror(rv) );
         }
      // loop through all the results and connect to the first we can
         for( p=servinfo; p!=NULL; p=p->ai_next)

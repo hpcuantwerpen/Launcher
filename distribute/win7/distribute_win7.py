@@ -7,19 +7,24 @@ def mkdir_p(directory):
 def walk_dir_recursive(dir,instdir, level=0):
     s=''
     for folder,sub_folders,files in os.walk(dir):
-        s += instdir+'\n'
-        for fname in files:
-            s += '    File "${DISTRIBUTION_DIR}\\'
-            if level>0:
-                s+=folder
-                s+='\\'
-            s+= fname
-            s+='"\n'
+        if len(files)>0:
+            s += instdir+'\n'
+            #print '@@\n',s
+            for fname in files:
+                s += '    File "${DISTRIBUTION_DIR}\\'
+                if level>0:
+                    s+=folder
+                    s+='\\'
+                s+= fname
+                s+='"\n'
+            #print '##\n',s
+        #else:
+            #print '@@@@'
         for fname in sub_folders:
-            instdir_fname = copy.copy(instdir)
-            instdir_fname+= '\\'
-            instdir_fname+= fname
-            s += walk_dir_recursive(fname,instdir_fname,level=level+1)
+            instdir_fname = instdir+'\\'+fname
+            sub_dir_fname = dir    +'\\'+fname
+            s += walk_dir_recursive(sub_dir_fname,instdir_fname,level=level+1)
+        #print '**\n',s
         return s
     
 
@@ -101,6 +106,11 @@ if __name__=='__main__':
     #copy the clusters directory
     print_title('Copying clusters directory (.info files)')
     shutil.copytree(os.path.join(source_dir,'Launcher','clusters'),os.path.join(build_distribute_win7_dir,'clusters'))
+    assert os.path.exists(os.path.join(build_distribute_win7_dir,'clusters'))
+        
+    #copy the jobs directory
+    print_title('Copying jobs directory')
+    shutil.copytree(os.path.join(source_dir,'Launcher','jobs'),os.path.join(build_distribute_win7_dir,'jobs'))
     assert os.path.exists(os.path.join(build_distribute_win7_dir,'clusters'))
         
     #windeployqt
