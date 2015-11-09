@@ -1,5 +1,4 @@
 TODO LIST
-- add a dummy entry at the beginning of the module list
 - intercept “internet connection but no vpn”
 
 - add deleteAll button
@@ -33,6 +32,7 @@ TODO LIST
 DONE (reverse chronological order)
 ==================================
 2015-11-09
+- add a dummy entry at the beginning of the module list
 - make ExecuteRemoteCommand a member of ssh2::Session instead of of MainWindow
   in this way the commands executed by sftp_get/put_file/dir can be wrapped too.
 - intercept “no internet connection”
