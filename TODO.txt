@@ -27,19 +27,23 @@ TODO LIST
 
 DONE (reverse chronological order)
 ==================================
-2015-11-09
+2015-11-11
 - templates:
   . could be implemented as session config files : not a good idea, script is not
     in config file, on script parameters
   . as a complete job with some functionality to copy the entire directory (including
     any input files)
 - delete job must kill it if not finished
+
+2015-11-10
+- bug fix: getaddrinfo failing on windows 7
+  see http://www.cplusplus.com/forum/windows/41339/
+- bug fix: CRLF->LF conversion on windows
 - add a dummy entry at the beginning of the module list
 - make ExecuteRemoteCommand a member of ssh2::Session instead of of MainWindow
   in this way the commands executed by sftp_get/put_file/dir can be wrapped too.
 - intercept “internet connection but no vpn”
 - intercept “no internet connection”
-
 
 2015-11-07
 - bug fix: sftp_put_dir writes only one memory block (mem)
