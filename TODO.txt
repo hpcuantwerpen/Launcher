@@ -32,6 +32,10 @@ TODO LIST
 DONE (reverse chronological order)
 ==================================
 2015-11-09
+- bug fix: getaddrinfo failing on windows 7
+
+2015-11-09
+- bug fix: CRLF->LF conversion on windows
 - add a dummy entry at the beginning of the module list
 - make ExecuteRemoteCommand a member of ssh2::Session instead of of MainWindow
   in this way the commands executed by sftp_get/put_file/dir can be wrapped too.

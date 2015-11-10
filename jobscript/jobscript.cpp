@@ -135,7 +135,7 @@ namespace pbs
         if( filepath.isEmpty() )
             throw_<InexistingFile>("Empty filename. \n    in 'void Script::read()'");
         QFile file(filepath);
-        if( !file.open(QIODevice::ReadOnly | QIODevice::Text) )
+        if( !file.open(QIODevice::ReadOnly|QIODevice::Text) )
             throw_<InexistingFile>("File not found.\n    filepath: '%1'\n    in 'void Script::read()'.", filepath );
         this->filepath_ = filepath;
         QTextStream in(&file);
@@ -170,7 +170,7 @@ namespace pbs
         Script* non_const_this = const_cast<Script*>(this);
         (*non_const_this)["generated_on"] = toolbox::now();
         QFile f(fileinfo.filePath());
-        f.open(QIODevice::Truncate|QIODevice::Text|QIODevice::WriteOnly);
+        f.open(QIODevice::Truncate/*|QIODevice::Text*/|QIODevice::WriteOnly);
         QTextStream out(&f);
 
         const_cast<Script*>(this)->add( QString(FINISHED), /*hidden=*/false, /*position=*/types::LastPosition );

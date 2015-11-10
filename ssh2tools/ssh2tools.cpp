@@ -166,12 +166,30 @@ namespace ssh2
             throw_<MissingKey>( "Missing private/public key pair for user %1.", this->username_.c_str() );
         }
 
-      /*const char *hostname    = "143.169.237.31";
-        const char *username    = "vsc20170";
-        const char *password    = "";
-       */
-        struct addrinfo hints, *servinfo, *p;
         int rv;
+#ifdef Q_OS_WIN
+        WORD wVersionRequested;
+        WSADATA wsaData;
+
+     // Use the MAKEWORD(lowbyte, highbyte) macro declared in Windef.h
+        wVersionRequested = MAKEWORD(2, 2);
+        rv = WSAStartup(wVersionRequested, &wsaData);
+        if( rv!=0 ) {
+            throw_<WinSockFailure>("WSAStartup failed with error %1.", rv);
+        }
+
+     /* Confirm that the WinSock DLL supports 2.2.
+      * Note that if the DLL supports versions greater
+      * than 2.2 in addition to 2.2, it will still return
+      * 2.2 in wVersion since that is the version we
+      * requested.
+      */if (LOBYTE(wsaData.wVersion) != 2 || HIBYTE(wsaData.wVersion) != 2)
+        {   printf("Could not find a usable version of Winsock.dll\n");
+            WSACleanup();
+            throw_<WinSockFailure>("Could not find a usable version of Winsock.dll (version 2.2 needed).");
+        }
+#endif
+        struct addrinfo hints, *servinfo, *p;
 
         memset(&hints, 0, sizeof hints);
         hints.ai_family = AF_UNSPEC; // use AF_INET6 to forve IPv6
@@ -876,11 +894,15 @@ namespace ssh2
     reset()
     {
         this->close();
+
         this->   username_.clear();
         this->private_key_.clear();
         this-> public_key_.clear();
         this-> passphrase_.clear();
         this->isAuthenticated_= false;
+#ifdef Q_OS_WIN
+        WSACleanup();
+#endif
     }
  //-----------------------------------------------------------------------------
     Session::

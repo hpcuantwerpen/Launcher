@@ -190,17 +190,19 @@ namespace ssh2
                   );
     };
  //=============================================================================
-    SUBCLASS_EXCEPTION( MissingLoginNode     , std::runtime_error )
-    SUBCLASS_EXCEPTION( MissingUsername      , std::runtime_error )
-    SUBCLASS_EXCEPTION( MissingKey           , std::runtime_error )
-    SUBCLASS_EXCEPTION( PassphraseNeeded     , std::runtime_error )
-    SUBCLASS_EXCEPTION( WrongPassphrase      , std::runtime_error )
-    SUBCLASS_EXCEPTION( RemoteExecutionFailed, std::runtime_error )
-    SUBCLASS_EXCEPTION( FileOpenError        , std::runtime_error )
-    SUBCLASS_EXCEPTION( SshOpenError         , std::runtime_error )
-    SUBCLASS_EXCEPTION( ConnectTimedOut      , std::runtime_error )
-    SUBCLASS_EXCEPTION( NoAddrInfo           , std::runtime_error )
-
+    SUBCLASS_EXCEPTION( MissingLoginNode       , std::runtime_error )
+    SUBCLASS_EXCEPTION( MissingUsername        , std::runtime_error )
+    SUBCLASS_EXCEPTION( MissingKey             , std::runtime_error )
+    SUBCLASS_EXCEPTION( PassphraseNeeded       , std::runtime_error )
+    SUBCLASS_EXCEPTION( WrongPassphrase        , std::runtime_error )
+    SUBCLASS_EXCEPTION( RemoteExecutionFailed  , std::runtime_error )
+    SUBCLASS_EXCEPTION( FileOpenError          , std::runtime_error )
+    SUBCLASS_EXCEPTION( SshOpenError           , std::runtime_error )
+    SUBCLASS_EXCEPTION( ConnectTimedOut        , std::runtime_error )
+    SUBCLASS_EXCEPTION( NoAddrInfo             , std::runtime_error )
+#ifdef Q_OS_WIN
+    SUBCLASS_EXCEPTION( WinSockFailure         , std::runtime_error )
+#endif
     SUBCLASS_EXCEPTION( InexistingRemoteCommand, std::runtime_error )
  //=============================================================================
 }// namespace ssh2

@@ -289,6 +289,13 @@
 #ifdef QT_DEBUG
         this->verbosity_= 2;
 #endif
+#ifdef Q_OS_WIN
+        QFont font("Courier New",9);
+
+        this->ui->wFinished   ->setFont(font);
+        this->ui->wNotFinished->setFont(font);
+        this->ui->wRetrieved  ->setFont(font);
+#endif
     }
 
     void MainWindow::createActions()
@@ -1019,7 +1026,7 @@ bool MainWindow::getPrivatePublicKeyPair()
 #endif
     QString private_key;
     QString msg("You must provide a PRIVATE key file (openssh format).\n");
-#ifdef Q_OS_MAC// Q_OS_WIN
+#ifdef Q_OS_WIN
     msg+="[Windows users should be aware that PuTTY keys are NOT in openssh format. Consult the VSC website for how to convert your PuTTY keys.]\n";
 #endif
     msg+="Continue?";
@@ -2117,7 +2124,7 @@ void MainWindow::on_wNotFinished_selectionChanged()
     IGNORE_SIGNALS_UNTIL_END_OF_SCOPE;
     this->selected_job_ = this->selectedJob( this->ui->wNotFinished );
     if( !this->selected_job_.isEmpty() ) {
-        this->statusBar()->showMessage( QString("Selected job ").append( this->selected_job_ ) );
+        this->statusBar()->showMessage( QString("Selected job:%1.").arg( this->selected_job_ ) );
     }
 }
 
@@ -2127,7 +2134,10 @@ void MainWindow::on_wFinished_selectionChanged()
 
     IGNORE_SIGNALS_UNTIL_END_OF_SCOPE;
     this->selected_job_ = this->selectedJob( this->ui->wFinished );
-    this->statusBar()->showMessage( QString("Selected job ").append( this->selected_job_ ) );
+//    this->statusBar()->showMessage( QString("Selected job ").append( this->selected_job_ ) );
+    if( !this->selected_job_.isEmpty() ) {
+        this->statusBar()->showMessage( QString("Selected job:%1.").arg( this->selected_job_ ) );
+    }
 }
 
 void MainWindow::on_wClearSelection_clicked()
