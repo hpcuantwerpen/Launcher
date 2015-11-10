@@ -1,13 +1,9 @@
 TODO LIST
-- intercept “internet connection but no vpn”
-
-- add deleteAll button
 
 - the config file is in fact a session configuration
   Things would probably be more practical if we had a session configuration file
   (selectable by user) and a Launcher config file
 
-- templates: could be implemented as session config files
 
 - fix compile time warnings on macosx
 
@@ -32,9 +28,16 @@ TODO LIST
 DONE (reverse chronological order)
 ==================================
 2015-11-09
+- templates:
+  . could be implemented as session config files : not a good idea, script is not
+    in config file, on script parameters
+  . as a complete job with some functionality to copy the entire directory (including
+    any input files)
+- delete job must kill it if not finished
 - add a dummy entry at the beginning of the module list
 - make ExecuteRemoteCommand a member of ssh2::Session instead of of MainWindow
   in this way the commands executed by sftp_get/put_file/dir can be wrapped too.
+- intercept “internet connection but no vpn”
 - intercept “no internet connection”
 
 

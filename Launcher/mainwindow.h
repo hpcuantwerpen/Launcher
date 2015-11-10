@@ -29,7 +29,13 @@ namespace Ui {
  //-----------------------------------------------------------------------------
     QString validateUsername( QString const & username );
  //-----------------------------------------------------------------------------
-
+    QString
+    copy_folder_recursively
+      ( QString const& source
+      , QString const& destination
+      , int level=1
+      );
+ //-----------------------------------------------------------------------------
 
 
 class MainWindow : public QMainWindow
@@ -134,6 +140,8 @@ private slots:
 
     void on_wClearSelection_clicked();
 
+    void on_wCreateTemplate_clicked();
+
 public:
     void setupHome();
     void setIgnoreSignals( bool ignore=true );
@@ -141,13 +149,6 @@ public:
 
     NodesetInfo const& nodesetInfo() const;
     ClusterInfo const& clusterInfo() const;
-
-//    template <class T>
-//    QString signature( T arg1 ) const {
-//        QString s;
-//        s.append( QString("    arg1 = %1\n").arg(arg1) );
-//        return s;
-//    }
 
     void storeResetValues();
     QString check_script_unsaved_changes();
@@ -197,6 +198,8 @@ public:
     QString selectedJob( QTextEdit* qTextEdit );
     void clearSelection( QTextEdit* qTextEdit );
     void deleteJob( QString const& jobid ); // from joblist
+
+    QString select_template_location();
 
 private:
     Ui::MainWindow *ui;

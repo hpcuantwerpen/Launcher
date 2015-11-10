@@ -624,6 +624,19 @@ p, li { white-space: pre-wrap; }
                  <item>
                   <widget class="QComboBox" name="wRemote"/>
                  </item>
+                 <item>
+                  <spacer name="verticalSpacer_3">
+                   <property name="orientation">
+                    <enum>Qt::Vertical</enum>
+                   </property>
+                   <property name="sizeHint" stdset="0">
+                    <size>
+                     <width>20</width>
+                     <height>40</height>
+                    </size>
+                   </property>
+                  </spacer>
+                 </item>
                 </layout>
                </widget>
                <widget class="QFrame" name="verticalFrame_3">
@@ -664,6 +677,19 @@ p, li { white-space: pre-wrap; }
                    </property>
                   </widget>
                  </item>
+                 <item>
+                  <spacer name="verticalSpacer_2">
+                   <property name="orientation">
+                    <enum>Qt::Vertical</enum>
+                   </property>
+                   <property name="sizeHint" stdset="0">
+                    <size>
+                     <width>20</width>
+                     <height>40</height>
+                    </size>
+                   </property>
+                  </spacer>
+                 </item>
                 </layout>
                </widget>
                <widget class="QFrame" name="verticalFrame_4">
@@ -703,6 +729,43 @@ p, li { white-space: pre-wrap; }
                     <set>Qt::AlignCenter</set>
                    </property>
                   </widget>
+                 </item>
+                 <item>
+                  <layout class="QHBoxLayout" name="horizontalLayout_15">
+                   <property name="bottomMargin">
+                    <number>0</number>
+                   </property>
+                   <item>
+                    <widget class="QPushButton" name="wSelectTemplate">
+                     <property name="font">
+                      <font>
+                       <pointsize>11</pointsize>
+                      </font>
+                     </property>
+                     <property name="toolTip">
+                      <string>&lt;html&gt;&lt;head/&gt;&lt;body&gt;&lt;p&gt;Select a template for your job&lt;/p&gt;&lt;/body&gt;&lt;/html&gt;</string>
+                     </property>
+                     <property name="text">
+                      <string>select template</string>
+                     </property>
+                    </widget>
+                   </item>
+                   <item>
+                    <widget class="QPushButton" name="wCreateTemplate">
+                     <property name="font">
+                      <font>
+                       <pointsize>11</pointsize>
+                      </font>
+                     </property>
+                     <property name="toolTip">
+                      <string>&lt;html&gt;&lt;head/&gt;&lt;body&gt;&lt;p&gt;Use the current job folder as a template&lt;/p&gt;&lt;/body&gt;&lt;/html&gt;</string>
+                     </property>
+                     <property name="text">
+                      <string>create template</string>
+                     </property>
+                    </widget>
+                   </item>
+                  </layout>
                  </item>
                 </layout>
                </widget>
@@ -935,14 +998,14 @@ p, li { white-space: pre-wrap; }
           <item row="2" column="0">
            <widget class="QPushButton" name="wRetrieveSelectedJob">
             <property name="text">
-             <string>Retrieve results for selected job id</string>
+             <string>Retrieve results for selected job</string>
             </property>
            </widget>
           </item>
           <item row="2" column="1">
            <widget class="QPushButton" name="wDeleteSelectedJob">
             <property name="text">
-             <string>Delete selected job (no retrieval)</string>
+             <string>Delete selected job (no retrieval), kill if not finished</string>
             </property>
            </widget>
           </item>
@@ -963,7 +1026,7 @@ p, li { white-space: pre-wrap; }
           <item row="3" column="0">
            <widget class="QPushButton" name="wRetrieveAllJobs">
             <property name="text">
-             <string>Retrieve results for all jobs</string>
+             <string>Retrieve results for all finished jobs</string>
             </property>
            </widget>
           </item>

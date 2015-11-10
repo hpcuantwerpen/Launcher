@@ -155,7 +155,6 @@
             this->getConfigItem("wNotifyBegin", false );
             this->getConfigItem("wNotifyEnd"  , false );
         }
-//        ci = this->getConfigItem("wJobname", QString() );
 
         dc::DataConnectorBase::config = &(this->launcher_.config);
         dc::DataConnectorBase::script = &(this->launcher_.script);
@@ -229,6 +228,9 @@
         if( !value.isEmpty() ) {
             this->ui->wJobname ->setText(value);
             this->ui->wJobname2->setText(value);
+            this->ui->wCreateTemplate->setEnabled(true);
+        } else {
+            this->ui->wCreateTemplate->setEnabled(false);
         }
 
      // verify existence of local file location (if present) and set tooltips
@@ -1420,6 +1422,8 @@ void MainWindow::on_wJobnameButton_clicked()
 {
     LOG_AND_CHECK_IGNORESIGNAL(NO_ARGUMENT);
 
+    this->ui->wCreateTemplate->setEnabled(false);
+
     if( this->ui->wLocal->text().isEmpty() ) {
         QMessageBox::warning( this, TITLE, "You must select a local file location first.");
         return;
@@ -1442,6 +1446,8 @@ void MainWindow::on_wJobnameButton_clicked()
                                                     "least one level above this folder.").arg(parent) );
         return;
     }
+    this->ui->wCreateTemplate->setEnabled(true);
+
     this->statusBar()->clearMessage();
     parent.append("/");
     QString selected_leaf = selected;
@@ -1453,8 +1459,8 @@ void MainWindow::on_wJobnameButton_clicked()
     QString remote_folder = this->remote_subfolder_jobname();
     this->ui->wJobname2->setToolTip(remote_folder);
 
-    this->getConfigItem( "localFolder")->set_value(selected);
-    this->getConfigItem("remoteFolder")->set_value(remote_folder);
+    this->getConfigItem   ( "localFolder")->set_value(selected);
+    this->getConfigItem   ("remoteFolder")->set_value(remote_folder);
     this->getDataConnector( "localFolder")->value_config_to_script();
     this->getDataConnector("remoteFolder")->value_config_to_script();
 
@@ -1853,6 +1859,14 @@ void MainWindow::deleteJob( QString const& jobid )
         if( job_list[i].startsWith(jobid) )
         {
             Job job(job_list[i]);
+         // kill job if not finished
+            if( job.status()==Job::Submitted ) {
+                QString msg = QString("killing job %1 ... ").arg( job.long_id() );
+                this->statusBar()->showMessage(msg);
+                QString cmd = QString("qdel %1").arg( job.short_id() );
+                this->sshSession_.execute_remote_command(cmd);
+                this->statusBar()->showMessage( msg.append("done") );
+            }
          // remove local job folder
             if( this->ui->wCheckDeleteLocalJobFolder->isChecked() ) {
                 QString msg = QString("Removing: ").append( job.local_job_folder() ).append(" ... ");
@@ -1918,7 +1932,11 @@ void MainWindow::on_wCheckDeleteRemoteJobFolder_toggled(bool checked)
 SUBCLASS_EXCEPTION(BadLauncherHome,std::runtime_error)
 SUBCLASS_EXCEPTION(BadDistribution,std::runtime_error)
 
-QString copy_folder_recursively( QString const& source, QString const& destination, int level=1 )
+QString
+copy_folder_recursively
+  ( QString const& source
+  , QString const& destination
+  , int level )
 {
     QDir().mkpath(destination);
     QString log_msg = QString("\n      ").append(destination);
@@ -1956,22 +1974,8 @@ QString copy_folder_recursively( QString const& source, QString const& destinati
     return log_msg;
 }
 
-
 void MainWindow::setupHome()
 {
- // create standard paths
-//    LOG_CALLER <<"\n    creating standard paths ";
-//    QDir launcher_home( this->launcher_.homePath() );
-//    QStringList folders({"clusters","jobs"});
-//    for ( QStringList::const_iterator iter=folders.cbegin()
-//        ; iter!=folders.cend(); ++iter )
-//    {
-//        if( !launcher_home.mkpath(*iter) ) {
-//            throw_<BadLauncherHome>("Cannot create directory '%1'.", launcher_home.absoluteFilePath(*iter) );
-//        }
-//        Log() << QString("\n        ").append( this->launcher_.homePath(*iter)).C_STR();
-//    }
-
  // get the location of the application and derive the location of the clusters info files.
  // see http://stackoverflow.com/questions/4515602/how-to-get-executable-name-in-qt
     QString applicationFilePath = QCoreApplication::applicationFilePath();
@@ -1990,32 +1994,9 @@ void MainWindow::setupHome()
                               );
     }
     Log() << "\n    Copying standard folders.";
-    for ( int i=0; i<folders.size(); ++i )
-    {
+    for ( int i=0; i<folders.size(); ++i ) {
         Log() << copy_folder_recursively( path_to_folders[i], this->launcher_.homePath( folders[i] ) ).C_STR();
     }
-//        QString const& path = *iter;
-//        Log() << QString("\n    Copying cluster info files from '%1'.").arg(path).C_STR();
-//        dir = QDir(path, "*.info");
-//    if( dir.entryInfoList().size()==0 ) {
-//        QMessageBox::Button answer = QMessageBox::question(this,TITLE,"Your Launcher distribution has no clusters .info files.\nClick OK to select a clusters directory on your local file system, or Cancel to abort.", QMessageBox::Ok|QMessageBox::Cancel,QMessageBox::Cancel);
-//        if( answer==QMessageBox::Ok) {
-//            dir = QDir( this->get_path_to_clusters() );
-//        } else {
-//            throw_<NoClustersFound>("Aborting on user request.");
-//        }
-//    }
-//    QFileInfoList clusters = dir.entryInfoList();
-//    QString destination = this->launcher_.homePath("clusters");
-//    for ( QFileInfoList::ConstIterator iter=clusters.cbegin()
-//        ; iter!=clusters.cend(); ++iter )
-//    {
-//        Log() << QString("\n        ").append( iter->fileName() ).C_STR();
-//        QString tmp = iter->absoluteFilePath();
-//        QFile qFile( tmp );
-//        tmp = QString(destination).append('/').append( iter->fileName() );
-//        qFile.copy( tmp );
-//    }
 }
 
 QString MainWindow::get_path_to_clusters()
@@ -2140,4 +2121,120 @@ void MainWindow::on_wClearSelection_clicked()
         this->selected_job_.clear();
         this->statusBar()->showMessage("Selection cleared.");
     }
+}
+
+QString MainWindow::select_template_location()
+{
+    QString msg("Select new template location:");
+    this->statusBar()->showMessage(msg);
+    QString template_folder = QFileDialog::getExistingDirectory
+            ( this, "Select template location (existing or new directory):"
+            , this->launcher_.homePath("templates")
+            );
+
+    if( !template_folder.isEmpty() )
+    {// the user has selected a directory
+     // verify that the selected directory is not the templates directory itself.
+        if( template_folder==this->launcher_.homePath("templates") )
+        {
+            msg = QString("Directory '%1' must not be used as a template location. \nYou must select a subdirectory.");
+            QMessageBox::warning(this,TITLE,msg);
+            template_folder.clear();
+        }
+        else
+        {// the user has selected a valid directory,
+            QDir qdir_template_folder(template_folder);
+            if( !qdir_template_folder.exists() )
+            {// non-existing directory selected, this shouldn't happen, though
+                qdir_template_folder.mkpath( QString() );
+            } else {// make sure that the directory is empty
+                if( !qdir_template_folder.entryList().isEmpty() )
+                {// non-empty directory, ask permission to overwrite
+                    msg = QString("Directory '%1' is not empty.\n"
+                                  "Overwrite?").arg(template_folder);
+                    QMessageBox::Button answer =
+                    QMessageBox::question( this,TITLE,msg
+                                         , QMessageBox::Cancel|QMessageBox::Yes
+                                         , QMessageBox::Yes );
+                    if( answer==QMessageBox::Yes )
+                    {// clear the selected folder
+                        msg = QString("Overwriting directory '%1' ... ").arg(template_folder);
+                        this->statusBar()->showMessage(msg);
+                     // remove the directory and its contents
+                        qdir_template_folder.removeRecursively();
+                     // create the directory again, now empty
+                        qdir_template_folder.mkpath( QString() );
+                    } else {
+                        template_folder.clear();
+                    }
+                }
+            }
+        }
+    }
+    return template_folder; // an empty string implies Cancel template creation.
+}
+
+void MainWindow::on_wCreateTemplate_clicked()
+{
+    if( this->ui->wJobname->text().isEmpty() ) {
+        return;
+    }
+    QString template_folder = QString("templates/").append( this->ui->wJobname->text() );
+    template_folder = this->launcher_.homePath( template_folder );
+
+    QString msg = QString("Create template based on job folder %1.\n"
+                          "template location: '%2'.")
+                     .arg( this->local_subfolder_jobname() )
+                     .arg( template_folder );
+
+    QDir qDir_template_folder(template_folder);
+    if( qDir_template_folder.exists() )
+    {
+        int answer = QMessageBox::question( this, TITLE, msg
+                                          ,"Cancel"
+                                          ,"Overwrite existing template"
+                                          ,"Select new template location..."
+                                          );
+        switch (answer) {
+          case 1:
+            msg = "Overwriting existing template...";
+            this->statusBar()->showMessage(msg);
+            break;
+          case 2:
+            template_folder = this->select_template_location();
+            if( !template_folder.isEmpty() )
+                break;
+            // no break here: we are canceling!
+          default:
+            msg = "Template creation canceled.";
+            this->statusBar()->showMessage(msg);
+            return; // without creating the template, since we are canceling.
+        }
+    } else {
+        int answer =
+        QMessageBox::question( this, TITLE, msg
+                             ,"Cancel"
+                             , QString("Create templates/").append( this->ui->wJobname->text() )
+                             ,"Select another template location"
+                             );
+        switch( answer ) {
+          case 1:
+            qDir_template_folder.mkpath( QString() );
+            msg = QString("Creating 'templates/%1' ... ").arg( this->ui->wJobname->text() );
+            this->statusBar()->showMessage(msg);
+            break;
+          case 2:
+            template_folder = this->select_template_location();
+            if( !template_folder.isEmpty() )
+                break;
+            // no break here: we are canceling!
+          default:
+            msg = "Template creation canceled.";
+            this->statusBar()->showMessage(msg);
+            return; // without creating the template, since we are canceling.
+        }
+    }
+ // create the template by copying the entire folder
+    copy_folder_recursively( this->local_subfolder_jobname(), template_folder );
+    this->statusBar()->showMessage(msg.append("done."));
 }
