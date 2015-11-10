@@ -2140,6 +2140,14 @@ void MainWindow::on_wClearSelection_clicked()
     }
 }
 
+bool isNonEmptyDir( QDir const& qdir ) {
+    QStringList entries( qdir.entryList() );
+    return entries.size()>2;  // even empty directory contains "." and ".."
+}
+bool isNonEmptyDir( QString const& dirpath ) {
+    return isNonEmptyDir( QDir(dirpath) );
+}
+
 QString MainWindow::select_template_location()
 {
     QString msg("Select new template location:");
@@ -2165,9 +2173,8 @@ QString MainWindow::select_template_location()
             {// non-existing directory selected, this shouldn't happen, though
                 qdir_template_folder.mkpath( QString() );
             } else {// make sure that the directory is empty
-                QStringList entries( qdir_template_folder.entryList() );
-                if( entries.size()>2 ) // even empty directory contains "." and ".."
-                {// non-empty directory, ask permission to overwrite
+                if( isNonEmptyDir(qdir_template_folder) )
+                {// ask permission to overwrite
                     msg = QString("Directory '%1' is not empty.\n"
                                   "Overwrite?").arg(template_folder);
                     QMessageBox::Button answer =
@@ -2195,6 +2202,7 @@ QString MainWindow::select_template_location()
 void MainWindow::on_wCreateTemplate_clicked()
 {
     if( this->ui->wJobname->text().isEmpty() ) {
+        this->statusBar()->showMessage("No job folder, cannot create template.");
         return;
     }
     QString template_folder = QString("templates/").append( this->ui->wJobname->text() );
@@ -2252,6 +2260,45 @@ void MainWindow::on_wCreateTemplate_clicked()
     }
  // create the template by copying the entire folder
     copy_folder_recursively( this->local_subfolder_jobname(), template_folder );
-    qdir_template_folder = QDir(template_folder);
     this->statusBar()->showMessage( msg.append( QString("'%1' created.").arg(template_folder) ) );
+}
+
+void MainWindow::on_wSelectTemplate_clicked()
+{
+    QString msg;
+    if( this->local_subfolder().isEmpty() ) {
+        msg = "You must select a local file location and a subfolder first!";
+        QMessageBox::warning(this,TITLE,msg);
+        this->statusBar()->showMessage(msg);
+        return;
+    }
+    msg = "Select template folder:";
+    this->statusBar()->showMessage(msg);
+    QString template_folder = QFileDialog::getExistingDirectory
+            ( this, "Select template location (existing or new directory):"
+            , this->launcher_.homePath("templates")
+            );
+    QDir qdir_template_folder(template_folder);
+    if( !isNonEmptyDir(qdir_template_folder) ) {
+        msg = "Empty folder selected, no template found!";
+        QMessageBox::warning(this,TITLE,msg);
+        this->statusBar()->showMessage(msg);
+        return;
+    }
+    bool template_folder_contains_pbs_sh = qdir_template_folder.exists("pbs.sh");
+    if( !template_folder_contains_pbs_sh ) {
+        msg = "The selected folder does not contain a jobscript ('pbs.sh').\n"
+              "Continue to use as a job template?";
+        QMessageBox::Button answer =
+        QMessageBox::question(this,TITLE,msg,QMessageBox::Yes|QMessageBox::No,QMessageBox::No);
+        if( answer!=QMessageBox::Yes ) {
+            return;
+        }
+    }
+    copy_folder_recursively( template_folder, this->local_subfolder_jobname() );
+    if( template_folder_contains_pbs_sh ) {
+        this->loadJobscript( QString( this->local_subfolder_jobname() ).append("/pbs.sh") );
+    }
+    this->statusBar()->showMessage(msg);
+    return;
 }

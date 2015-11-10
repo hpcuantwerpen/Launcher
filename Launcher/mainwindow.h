@@ -142,6 +142,8 @@ private slots:
 
     void on_wCreateTemplate_clicked();
 
+    void on_wSelectTemplate_clicked();
+
 public:
     void setupHome();
     void setIgnoreSignals( bool ignore=true );
