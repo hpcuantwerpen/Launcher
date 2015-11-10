@@ -1505,6 +1505,13 @@ bool MainWindow::loadJobscript( QString const& filepath )
     {
         Log(1) << "\n    reading the job script ... ";
         this->launcher_.script.read(filepath);
+     // make sure the jobscript's jobname corresponds to the name of the job folder.
+        QDir qdir(filepath);
+        qdir.cdUp();
+        QString jobfolder( qdir.dirName() );
+        if( this->launcher_.script["-N"] != jobfolder ) {
+            this->launcher_.script["-N"]  = jobfolder;
+        }
         Log(1) << "done";
     } catch( std::runtime_error& e ) {
         QString msg = QString("An error occurred while reading the jobscript '%1'.\n Error:\n")
@@ -2158,7 +2165,8 @@ QString MainWindow::select_template_location()
             {// non-existing directory selected, this shouldn't happen, though
                 qdir_template_folder.mkpath( QString() );
             } else {// make sure that the directory is empty
-                if( !qdir_template_folder.entryList().isEmpty() )
+                QStringList entries( qdir_template_folder.entryList() );
+                if( entries.size()>2 ) // even empty directory contains "." and ".."
                 {// non-empty directory, ask permission to overwrite
                     msg = QString("Directory '%1' is not empty.\n"
                                   "Overwrite?").arg(template_folder);
@@ -2192,15 +2200,13 @@ void MainWindow::on_wCreateTemplate_clicked()
     QString template_folder = QString("templates/").append( this->ui->wJobname->text() );
     template_folder = this->launcher_.homePath( template_folder );
 
-    QString msg = QString("Create template based on job folder %1.\n"
-                          "template location: '%2'.")
-                     .arg( this->local_subfolder_jobname() )
-                     .arg( template_folder );
+    QString msg = QString("Creating job template from job folder '%1' ...")
+                     .arg( this->ui->wJobname->text() );
 
-    QDir qDir_template_folder(template_folder);
-    if( qDir_template_folder.exists() )
+    QDir qdir_template_folder(template_folder);
+    if( qdir_template_folder.exists() )
     {
-        int answer = QMessageBox::question( this, TITLE, msg
+        int answer = QMessageBox::question( this, TITLE, QString(msg).append("\n(the template folder already exists).")
                                           ,"Cancel"
                                           ,"Overwrite existing template"
                                           ,"Select new template location..."
@@ -2229,7 +2235,7 @@ void MainWindow::on_wCreateTemplate_clicked()
                              );
         switch( answer ) {
           case 1:
-            qDir_template_folder.mkpath( QString() );
+            qdir_template_folder.mkpath( QString() );
             msg = QString("Creating 'templates/%1' ... ").arg( this->ui->wJobname->text() );
             this->statusBar()->showMessage(msg);
             break;
@@ -2246,5 +2252,6 @@ void MainWindow::on_wCreateTemplate_clicked()
     }
  // create the template by copying the entire folder
     copy_folder_recursively( this->local_subfolder_jobname(), template_folder );
-    this->statusBar()->showMessage(msg.append("done."));
+    qdir_template_folder = QDir(template_folder);
+    this->statusBar()->showMessage( msg.append( QString("'%1' created.").arg(template_folder) ) );
 }
