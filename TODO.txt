@@ -1,8 +1,6 @@
 TODO LIST
 - intercept “internet connection but no vpn”
 
-- add deleteAll button
-
 - the config file is in fact a session configuration
   Things would probably be more practical if we had a session configuration file
   (selectable by user) and a Launcher config file
@@ -33,6 +31,7 @@ DONE (reverse chronological order)
 ==================================
 2015-11-09
 - bug fix: getaddrinfo failing on windows 7
+  see http://www.cplusplus.com/forum/windows/41339/
 
 2015-11-09
 - bug fix: CRLF->LF conversion on windows

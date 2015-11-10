@@ -168,6 +168,7 @@ namespace ssh2
 
         int rv;
 #ifdef Q_OS_WIN
+     // see http://www.cplusplus.com/forum/windows/41339/
         WORD wVersionRequested;
         WSADATA wsaData;
 
