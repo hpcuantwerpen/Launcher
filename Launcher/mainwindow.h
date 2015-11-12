@@ -203,6 +203,10 @@ public:
 
     QString select_template_location();
 
+    void warn( QString const& msg1, QString const& msg2=QString() );
+    // msg1 -> status bar
+    // msg1+msg2 -> QMessageBox::warning
+
 private:
     Ui::MainWindow *ui;
     Launcher launcher_;

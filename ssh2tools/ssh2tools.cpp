@@ -40,6 +40,12 @@
  //     if( condition ) {
  //         LOG(1) << "blablabla";
  //     }
+#define WARN \
+    QString _msg_("\n[ ssh2::Session::%1, %2, %3 ]");\
+    _msg_ = _msg_.arg(__func__).arg(__FILE__).arg(__LINE__);\
+    Log(0) << WARNING << _msg_.toStdString()
+ // no terminating ';', hence can be used as
+ //     LOG(1) << message << another_message;
 
 static int waitsocket(int socket_fd, LIBSSH2_SESSION *session)
 {
@@ -203,12 +209,12 @@ namespace ssh2
         for( p=servinfo; p!=NULL; p=p->ai_next)
         {
             if( (this->sock_ = socket( p->ai_family, p->ai_socktype, p->ai_protocol )) == -1 ) {
-                perror("this->sock_et");
+                WARN << "\n    socket(...):" << strerror(errno);
                 continue; // try next element in the list
             }
             if( connect( this->sock_, p->ai_addr, p->ai_addrlen ) == -1 ) {
                 ::close( this->sock_ );
-                perror("connect");
+                WARN << "\n    connect(...):"<<strerror(errno);
                 continue; // try next element in the list
             }
             break; // if we get here, we must have connected successfully
@@ -294,19 +300,17 @@ namespace ssh2
         } else
         {// Or by public key
 */
-            while( ( rv = libssh2_userauth_publickey_fromfile
-                            ( this->session_
-                            , this->username_   .c_str()
-                            , this->public_key_ .c_str()
-                            , this->private_key_.c_str()
-                            , this->passphrase_ .c_str()
-                            )
-                    ) == LIBSSH2_ERROR_EAGAIN
-                 );
-            if( rv==0 ) {
-                this->isAuthenticated_ = true;
-                return;
-            }
+        while( ( rv = libssh2_userauth_publickey_fromfile
+                        ( this->session_
+                        , this->username_   .c_str()
+                        , this->public_key_ .c_str()
+                        , this->private_key_.c_str()
+                        , this->passphrase_ .c_str()
+                        )
+                ) == LIBSSH2_ERROR_EAGAIN )
+        {}
+
+        if( rv!=0 ) {
             this->close();
             if( rv==LIBSSH2_ERROR_PUBLICKEY_UNVERIFIED ) {
                 if( this->passphrase_.empty() ) {
@@ -317,6 +321,9 @@ namespace ssh2
             } else {
                 throw_<std::runtime_error>("Failed at libssh2_userauth_publickey_fromfile, exitcode=%1.", rv );
             }
+        }
+        this->isAuthenticated_ = true;
+        return;
 //      }
     }
  //-----------------------------------------------------------------------------

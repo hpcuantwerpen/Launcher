@@ -1133,6 +1133,13 @@ void MainWindow::activateAuthenticateButton (bool activate, QString const& inact
     }
 }
 
+void MainWindow::warn( QString const& msg1, QString const& msg2 )
+{
+    this->statusBar()->showMessage(msg1);
+    QMessageBox::warning(this,TITLE,QString(msg1).append(msg2));
+}
+
+
 void MainWindow::on_wAuthenticate_clicked()
 {
     LOG_AND_CHECK_IGNORESIGNAL(NO_ARGUMENT);
@@ -1141,51 +1148,53 @@ void MainWindow::on_wAuthenticate_clicked()
     int max_attempts = 3;
     bool no_connection = false;
     int attempts = max_attempts;
+    enum {
+        success, retry, failed
+    } result;
     while( attempts )
     {
         try {
             this->sshSession_.open();
+            result = success;
         }
-        catch( ssh2::MissingUsername& e ) {
+        catch( ssh2::MissingUsername& e )
+        {// It is the ssh2::Session which has no username sofar (not the gui)
             QString username = validateUsername( this->ui->wUsername->text() );
             if( username.isEmpty() ) {
-                this->statusBar()->showMessage("Invalid username");
-                this->activateAuthenticateButton(false,"authenticate...");
-                break;
+                this->warn("Invalid username. Expecting 'vscXXXXX'.");
+                result = failed;
+            } else {
+                this->sshSession_.setUsername( username );
+                if( this->getConfigItem("wUsername")->value().toString() == username ) {
+                    this->sshSession_.setPrivatePublicKeyPair
+                            ( this->getConfigItem("privateKey")->value().toString()
+                            , this->getConfigItem("publicKey" )->value().toString()
+                            , false
+                            );
+                }
+                result = retry;
             }
-            this->sshSession_.setUsername( username );
-            if( this->getConfigItem("wUsername")->value().toString() == username ) {
-                this->sshSession_.setPrivatePublicKeyPair
-                        ( this->getConfigItem("privateKey")->value().toString()
-                        , this->getConfigItem("publicKey" )->value().toString()
-                        , false
-                        );
-            }
-            continue;
         }
         catch( ssh2::MissingKey& e ) {
-            if( !this->getPrivatePublicKeyPair() )
-            {// failed to provide existing keys
-                break;
-            } else
-            {// existing keys provided
-                continue;
-            }
+            result = ( this->getPrivatePublicKeyPair() ? retry : failed );
         }
         catch( ssh2::PassphraseNeeded& e ) {
             QString msg = QString("Enter passphrase for unlocking key '%1':").arg( this->sshSession_.privateKey() );
             QString passphrase = QInputDialog::getText( 0, TITLE, msg, QLineEdit::Password );
             this->sshSession_.setPassphrase( passphrase );
-            --attempts;
-            continue;
+            result = retry;
         }
         catch( ssh2::WrongPassphrase& e ) {
-            QString msg = QString("Could not unlock private key.\n%1 attempts left.\nEnter passphrase for unlocking key '%2':")
-                          .arg(attempts).arg( this->sshSession_.privateKey() );
-            QString passphrase = QInputDialog::getText( 0, "Passphrase needed", msg );
-            this->sshSession_.setPassphrase( passphrase );
-            --attempts;
-            continue;
+            if( attempts ) {
+                QString msg = QString("Could not unlock private key.\n%1 attempts left.\nEnter passphrase for unlocking key '%2':")
+                              .arg(attempts).arg( this->sshSession_.privateKey() );
+                QString passphrase = QInputDialog::getText( 0, "Passphrase needed", msg );
+                this->sshSession_.setPassphrase( passphrase );
+                --attempts;
+                result = retry;
+            } else {
+                result = failed;
+            }
         }
         catch( ssh2::NoAddrInfo &e ) {
             QString msg= QString("Could not getaddrinfo for %1.").arg( this->sshSession_.loginNode() );
@@ -1193,9 +1202,8 @@ void MainWindow::on_wAuthenticate_clicked()
             QMessageBox::warning( this,TITLE,msg.append("\n  . Check your internet connection."
                                                         "\n  . Check the availability of the cluster."
                                                         ) );
-
             no_connection=true;
-            break;
+            result = failed;
         }
         catch( ssh2::ConnectTimedOut &e ) {
             QString msg= QString("Could not reach  %1.").arg( this->ui->wCluster->currentText() );
@@ -1204,58 +1212,65 @@ void MainWindow::on_wAuthenticate_clicked()
                                                         "\n  . Check your VPN connection if you are outside the university."
                                                         "\n  . Check the availability of the cluster."
                                                         ) );
+            result = failed;
             no_connection=true;
-            break;
         }
         catch( std::runtime_error& e ) {
-            QString msg( e.what() );
-            if( msg.startsWith("getaddrinfo[8] :") ) {
-                msg.append(" (verify your internet connection).");
-            }
-            this->statusBar()->showMessage(msg);
+            QString msg = QString("Error attempting to authenticate on %1: ").append( e.what() )
+                             .arg( this->ui->wCluster->currentText() );
+            this->warn(msg);
             Log(0) << msg.prepend("\n    ").C_STR();
          // remove keys from ssh session and from config
             this->sshSession_.setUsername( this->getConfigItem("wUsername")->value().toString() );
             this->getConfigItem("privateKey")->set_value( QString() );
             this->getConfigItem("publicKey" )->set_value( QString() );
-            break;
+            result = failed;
         }
-     // success
-        this->activateAuthenticateButton(false,"authenticated");
-        this->statusBar()->showMessage("Authentication succeeded.");
-        this->getConfigItem("privateKey")->set_value( this->sshSession_.privateKey() );
-        this->getConfigItem("publicKey" )->set_value( this->sshSession_. publicKey() );
+        if( result==failed ) {
+            if( attempts==0 )
+            {// after 3 unsuccesfull attempts to authenticate, we remove the keys from the config
+             // and the session: they are probably wrong
+                this->sshSession_.setUsername( this->getConfigItem("wUsername")->value().toString() );
+                this->getConfigItem("privateKey")->set_value( QString() );
+                this->getConfigItem("publicKey" )->set_value( QString() );
 
-        this->resolveRemoteFileLocations_();
+                QString msg = QString("Authentication failed: %1 failed attempts to provide passphrase.").arg(max_attempts);
+                this->statusBar()->showMessage(msg);
+                Log(0) << msg.prepend("\n    ").C_STR()
+                       << "\n    Forgetting keys now.";
+            }
+            break; //out of while loop
+        } else if( result==success ) {
+            this->activateAuthenticateButton(false,"authenticated");
+            this->statusBar()->showMessage("Authentication succeeded.");
+            this->getConfigItem("privateKey")->set_value( this->sshSession_.privateKey() );
+            this->getConfigItem("publicKey" )->set_value( this->sshSession_. publicKey() );
 
-        QString qs = this->ui->wRemote->currentText();
-        if( this->remote_env_vars_.contains(qs) ) {
-            this->ui->wRemote->setToolTip( this->remote_env_vars_[qs] );
+            this->resolveRemoteFileLocations_();
+
+            QString qs = this->ui->wRemote->currentText();
+            if( this->remote_env_vars_.contains(qs) ) {
+                this->ui->wRemote->setToolTip( this->remote_env_vars_[qs] );
+            }
+            QString cmd("__module_avail");
+            this->sshSession_.execute_remote_command(cmd);
+            QStringList modules = this->sshSession_.qout().split("\n");
+            modules.prepend("--- select a module below ---");
+            this->ui->wSelectModule->clear();
+            this->ui->wSelectModule->addItems(modules);
+
+            QString modules_cluster = QString("modules_").append(this->getConfigItem("wCluster")->value().toString() );
+            this->getConfigItem(modules_cluster)->set_choices(modules);
+
+            break; //out of while loop
+        } else if( result==retry ) {
+            continue; // = retry
         }
-        QString cmd("__module_avail");
-        this->sshSession_.execute_remote_command(cmd);
-        QStringList modules = this->sshSession_.qout().split("\n");
-        modules.prepend("--- select a module below ---");
-        this->ui->wSelectModule->clear();
-        this->ui->wSelectModule->addItems(modules);
-
-        QString modules_cluster = QString("modules_").append(this->getConfigItem("wCluster")->value().toString() );
-        this->getConfigItem(modules_cluster)->set_choices(modules);
-
-        break;
-    }
-    if( attempts==0 )
-    {// after 3 unsuccesfull attempts to authenticate, we remove the keys from the config
-     // and the session: they are probably wrong
-        this->sshSession_.setUsername( this->getConfigItem("wUsername")->value().toString() );
-        this->getConfigItem("privateKey")->set_value( QString() );
-        this->getConfigItem("publicKey" )->set_value( QString() );
-        this->statusBar()->showMessage( QString("Authentication failed: %1 failed attempts to provide passphrase.")
-                                           .arg(max_attempts)
-                                      );
     }
     if( no_connection )
-    {// attempt to obtain cluster modules from config file, to enable the user to work offline.
+    {
+        this->statusBar()->showMessage("Launcher was unable to make a connection. Proceeding offline.");
+     // attempt to obtain cluster modules from config file, to enable the user to work offline.
         QString modules_cluster = QString("modules_").append(this->getConfigItem("wCluster")->value().toString() );
         QStringList modules = this->getConfigItem(modules_cluster)->choices_as_QStringList();
         if( modules.isEmpty() ) {

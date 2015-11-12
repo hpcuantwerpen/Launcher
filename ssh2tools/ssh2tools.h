@@ -200,10 +200,10 @@ namespace ssh2
     SUBCLASS_EXCEPTION( SshOpenError           , std::runtime_error )
     SUBCLASS_EXCEPTION( ConnectTimedOut        , std::runtime_error )
     SUBCLASS_EXCEPTION( NoAddrInfo             , std::runtime_error )
+    SUBCLASS_EXCEPTION( InexistingRemoteCommand, std::runtime_error )
 #ifdef Q_OS_WIN
     SUBCLASS_EXCEPTION( WinSockFailure         , std::runtime_error )
 #endif
-    SUBCLASS_EXCEPTION( InexistingRemoteCommand, std::runtime_error )
  //=============================================================================
 }// namespace ssh2
 
