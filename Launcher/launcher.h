@@ -26,7 +26,7 @@
     public: // data
         typedef QMap<QString,ClusterInfo> Clusters_t;
 
-        cfg::Config config;
+        cfg::Config session_config;
         Clusters_t  clusters;
         pbs::Script script;
     private:

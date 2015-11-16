@@ -92,6 +92,7 @@ namespace cfg
         Config() {}
         virtual ~Config() {}
         void setFilename( QString const & filename ) const;
+        QString filename() const { return filename_; }
         void addItem( Item const& item );
         Item* getItem( QString const& itemName );
          // creates the item if it does not exist

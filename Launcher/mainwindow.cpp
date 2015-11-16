@@ -15,8 +15,36 @@
 #include <time.h>
 
 #define INITIAL_VERBOSITY 2
+#define NO_ARGUMENT QString()
+#define LOG_AND_CHECK_IGNORESIGNAL( ARGUMENT ) \
+  {\
+    QString msg("\n[ MainWindow::%1, %2, %3 ]");\
+    msg = msg.arg(__func__).arg(__FILE__).arg(__LINE__);\
+    if( this->verbosity_ && !QString((ARGUMENT)).isEmpty() ) \
+        msg.append("\n    Function was called with argument : ").append(ARGUMENT);\
+    msg.append( this->check_script_unsaved_changes() ) ;\
+    if( this->verbosity_ > 1 ) {\
+        if( this->ignoreSignals_ ) msg.append("\n    Ignoring signal");\
+        else                       msg.append("\n    Executing signal");\
+    }\
+    Log() << INFO << msg.toStdString();\
+    if( this->ignoreSignals_ ) return;\
+  }
 
  //-----------------------------------------------------------------------------
+#define LOG_CALLER_INFO \
+    QString caller = QString("\n[ MainWindow::%1, %2, %3 ]") \
+                     .arg(__func__).arg(__FILE__).arg(__LINE__);\
+    Log() << INFO << caller.C_STR()
+
+#define LOG_CALLER \
+    QString caller = QString("\n    [ MainWindow::%1, %2, %3 ]") \
+                     .arg(__func__).arg(__FILE__).arg(__LINE__);\
+    Log() << caller.C_STR()
+
+// LOG_CALLER_INFO has no terminating ';' so we can do
+//     LOG_CALLER_INFO << whatever << and << even << more;
+//-----------------------------------------------------------------------------
     QString validateEmailAddress( QString const & address )
     {
         QString result = address.toLower();
@@ -40,14 +68,6 @@
         }
         return result;
     }
- //-----------------------------------------------------------------------------
-    #define LOG_CALLER \
-        QString caller = QString("\n[ MainWindow::%1, %2, %3 ]") \
-                         .arg(__func__).arg(__FILE__).arg(__LINE__);\
-        Log() << INFO << caller.C_STR()
-
- // LOG_CALLER has no terminating ';' so we can do
- //     LOG_CALLER << whatever << and << even << more;
  //-----------------------------------------------------------------------------
 
 
@@ -82,7 +102,6 @@
         }
     }
 
-
  //-----------------------------------------------------------------------------
  // MainWindow::
  //-----------------------------------------------------------------------------
@@ -94,7 +113,7 @@
       , verbosity_(INITIAL_VERBOSITY)
       , pendingRequest_(NoPendingRequest)
     {
-        LOG_CALLER << "\n    Running Launcher version = "<<VERSION;
+        LOG_CALLER_INFO << "\n    Running Launcher version = "<<VERSION;
         ui->setupUi(this);
 
         ssh2::Session::autoOpen = true;
@@ -112,17 +131,164 @@
 
      // read the cfg::Config object from file
      // (or create an empty one if there is no config file yet)
-        QString launcher_cfg( Launcher::homePath("Launcher.cfg") );
-        if( QFileInfo(launcher_cfg).exists() ) {
-            this->launcher_.config.load(launcher_cfg);
-            if( this->launcher_.config.contains("windowHeight") ) {
-                this->resize( this->launcher_.config["windowWidth" ].value().toInt()
-                            , this->launcher_.config["windowHeight"].value().toInt() );
-            }
+        QString path_to_session_data = this->load_session_path();
+        if( path_to_session_data.isEmpty() || !QFileInfo(path_to_session_data).exists() ) {
+            this->new_session( this->launcher_.homePath("session.data"));
         } else {
-            this->launcher_.config.setFilename( launcher_cfg );
+            this->open_session( path_to_session_data );
         }
 
+        createActions();
+        createMenus();
+#ifdef QT_DEBUG
+        this->verbosity_= 2;
+#endif
+#ifdef Q_OS_WIN
+        QFont font("Courier New",7);
+
+        this->ui->wFinished   ->setFont(font);
+        this->ui->wNotFinished->setFont(font);
+        this->ui->wRetrieved  ->setFont(font);
+#endif
+    }
+
+    void MainWindow::createActions()
+    {
+        aboutAction_ = new QAction("&About", this);
+        connect( aboutAction_, SIGNAL(triggered()), this, SLOT( about() ) );
+
+        verboseAction_ = new QAction("Verbose logging", this);
+        connect( verboseAction_, SIGNAL(triggered()), this, SLOT( verbose_logging() ) );
+
+        openSessionAction_ = new QAction("&Open session ...", this);
+        connect( openSessionAction_, SIGNAL(triggered()), this, SLOT( open_session() ) );
+
+        newSessionAction_ = new QAction("&New session", this);
+        connect( newSessionAction_, SIGNAL(triggered()), this, SLOT( new_session() ) );
+
+        saveSessionAction_ = new QAction("&Save session", this);
+        connect( saveSessionAction_, SIGNAL(triggered()), this, SLOT( save_session() ) );
+    }
+
+    void MainWindow::createMenus()
+    {
+        helpMenu_ = menuBar()->addMenu("&Help");
+        helpMenu_->addAction(aboutAction_);
+
+        sessionMenu_ = menuBar()->addMenu("&Session");
+        sessionMenu_ ->addAction( newSessionAction_);
+        sessionMenu_ ->addAction(openSessionAction_);
+        sessionMenu_ ->addAction(saveSessionAction_);
+
+        extraMenu_ = menuBar()->addMenu("&Extra");
+        extraMenu_ ->addAction(verboseAction_);
+    }
+
+    void MainWindow::about()
+    {
+        QString msg;
+        msg.append( QString("program : %1\n").arg(TITLE  ) )
+           .append( QString("version : %1\n").arg(VERSION) )
+           .append(         "contact : engelbert.tijskens@uantwerpen.be")
+           ;
+        QMessageBox::about(this,TITLE,msg);
+    }
+
+    void MainWindow::verbose_logging()
+    {
+        this->verbosity_ = ( this->verboseAction_->isChecked() ? 2 : 0 );
+    }
+
+    void MainWindow::new_session()
+    {
+        LOG_AND_CHECK_IGNORESIGNAL( NO_ARGUMENT );
+
+        QString session_data = this->launcher_.homePath("");
+        session_data = QFileDialog::getSaveFileName( this, "Enter a new filename or select a .data file for the new session"
+                                                  , session_data
+                                                  ,"Launcher sessions (*.data)"
+                                                  , nullptr
+                                                  , QFileDialog::DontConfirmOverwrite
+                                                  );
+
+        if( !session_data.isEmpty() ) {
+            if( !session_data.endsWith(".data") ) {
+                session_data.append(".data");
+            }
+            this->new_session(session_data);
+        } else {
+            Log()<<"\n    Canceled.";
+        }
+    }
+
+    void MainWindow::new_session( QString const& path )
+    {
+        LOG_CALLER << QString("\n      path; '%1'").arg(path).C_STR();
+        this->launcher_.session_config.clear();
+        this->setup_session();
+        this->launcher_.session_config.save(path);
+        this->save_session_path(path);
+    }
+
+    void MainWindow::save_session_path( QString const& path )
+    {
+        LOG_CALLER << QString("\n      path; '%1'").arg(path).C_STR();
+        cfg::Config launcher_config;
+        QString launcher_cfg( this->launcher_.homePath("launcher.cfg") );
+        if( QFileInfo(launcher_cfg).exists() ) {
+            launcher_config.load( launcher_cfg );
+            launcher_config.getItem("session")->set_value_and_type( path );
+            launcher_config.save();
+        } else {
+            launcher_config.getItem("session")->set_value_and_type( path );
+            launcher_config.save(launcher_cfg);
+        }
+    }
+
+    QString MainWindow::load_session_path()
+    {
+        cfg::Config launcher_config;
+        QString path_to_launcher_config( Launcher::homePath("Launcher.cfg") );
+        if( QFileInfo(path_to_launcher_config).exists() ) {
+            launcher_config.load( path_to_launcher_config );
+            return launcher_config.getItem("session")->value().toString();
+        } else  {
+            return QString();
+        }
+    }
+
+    void MainWindow::open_session( )
+    {
+        LOG_AND_CHECK_IGNORESIGNAL( NO_ARGUMENT );
+
+        QString path_to_session_data =
+                QFileDialog::getOpenFileName( this, "Select a .data file"
+                                            , this->launcher_.homePath()
+                                            ,"Launcher sessions (*.data)"
+                                            );
+        if( !path_to_session_data.isEmpty() ) {
+            this->open_session(path_to_session_data);
+        } else {
+            Log()<<"\n    Canceled.";
+        }
+    }
+
+    void MainWindow::open_session( QString const& path )
+    {
+        LOG_CALLER << QString("\n      path; '%1'").arg(path).C_STR();
+
+        this->launcher_.session_config.load(path);
+        this->setup_session();
+    }
+
+    void MainWindow::setup_session( )
+    {
+        this->data_.clear();
+
+        if( this->launcher_.session_config.contains("windowHeight") ) {
+            this->resize( this->launcher_.session_config["windowWidth" ].value().toInt()
+                        , this->launcher_.session_config["windowHeight"].value().toInt() );
+        }
      // initialize gui items
      /* Every QWidget in the gui (almost) has a cfg::Item that has to be
       * initialized first (either by constructing it or by reading it
@@ -137,7 +303,7 @@
         this->setIgnoreSignals();
         cfg::Item* ci = nullptr;
      // wWalltimeUnit
-        ci = this->getConfigItem("wWalltimeUnit");
+        ci = this->getSessionConfigItem("wWalltimeUnit");
         if( !ci->isInitialized() ) {
             QStringList units;
             units <<"seconds"<<"minutes"<<"hours"<<"days"<<"weeks";
@@ -145,18 +311,18 @@
             ci->set_value("hours");
         }
 
-        ci = this->getConfigItem("walltimeSeconds","1:00:00");
+        ci = this->getSessionConfigItem("walltimeSeconds","1:00:00");
 
-        ci = this->getConfigItem("wNotifyAddress", QString() );
-        ci = this->getConfigItem("notifyWhen");
+        ci = this->getSessionConfigItem("wNotifyAddress", QString() );
+        ci = this->getSessionConfigItem("notifyWhen");
         if( !ci->isInitialized() ) {
             ci->set_value("");
-            this->getConfigItem("wNotifyAbort", false );
-            this->getConfigItem("wNotifyBegin", false );
-            this->getConfigItem("wNotifyEnd"  , false );
+            this->getSessionConfigItem("wNotifyAbort", false );
+            this->getSessionConfigItem("wNotifyBegin", false );
+            this->getSessionConfigItem("wNotifyEnd"  , false );
         }
 
-        dc::DataConnectorBase::config = &(this->launcher_.config);
+        dc::DataConnectorBase::config = &(this->launcher_.session_config);
         dc::DataConnectorBase::script = &(this->launcher_.script);
         this->data_.append( dc::newDataConnector( this->ui->wWalltimeUnit , "wWalltimeUnit"  , ""         ) );
         this->data_.append( dc::newDataConnector(                           "walltimeSeconds", "walltime" ) );
@@ -175,7 +341,7 @@
         } else {
             this->launcher_.readClusterInfo( path_to_clusters );
         }
-        ci = this->getConfigItem("wCluster");
+        ci = this->getSessionConfigItem("wCluster");
         try {
             ci->set_choices( this->launcher_.clusters.keys() );
         } catch( cfg::InvalidConfigItemValue & e) {
@@ -197,34 +363,34 @@
         this->storeResetValues();
 
         this->data_.append( dc::newDataConnector( this->ui->wUsername, "wUsername", "" ) );
-        bool can_authenticate = !this->getConfigItem("wUsername")->value().toString().isEmpty();
+        bool can_authenticate = !this->getSessionConfigItem("wUsername")->value().toString().isEmpty();
         this->activateAuthenticateButton( can_authenticate );
 
      //=====================================
      // wRemote/wLocal/wSubfolder/wJobname
      // wRemote
-        ci = this->getConfigItem("wRemote");
+        ci = this->getSessionConfigItem("wRemote");
         if( !ci->isInitialized() ) {
             ci->set_choices( QStringList({"$VSC_SCRATCH","$VSC_DATA"}) );
             ci->set_value("$VSC_SCRATCH");
         }
         this->data_.append( dc::newDataConnector( this->ui->wRemote, "wRemote", "") );
      // wLocal
-        ci = this->getConfigItem("wLocal");
+        ci = this->getSessionConfigItem("wLocal");
         if( !ci->isInitialized() ) {
             ci                               ->set_value_and_type( this->launcher_.homePath() );
-            this->getConfigItem("wSubfolder")->set_value_and_type("jobs");
-            this->getConfigItem("wJobname"  )->set_value_and_type("hello_world");
+            this->getSessionConfigItem("wSubfolder")->set_value_and_type("jobs");
+            this->getSessionConfigItem("wJobname"  )->set_value_and_type("hello_world");
         }
         this->data_.append( dc::newDataConnector( this->ui->wLocal, "wLocal", "") );
      // Subfolder
-        QString value = this->getConfigItem("wSubfolder")->value().toString();
+        QString value = this->getSessionConfigItem("wSubfolder")->value().toString();
         if( !value.isEmpty() ) {
             this->ui->wSubfolder ->setText(value);
             this->ui->wSubfolder2->setText(value);
         }
      // wJobname
-        value = this->getConfigItem("wJobname")->value().toString();
+        value = this->getSessionConfigItem("wJobname")->value().toString();
         if( !value.isEmpty() ) {
             this->ui->wJobname ->setText(value);
             this->ui->wJobname2->setText(value);
@@ -247,27 +413,27 @@
         this->data_.append( dc::newDataConnector(                       "remoteFolder", "remote_folder") );
 
         QString qs;
-        qs = this->getConfigItem("wSubfolder")->value().toString();
+        qs = this->getSessionConfigItem("wSubfolder")->value().toString();
         this->ui->wSubfolder ->setText(qs);
         this->ui->wSubfolder2->setText(qs);
 
-        qs = this->getConfigItem("wJobname")->value().toString();
+        qs = this->getSessionConfigItem("wJobname")->value().toString();
         this->ui->wJobname ->setText(qs);
         this->ui->wJobname2->setText(qs);
 
-        this->getConfigItem("wEmptyRemoteFolder", true );
+        this->getSessionConfigItem("wEmptyRemoteFolder", true );
         this->data_.append( dc::newDataConnector( this->ui->wEmptyRemoteFolder, "wEmptyRemoteFolder", "") );
 
-        this->getConfigItem("wCheckCopyToDesktop", true );
+        this->getSessionConfigItem("wCheckCopyToDesktop", true );
         this->data_.append( dc::newDataConnector( this->ui->wCheckCopyToDesktop, "wCheckCopyToDesktop", "") );
 
-        this->getConfigItem("CheckCopyToVscData", true );
+        this->getSessionConfigItem("CheckCopyToVscData", true );
         this->data_.append( dc::newDataConnector( this->ui->wCheckCopyToVscData, "CheckCopyToVscData", "") );
 
-        this->getConfigItem("wCheckDeleteLocalJobFolder", true );
+        this->getSessionConfigItem("wCheckDeleteLocalJobFolder", true );
         this->data_.append( dc::newDataConnector( this->ui->wCheckDeleteLocalJobFolder, "wCheckDeleteLocalJobFolder", "") );
 
-        this->getConfigItem("wCheckDeleteRemoteJobFolder", true );
+        this->getSessionConfigItem("wCheckDeleteRemoteJobFolder", true );
         this->data_.append( dc::newDataConnector( this->ui->wCheckDeleteRemoteJobFolder, "wCheckDeleteRemoteJobFolder", "") );
 
         this->setIgnoreSignals(false);
@@ -277,7 +443,7 @@
         this->paletteRedForeground_ = new QPalette();
         this->paletteRedForeground_->setColor(QPalette::Text,Qt::red);
 
-        if( !this->getConfigItem("wJobname")->value().toString().isEmpty() ) {
+        if( !this->getSessionConfigItem("wJobname")->value().toString().isEmpty() ) {
             this->lookForJobscript( local_subfolder_jobname );
         } else
         {// no jobname - all values are either default, or come from the config file
@@ -285,70 +451,52 @@
             this->launcher_.script.set_has_unsaved_changes(false);
         }
         this->on_wAuthenticate_clicked();
-
-        createActions();
-        createMenus();
-#ifdef QT_DEBUG
-        this->verbosity_= 2;
-#endif
-#ifdef Q_OS_WIN
-        QFont font("Courier New",9);
-
-        this->ui->wFinished   ->setFont(font);
-        this->ui->wNotFinished->setFont(font);
-        this->ui->wRetrieved  ->setFont(font);
-#endif
     }
 
-    void MainWindow::createActions()
+    void MainWindow::save_session()
     {
-        aboutAction_ = new QAction(tr("&About"), this);
-        connect( aboutAction_, SIGNAL(triggered()), this, SLOT( about() ) );
+        LOG_AND_CHECK_IGNORESIGNAL( NO_ARGUMENT );
 
-        verboseAction_ = new QAction(tr("Verbose logging"), this);
-        connect( verboseAction_, SIGNAL(triggered()), this, SLOT( verbose_logging() ) );
+        QString path_to_session_data = this->launcher_.session_config.filename();
+        if( path_to_session_data.isEmpty() ) {
+            path_to_session_data = this->launcher_.homePath("session.data");
+        }
+        path_to_session_data = QFileDialog::getSaveFileName( this, "Save this Launcher session"
+                                                  , path_to_session_data
+                                                  ,"Launcher sessions (*.data)"
+                                                  , nullptr
+                                                  , QFileDialog::DontConfirmOverwrite
+                                                  );
+        if( !path_to_session_data.isEmpty() ) {
+            this->save_session( path_to_session_data );
+        } else {
+            Log() << "\n    canceled.";
+        }
     }
 
-    void MainWindow::createMenus()
+    void MainWindow::save_session( QString const& path_to_session_data )
     {
-        helpMenu_ = menuBar()->addMenu("&Help");
-        helpMenu_->addAction(aboutAction_);
-        extraMenu_ = menuBar()->addMenu("&Extra");
-        extraMenu_ ->addAction(verboseAction_);
-    }
-
-    void MainWindow::about()
-    {
-        QString msg;
-        msg.append( QString("program : %1\n").arg(TITLE  ) )
-           .append( QString("version : %1\n").arg(VERSION) )
-           .append(         "contact : engelbert.tijskens@uantwerpen.be")
-           ;
-        QMessageBox::about(this,TITLE,msg);
-    }
-
-
-    void MainWindow::verbose_logging()
-    {
-        this->verbosity_ = ( this->verboseAction_->isChecked() ? 2 : 0 );
+        LOG_CALLER << QString("\n      path: '%1'").arg( path_to_session_data ).C_STR();
+        this->launcher_.session_config.save( path_to_session_data );
+        this->save_session_path( path_to_session_data );
     }
 
     QString
     MainWindow::
     local_subfolder()
     {
-        cfg::Item* ci = this->getConfigItem("wLocal");
+        cfg::Item* ci = this->getSessionConfigItem("wLocal");
         QString path = ci->value().toString();
         if( path.isEmpty() || !QFile::exists(path) ) {
             if( !path.isEmpty() )
                 this->statusBar()->showMessage( QString("Local file location '%1' was not found").arg(path) );
             QString empty;
             ci->set_value(empty);
-            this->getConfigItem("wSubfolder")->set_value(empty);
-            this->getConfigItem("wJobname"  )->set_value(empty);
+            this->getSessionConfigItem("wSubfolder")->set_value(empty);
+            this->getSessionConfigItem("wJobname"  )->set_value(empty);
             return empty;
         }
-        ci = this->getConfigItem("wSubfolder");
+        ci = this->getSessionConfigItem("wSubfolder");
         QString s = ci->value().toString();
         path.append("/").append(s);
         if( s.isEmpty() || !QFile::exists(path) ) {
@@ -356,7 +504,7 @@
                 this->statusBar()->showMessage( QString("Local file location '%1' was not found").arg(path) );
             QString empty;
             ci->set_value(empty);
-            this->getConfigItem("wJobname"  )->set_value(empty);
+            this->getSessionConfigItem("wJobname"  )->set_value(empty);
             return empty;
         }
         return path;
@@ -370,7 +518,7 @@
         if( path.isEmpty() ) {
             return path;
         }
-        cfg::Item* ci = this->getConfigItem("wJobname");
+        cfg::Item* ci = this->getSessionConfigItem("wJobname");
         QString s = ci->value().toString();
         path.append("/").append(s);
         if( s.isEmpty() || !QFile::exists(path) ) {
@@ -387,10 +535,10 @@
     MainWindow::
     remote_subfolder()
     {
-        QString path = this->getConfigItem("wRemote")->value().toString();
+        QString path = this->getSessionConfigItem("wRemote")->value().toString();
         if( this->remote_env_vars_.contains(path) )
             path = this->remote_env_vars_[path];
-        QString s = this->getConfigItem("wSubfolder")->value().toString();
+        QString s = this->getSessionConfigItem("wSubfolder")->value().toString();
         if( s.isEmpty() )
             return s;
         path.append("/").append(s);
@@ -404,7 +552,7 @@
         QString path = this->remote_subfolder();
         if( path.isEmpty() )
             return path;
-        QString s = this->getConfigItem("wJobname")->value().toString();
+        QString s = this->getSessionConfigItem("wJobname")->value().toString();
         if( s.isEmpty() )
             return s;
         path.append("/").append(s);
@@ -425,7 +573,7 @@
  //-----------------------------------------------------------------------------
     MainWindow::~MainWindow()
     {
-        LOG_CALLER
+        LOG_CALLER_INFO
          << "\n    Launcher closing down";
 
         for( QList<dc::DataConnectorBase*>::iterator iter = this->data_.begin(); iter!=this->data_.end(); ++iter ) {
@@ -434,11 +582,10 @@
         }
 
         QSize windowSize = this->size();
-        this->getConfigItem("windowWidth" )->set_value( windowSize.width () );
-        this->getConfigItem("windowHeight")->set_value( windowSize.height() );
+        this->getSessionConfigItem("windowWidth" )->set_value( windowSize.width () );
+        this->getSessionConfigItem("windowHeight")->set_value( windowSize.height() );
 
-        Log() << "\n    - saving config file.";
-        this->launcher_.config.save();
+        this->save_session( this->launcher_.session_config.filename() );
 
         if ( this->launcher_.script.has_unsaved_changes() ) {
             QMessageBox::Button answer = QMessageBox::question(this,TITLE,"The current script has unsaved changes.\nDo you want to save?");
@@ -502,9 +649,9 @@
     template <class T>
     cfg::Item*
     MainWindow::
-    getConfigItem( QString const& name, T default_value )
+    getSessionConfigItem( QString const& name, T default_value )
     {
-        cfg::Item* ci = this->launcher_.config.getItem(name);
+        cfg::Item* ci = this->launcher_.session_config.getItem(name);
         if( ci->type() == QVariant::Invalid )
             ci->set_value_and_type( default_value );
         return ci;
@@ -512,14 +659,14 @@
  //-----------------------------------------------------------------------------
     cfg::Item*
     MainWindow::
-    getConfigItem( QString const& name ) {
-        return this->launcher_.config.getItem(name);
+    getSessionConfigItem( QString const& name ) {
+        return this->launcher_.session_config.getItem(name);
     }
  //-----------------------------------------------------------------------------
     ClusterInfo const&
     MainWindow::clusterInfo() const
     {
-        QString            clusterName = const_cast<MainWindow*>(this)->launcher_.config.getItem("wCluster")->value().toString();
+        QString            clusterName = const_cast<MainWindow*>(this)->launcher_.session_config.getItem("wCluster")->value().toString();
         ClusterInfo const& clusterInfo = *( this->launcher_.clusters.find( clusterName ) );
         return clusterInfo;
     }
@@ -528,8 +675,8 @@
     MainWindow::nodesetInfo() const
     {
         MainWindow* non_const_this = const_cast<MainWindow*>(this);
-        QString nodesetName = non_const_this->getConfigItem("wNodeset")->value().toString();
-        QString clusterName = non_const_this->getConfigItem("wCluster")->value().toString();
+        QString nodesetName = non_const_this->getSessionConfigItem("wNodeset")->value().toString();
+        QString clusterName = non_const_this->getSessionConfigItem("wCluster")->value().toString();
         NodesetInfo const& nodesetInfo = *( this->launcher_.clusters[clusterName].nodesets().find( nodesetName ) );
         return nodesetInfo;
     }
@@ -538,10 +685,10 @@
     {// act on config items only...
         {
             IgnoreSignals ignoreSignals( this );
-            QString cluster = this->getConfigItem("wCluster")->value().toString();
+            QString cluster = this->getSessionConfigItem("wCluster")->value().toString();
             ClusterInfo& clusterInfo = *(this->launcher_.clusters.find( cluster ) );
          // Initialize Config items that depend on the cluster
-            cfg::Item* ci = this->getConfigItem("wNodeset");
+            cfg::Item* ci = this->getSessionConfigItem("wNodeset");
             ci->set_choices      ( clusterInfo.nodesets().keys() );
             ci->set_default_value( clusterInfo.defaultNodeset() );
             ci->set_value        ( clusterInfo.defaultNodeset() );
@@ -577,14 +724,14 @@
     void MainWindow::nodesetDependencies( bool updateWidgets )
     {
         NodesetInfo const& nodesetInfo = this->nodesetInfo();
-        cfg::Item* ci = this->getConfigItem("wNNodes");
+        cfg::Item* ci = this->getSessionConfigItem("wNNodes");
         QList<QVariant> range;
         range.append( 1 );
         range.append( nodesetInfo.nNodes() );
         ci->set_choices( range, true );
         ci->set_value( 1 );
 
-        ci = this->getConfigItem("wNCoresPerNode");
+        ci = this->getSessionConfigItem("wNCoresPerNode");
         range.last() = nodesetInfo.nCoresPerNode();
         ci->set_choices( range, true );
         ci->set_value( range.last() );
@@ -594,12 +741,12 @@
          // It is also not connected to an cfg::Item by a DataConnector, hence
          // we do update it even if updateWidgets is false.
 
-        ci = this->getConfigItem("wNCores");
+        ci = this->getSessionConfigItem("wNCores");
         range.last() = nodesetInfo.nCoresAvailable();
         ci->set_choices( range, true );
         ci->set_value( nodesetInfo.nCoresPerNode() );
 
-        ci = this->getConfigItem("wGbPerCore");
+        ci = this->getSessionConfigItem("wGbPerCore");
         range.clear();
         range.append( round(nodesetInfo.gbPerCoreAvailable(),3) );
         range.append( round(nodesetInfo.gbPerNodeAvailable(),3) );
@@ -607,8 +754,8 @@
         ci->set_value( nodesetInfo.gbPerCoreAvailable() );
 
         double gbTotal  = this->ui->wGbPerNode->text().toDouble();
-               gbTotal *= this->getConfigItem("wNNodes")->value().toInt();
-        this->getConfigItem("wGbTotal")->set_value( QString().setNum( gbTotal, 'g', 3 ) );
+               gbTotal *= this->getSessionConfigItem("wNNodes")->value().toInt();
+        this->getSessionConfigItem("wGbTotal")->set_value( QString().setNum( gbTotal, 'g', 3 ) );
 
         if( updateWidgets ) {
             IgnoreSignals ignoreSignals( this );
@@ -653,7 +800,7 @@
  //-----------------------------------------------------------------------------
     void MainWindow::walltimeUnitDependencies( bool updateWidgets )
     {
-        QString unit = this->getConfigItem("wWalltimeUnit")->value().toString();
+        QString unit = this->getSessionConfigItem("wWalltimeUnit")->value().toString();
         this->walltimeUnitSeconds_ = nSecondsPerUnit(unit);
         double step = ( unit=="weeks" ? 1.0/7.0 :
                       ( unit=="days"  ? 0.25    :
@@ -665,11 +812,11 @@
         range.append( walltime_limit );
         range.append( step );
 
-        cfg::Item* ci_wWalltime = this->getConfigItem("wWalltime");
+        cfg::Item* ci_wWalltime = this->getSessionConfigItem("wWalltime");
         try {
             ci_wWalltime->set_choices(range,true);
         } catch( cfg::InvalidConfigItemValue& e) {}
-        double w = (double) unformatWalltimeSeconds( this->getConfigItem("walltimeSeconds")->value().toString() );
+        double w = (double) unformatWalltimeSeconds( this->getSessionConfigItem("walltimeSeconds")->value().toString() );
         w /= this->walltimeUnitSeconds_;
         ci_wWalltime->set_value(w);
 
@@ -713,27 +860,12 @@
 
 #define IGNORE_SIGNALS_UNTIL_END_OF_SCOPE IgnoreSignals ignoreSignals(this)
 
-#define NO_ARGUMENT QString()
-#define LOG_AND_CHECK_IGNORESIGNAL( ARGUMENT ) \
-  {\
-    QString msg("\n[ MainWindow::%1, %2, %3 ]");\
-    msg = msg.arg(__func__).arg(__FILE__).arg(__LINE__);\
-    if( this->verbosity_ && !QString((ARGUMENT)).isEmpty() ) \
-        msg.append("\n    Function was called with argument : ").append(ARGUMENT);\
-    msg.append( this->check_script_unsaved_changes() ) ;\
-    if( this->verbosity_ > 1 ) {\
-        if( this->ignoreSignals_ ) msg.append("\n    Ignoring signal");\
-        else                       msg.append("\n    Executing signal");\
-    }\
-    Log() << INFO << msg.toStdString();\
-    if( this->ignoreSignals_ ) return;\
-  }
 
 void MainWindow::on_wCluster_currentIndexChanged( QString const& arg1 )
 {
     LOG_AND_CHECK_IGNORESIGNAL( arg1 );
 
-    this->launcher_.config["wCluster"].set_value(arg1);
+    this->launcher_.session_config["wCluster"].set_value(arg1);
     this->clusterDependencies(true);
 }
 
@@ -741,7 +873,7 @@ void MainWindow::on_wNodeset_currentTextChanged(const QString &arg1)
 {
     LOG_AND_CHECK_IGNORESIGNAL( arg1 );
 
-    this->getConfigItem("wNodeset")->set_value(arg1);
+    this->getSessionConfigItem("wNodeset")->set_value(arg1);
     this->nodesetDependencies(true);
 }
 
@@ -771,11 +903,11 @@ void MainWindow::on_wRequestNodes_clicked()
         this->statusBar()->showMessage(e.what());
         return;
     }
-    this->getConfigItem("wNNodes"       )->set_value( nodeset.granted().nNodes );
-    this->getConfigItem("wNCoresPerNode")->set_value( nodeset.granted().nCoresPerNode );
-    this->getConfigItem("wNCores"       )->set_value( nodeset.granted().nCores );
-    this->getConfigItem("wGbPerCore"    )->set_value( nodeset.granted().gbPerCore );
-    this->getConfigItem("wGbTotal"      )->set_value( nodeset.granted().gbTotal );
+    this->getSessionConfigItem("wNNodes"       )->set_value( nodeset.granted().nNodes );
+    this->getSessionConfigItem("wNCoresPerNode")->set_value( nodeset.granted().nCoresPerNode );
+    this->getSessionConfigItem("wNCores"       )->set_value( nodeset.granted().nCores );
+    this->getSessionConfigItem("wGbPerCore"    )->set_value( nodeset.granted().gbPerCore );
+    this->getSessionConfigItem("wGbTotal"      )->set_value( nodeset.granted().gbTotal );
     this->updateResourceItems();
     this->pendingRequest_ = NoPendingRequest;
 }
@@ -850,11 +982,11 @@ void MainWindow::on_wRequestCores_clicked()
         this->statusBar()->showMessage(e.what());
         return;
     }
-    this->getConfigItem("wNNodes"       )->set_value( nodeset.granted().nNodes );
-    this->getConfigItem("wNCoresPerNode")->set_value( nodeset.granted().nCoresPerNode );
-    this->getConfigItem("wNCores"       )->set_value( nodeset.granted().nCores );
-    this->getConfigItem("wGbPerCore"    )->set_value( nodeset.granted().gbPerCore );
-    this->getConfigItem("wGbTotal"      )->set_value( nodeset.granted().gbTotal );
+    this->getSessionConfigItem("wNNodes"       )->set_value( nodeset.granted().nNodes );
+    this->getSessionConfigItem("wNCoresPerNode")->set_value( nodeset.granted().nCoresPerNode );
+    this->getSessionConfigItem("wNCores"       )->set_value( nodeset.granted().nCores );
+    this->getSessionConfigItem("wGbPerCore"    )->set_value( nodeset.granted().gbPerCore );
+    this->getSessionConfigItem("wGbTotal"      )->set_value( nodeset.granted().gbTotal );
     this->updateResourceItems();
     this->pendingRequest_ = NoPendingRequest;
 }
@@ -909,7 +1041,7 @@ void MainWindow::on_wPages_currentChanged(int index_current_page)
             this->ui->wRetrieveAllJobs    ->setEnabled(ok);
             this->ui->wRetrieveSelectedJob->setEnabled(ok);
             this->ui->wCheckDeleteRemoteJobFolder->setEnabled(ok);
-            JobList joblist( this->getConfigItem("job_list")->value().toStringList() );
+            JobList joblist( this->getSessionConfigItem("job_list")->value().toStringList() );
             this->refreshJobs( joblist );
         }
         break;
@@ -949,7 +1081,7 @@ void MainWindow::on_wWalltime_valueChanged(double arg1)
 
     IGNORE_SIGNALS_UNTIL_END_OF_SCOPE;
 
-    cfg::Item* walltimeSeconds = this->getConfigItem("walltimeSeconds");
+    cfg::Item* walltimeSeconds = this->getSessionConfigItem("walltimeSeconds");
     double seconds = arg1*this->walltimeUnitSeconds_;
     walltimeSeconds->set_value( formatWalltimeSeconds( seconds ) );
     this->getDataConnector("walltimeSeconds")->value_config_to_script();
@@ -969,7 +1101,7 @@ void MainWindow::on_wNotifyAddress_editingFinished()
     } else {
         this->ui->wNotifyAddress->setPalette( QApplication::palette(this->ui->wNotifyAddress) );
         this->statusBar()->clearMessage();
-        this->getConfigItem("wNotifyAddress")->set_value(validated);
+        this->getSessionConfigItem("wNotifyAddress")->set_value(validated);
 
         IGNORE_SIGNALS_UNTIL_END_OF_SCOPE;
         dc::DataConnectorBase* link = this->getDataConnector("wNotifyAddress");
@@ -981,7 +1113,7 @@ void MainWindow::on_wNotifyAddress_editingFinished()
 
 void MainWindow::update_abe( QChar c, bool checked )
 {
-    cfg::Item* ci_notifyWhen = this->getConfigItem("notifyWhen");
+    cfg::Item* ci_notifyWhen = this->getSessionConfigItem("notifyWhen");
     QString abe = ci_notifyWhen->value().toString();
     if( checked && !abe.contains(c) ) {
         abe.append(c);
@@ -1042,6 +1174,10 @@ bool MainWindow::getPrivatePublicKeyPair()
     } else {
         return false;
     }
+#ifdef NO_PUBLIC_KEY_NEEDED
+    this->statusBar()->showMessage( QString("Private key:%1").arg(private_key) );
+    this->sshSession_.setPrivatePublicKeyPair(private_key);
+#else
  // private key is provided, now public key
     QString public_key = private_key;
     public_key.append(".pub"); // make an educated guess...
@@ -1059,6 +1195,7 @@ bool MainWindow::getPrivatePublicKeyPair()
     }
     this->statusBar()->showMessage("Private/public key pair found.");
     this->sshSession_.setPrivatePublicKeyPair( private_key, public_key );
+#endif
     return true;
 }
 
@@ -1076,13 +1213,13 @@ void MainWindow::on_wUsername_editingFinished()
      // reset the ssh session
         this->sshSession_.reset();
      // and forget the keys in the config file
-        this->getConfigItem("privateKey")->set_value( QString() );
-        this->getConfigItem("publicKey" )->set_value( QString() );
+        this->getSessionConfigItem("privateKey")->set_value( QString() );
+        this->getSessionConfigItem("publicKey" )->set_value( QString() );
         this->activateAuthenticateButton(false);
     } else
     {// valid username
         this->ui->wUsername->setPalette( QApplication::palette(this->ui->wUsername) );
-        cfg::Item* user = this->getConfigItem("wUsername");
+        cfg::Item* user = this->getSessionConfigItem("wUsername");
         if( user->value().toString() == username )
         {// username is the same as in the config, hence it has not changed!
             if( this->isUserAuthenticated() )
@@ -1094,8 +1231,10 @@ void MainWindow::on_wUsername_editingFinished()
                 this->sshSession_.setUsername(username);
              // set private/public key pair from config
                 if( this->sshSession_.setPrivatePublicKeyPair
-                        ( this->getConfigItem("privateKey")->value().toString()
-                        , this->getConfigItem("publicKey" )->value().toString()
+                        ( this->getSessionConfigItem("privateKey")->value().toString()
+#                   ifndef NO_PUBLIC_KEY_NEEDED
+                        , this->getSessionConfigItem("publicKey" )->value().toString()
+#                   endif
                         , false
                         )
                   ) {
@@ -1107,8 +1246,8 @@ void MainWindow::on_wUsername_editingFinished()
          // store in config
             user->set_value(username);
          // clear config values for private/public key pair
-            this->getConfigItem("privateKey")->set_value( QString() );
-            this->getConfigItem("publicKey" )->set_value( QString() );
+            this->getSessionConfigItem("privateKey")->set_value( QString() );
+            this->getSessionConfigItem("publicKey" )->set_value( QString() );
          // set the username for the ssh session
             this->sshSession_.setUsername(username);
         }
@@ -1158,21 +1297,29 @@ void MainWindow::on_wAuthenticate_clicked()
             result = success;
         }
         catch( ssh2::MissingUsername& e )
-        {// It is the ssh2::Session which has no username sofar (not the gui)
-            QString username = validateUsername( this->ui->wUsername->text() );
-            if( username.isEmpty() ) {
-                this->warn("Invalid username. Expecting 'vscXXXXX'.");
+        {// It is the ssh2::Session which has no username sofar (not the gui)            
+            QString username = this->ui->wUsername->text();
+            if( username.isEmpty() )
+            {// no need to tell the user that an empty username is invalid as a username
                 result = failed;
             } else {
-                this->sshSession_.setUsername( username );
-                if( this->getConfigItem("wUsername")->value().toString() == username ) {
-                    this->sshSession_.setPrivatePublicKeyPair
-                            ( this->getConfigItem("privateKey")->value().toString()
-                            , this->getConfigItem("publicKey" )->value().toString()
-                            , false
-                            );
+                username = validateUsername( this->ui->wUsername->text() );
+                if( username.isEmpty() ) {
+                    this->warn("Invalid username. Expecting 'vscXXXXX'.");
+                    result = failed;
+                } else {
+                    this->sshSession_.setUsername( username );
+                    if( this->getSessionConfigItem("wUsername")->value().toString() == username ) {
+                        this->sshSession_.setPrivatePublicKeyPair
+                                ( this->getSessionConfigItem("privateKey")->value().toString()
+                        #ifndef NO_PUBLIC_KEY_NEEDED
+                                , this->getSessionConfigItem("publicKey" )->value().toString()
+                        #endif
+                                , false
+                                );
+                    }
+                    result = retry;
                 }
-                result = retry;
             }
         }
         catch( ssh2::MissingKey& e ) {
@@ -1221,30 +1368,17 @@ void MainWindow::on_wAuthenticate_clicked()
             this->warn(msg);
             Log(0) << msg.prepend("\n    ").C_STR();
          // remove keys from ssh session and from config
-            this->sshSession_.setUsername( this->getConfigItem("wUsername")->value().toString() );
-            this->getConfigItem("privateKey")->set_value( QString() );
-            this->getConfigItem("publicKey" )->set_value( QString() );
+            this->sshSession_.setUsername( this->getSessionConfigItem("wUsername")->value().toString() );
+            this->getSessionConfigItem("privateKey")->set_value( QString() );
+            this->getSessionConfigItem("publicKey" )->set_value( QString() );
             result = failed;
         }
-        if( result==failed ) {
-            if( attempts==0 )
-            {// after 3 unsuccesfull attempts to authenticate, we remove the keys from the config
-             // and the session: they are probably wrong
-                this->sshSession_.setUsername( this->getConfigItem("wUsername")->value().toString() );
-                this->getConfigItem("privateKey")->set_value( QString() );
-                this->getConfigItem("publicKey" )->set_value( QString() );
-
-                QString msg = QString("Authentication failed: %1 failed attempts to provide passphrase.").arg(max_attempts);
-                this->statusBar()->showMessage(msg);
-                Log(0) << msg.prepend("\n    ").C_STR()
-                       << "\n    Forgetting keys now.";
-            }
-            break; //out of while loop
-        } else if( result==success ) {
+        if( result==success )
+        {
             this->activateAuthenticateButton(false,"authenticated");
             this->statusBar()->showMessage("Authentication succeeded.");
-            this->getConfigItem("privateKey")->set_value( this->sshSession_.privateKey() );
-            this->getConfigItem("publicKey" )->set_value( this->sshSession_. publicKey() );
+            this->getSessionConfigItem("privateKey")->set_value( this->sshSession_.privateKey() );
+            this->getSessionConfigItem("publicKey" )->set_value( this->sshSession_. publicKey() );
 
             this->resolveRemoteFileLocations_();
 
@@ -1259,20 +1393,37 @@ void MainWindow::on_wAuthenticate_clicked()
             this->ui->wSelectModule->clear();
             this->ui->wSelectModule->addItems(modules);
 
-            QString modules_cluster = QString("modules_").append(this->getConfigItem("wCluster")->value().toString() );
-            this->getConfigItem(modules_cluster)->set_choices(modules);
+            QString modules_cluster = QString("modules_").append(this->getSessionConfigItem("wCluster")->value().toString() );
+            this->getSessionConfigItem(modules_cluster)->set_choices(modules);
 
             break; //out of while loop
-        } else if( result==retry ) {
+        } else
+        if( result==retry ) {
             continue; // = retry
+        }
+        else
+        if( result==failed ) {
+            if( attempts==0 )
+            {// after 3 unsuccesfull attempts to authenticate, we remove the keys from the config
+             // and the session: they are probably wrong
+                this->sshSession_.setUsername( this->getSessionConfigItem("wUsername")->value().toString() );
+                this->getSessionConfigItem("privateKey")->set_value( QString() );
+                this->getSessionConfigItem("publicKey" )->set_value( QString() );
+
+                QString msg = QString("Authentication failed: %1 failed attempts to provide passphrase.").arg(max_attempts);
+                this->statusBar()->showMessage(msg);
+                Log(0) << msg.prepend("\n    ").C_STR()
+                       << "\n    Forgetting keys now.";
+            }
+            break; //out of while loop
         }
     }
     if( no_connection )
     {
         this->statusBar()->showMessage("Launcher was unable to make a connection. Proceeding offline.");
      // attempt to obtain cluster modules from config file, to enable the user to work offline.
-        QString modules_cluster = QString("modules_").append(this->getConfigItem("wCluster")->value().toString() );
-        QStringList modules = this->getConfigItem(modules_cluster)->choices_as_QStringList();
+        QString modules_cluster = QString("modules_").append(this->getSessionConfigItem("wCluster")->value().toString() );
+        QStringList modules = this->getSessionConfigItem(modules_cluster)->choices_as_QStringList();
         if( modules.isEmpty() ) {
             this->statusBar()->showMessage("List of modules not available for current cluster ");
         } else {
@@ -1393,11 +1544,11 @@ void MainWindow::on_wLocalFileLocationButton_clicked()
     QString directory = QFileDialog::getExistingDirectory( this, "Select local file location:", this->launcher_.homePath() );
     if( directory.isEmpty() ) return;
 
-    this->getConfigItem("wLocal")->set_value(directory);
+    this->getSessionConfigItem("wLocal")->set_value(directory);
 
     this->getDataConnector("wLocal")->value_config_to_widget();
 
-    this->getConfigItem   ("wSubfolder")->set_value("");
+    this->getSessionConfigItem   ("wSubfolder")->set_value("");
     this->getDataConnector("wSubfolder")->value_config_to_widget();
 
     this->ui->wSubfolder ->setToolTip("");
@@ -1431,7 +1582,7 @@ void MainWindow::on_wSubfolderButton_clicked()
     QString relative = folder;
             relative.remove(parent);
 
-    this->getConfigItem   ("wSubfolder")->set_value( relative );
+    this->getSessionConfigItem   ("wSubfolder")->set_value( relative );
     this->getDataConnector("wSubfolder")->value_config_to_widget(); // also triggers wSubfolder2
 
     this->ui->wSubfolder ->setToolTip(this-> local_subfolder() );
@@ -1474,15 +1625,15 @@ void MainWindow::on_wJobnameButton_clicked()
     parent.append("/");
     QString selected_leaf = selected;
     selected_leaf.remove(parent);
-    this->getConfigItem   ("wJobname")->set_value(selected_leaf);
+    this->getSessionConfigItem   ("wJobname")->set_value(selected_leaf);
     this->getDataConnector("wJobname")->value_config_to_widget(); // also triggers wJobname2
 
     this->ui->wJobname ->setToolTip(selected);
     QString remote_folder = this->remote_subfolder_jobname();
     this->ui->wJobname2->setToolTip(remote_folder);
 
-    this->getConfigItem   ( "localFolder")->set_value(selected);
-    this->getConfigItem   ("remoteFolder")->set_value(remote_folder);
+    this->getSessionConfigItem   ( "localFolder")->set_value(selected);
+    this->getSessionConfigItem   ("remoteFolder")->set_value(remote_folder);
     this->getDataConnector( "localFolder")->value_config_to_script();
     this->getDataConnector("remoteFolder")->value_config_to_script();
 
@@ -1493,6 +1644,7 @@ void MainWindow::lookForJobscript( QString const& job_folder)
 {
     QString script_file = QString(job_folder).append("/pbs.sh");
     if( QFile::exists(script_file) ) {
+
         QMessageBox::StandardButton answer =
             QMessageBox::question(this, TITLE
                                  , QString("The local job directory '%1' already contains a job script 'pbs.sh'.\n"
@@ -1566,10 +1718,10 @@ bool MainWindow::loadJobscript( QString const& filepath )
             }
         }
      // a few special cases:
-        QString abe = this->getConfigItem("notifyWhen")->value().toString();
-        this->getConfigItem   ("wNotifyAbort")->set_value( abe.contains('a') );
-        this->getConfigItem   ("wNotifyBegin")->set_value( abe.contains('b') );
-        this->getConfigItem   ("wNotifyEnd"  )->set_value( abe.contains('e') );
+        QString abe = this->getSessionConfigItem("notifyWhen")->value().toString();
+        this->getSessionConfigItem   ("wNotifyAbort")->set_value( abe.contains('a') );
+        this->getSessionConfigItem   ("wNotifyBegin")->set_value( abe.contains('b') );
+        this->getSessionConfigItem   ("wNotifyEnd"  )->set_value( abe.contains('e') );
         this->getDataConnector("wNotifyAbort")->value_config_to_widget();
         this->getDataConnector("wNotifyBegin")->value_config_to_widget();
         this->getDataConnector("wNotifyEnd"  )->value_config_to_widget();
@@ -1631,7 +1783,7 @@ void MainWindow::on_wSubfolder_textChanged(const QString &arg1)
 
     this->ui->wSubfolder2->setText(arg1);
 
-    this->getConfigItem   ("wJobname" )->set_value("");
+    this->getSessionConfigItem   ("wJobname" )->set_value("");
     this->getDataConnector("wJobname" )->value_config_to_widget();
 }
 
@@ -1641,7 +1793,7 @@ void MainWindow::on_wJobname_textChanged(const QString &arg1)
 
     this->ui->wJobname2->setText(arg1);
 
-    this->getConfigItem("wJobname" )->set_value( arg1 );
+    this->getSessionConfigItem("wJobname" )->set_value( arg1 );
 }
 
 
@@ -1649,7 +1801,7 @@ void MainWindow::on_wRemote_currentIndexChanged(const QString &arg1)
 {
     LOG_AND_CHECK_IGNORESIGNAL( arg1 );
 
-    this->getConfigItem("wRemote")->set_value(arg1);
+    this->getSessionConfigItem("wRemote")->set_value(arg1);
 
     QString tooltip = arg1;
     if( this->remote_env_vars_.contains(arg1) ) {
@@ -1728,7 +1880,7 @@ void MainWindow::on_wSubmit_clicked()
     this->sshSession_.execute_remote_command( cmd, this->remote_subfolder_jobname() );
     QString job_id = this->sshSession_.qout().trimmed();
     this->statusBar()->showMessage(QString("Job submitted: %1").arg(job_id));
-    cfg::Item* ci_job_list = this->getConfigItem("job_list");
+    cfg::Item* ci_job_list = this->getSessionConfigItem("job_list");
     if( ci_job_list->value().type()==QVariant::Invalid )
         ci_job_list->set_value_and_type( QStringList() );
     QStringList job_list = ci_job_list->value().toStringList();
@@ -1752,7 +1904,7 @@ void MainWindow::on_wRefresh_clicked()
 {
     LOG_AND_CHECK_IGNORESIGNAL(NO_ARGUMENT);
 
-    cfg::Item* ci_joblist = this->getConfigItem("job_list");
+    cfg::Item* ci_joblist = this->getSessionConfigItem("job_list");
     JobList joblist( ci_joblist->value().toStringList() );
     this->refreshJobs(joblist);
 }
@@ -1799,7 +1951,7 @@ void MainWindow::on_wRetrieveSelectedJob_clicked()
         return;
     }
 
-    cfg::Item* ci_joblist = this->getConfigItem("job_list");
+    cfg::Item* ci_joblist = this->getSessionConfigItem("job_list");
     JobList joblist( ci_joblist->value().toStringList() );
     Job const* job = joblist[this->selected_job_];
     if( !job ) {
@@ -1830,7 +1982,7 @@ void MainWindow::on_wRetrieveAllJobs_clicked()
 {
     LOG_AND_CHECK_IGNORESIGNAL(NO_ARGUMENT);
 
-    cfg::Item* ci_joblist = this->getConfigItem("job_list");
+    cfg::Item* ci_joblist = this->getSessionConfigItem("job_list");
     JobList joblist( ci_joblist->value().toStringList() );
 
     bool toDesktop = this->ui->wCheckCopyToDesktop->isChecked();
@@ -1872,7 +2024,7 @@ void MainWindow::refreshJobs( JobList const& joblist )
 
     this->ui->wRetrieved->setText( joblist.toString(Job::Retrieved) );
 
-    this->getConfigItem("job_list")->set_value( joblist.toStringList(Job::Submitted|Job::Finished) );
+    this->getSessionConfigItem("job_list")->set_value( joblist.toStringList(Job::Submitted|Job::Finished) );
 
     this->selected_job_.clear();
 }
@@ -1882,7 +2034,7 @@ void MainWindow::deleteJob( QString const& jobid )
     QString msg = QString("Removing job : ").append(jobid).append(" ... ");
     this->statusBar()->showMessage(msg);
 
-    cfg::Item* ci_job_list = this->getConfigItem("job_list");
+    cfg::Item* ci_job_list = this->getSessionConfigItem("job_list");
     QStringList job_list = ci_job_list->value().toStringList();
     for( int i=0; i<job_list.size(); ++i ) {
         if( job_list[i].startsWith(jobid) )
@@ -1937,25 +2089,25 @@ void MainWindow::on_wDeleteSelectedJob_clicked()
 void MainWindow::on_wCheckCopyToDesktop_toggled(bool checked)
 {
     LOG_AND_CHECK_IGNORESIGNAL( (checked?"true":"false") )
-    this->getConfigItem("wCheckCopyToDesktop")->set_value(checked);
+    this->getSessionConfigItem("wCheckCopyToDesktop")->set_value(checked);
 }
 
 void MainWindow::on_wCheckCopyToVscData_toggled(bool checked)
 {
     LOG_AND_CHECK_IGNORESIGNAL( (checked?"true":"false") )
-    this->getConfigItem("wCheckCopyToVscData")->set_value(checked);
+    this->getSessionConfigItem("wCheckCopyToVscData")->set_value(checked);
 }
 
 void MainWindow::on_wCheckDeleteLocalJobFolder_toggled(bool checked)
 {
     LOG_AND_CHECK_IGNORESIGNAL( (checked?"true":"false") )
-    this->getConfigItem("wCheckDeleteLocalJobFolder")->set_value(checked);
+    this->getSessionConfigItem("wCheckDeleteLocalJobFolder")->set_value(checked);
 }
 
 void MainWindow::on_wCheckDeleteRemoteJobFolder_toggled(bool checked)
 {
     LOG_AND_CHECK_IGNORESIGNAL( (checked?"true":"false") )
-    this->getConfigItem("wCheckDeleteRemoteJobFolder")->set_value(checked);
+    this->getSessionConfigItem("wCheckDeleteRemoteJobFolder")->set_value(checked);
 }
 
 SUBCLASS_EXCEPTION(BadLauncherHome,std::runtime_error)
@@ -2036,7 +2188,7 @@ QString MainWindow::get_path_to_clusters()
     if( dir.entryInfoList().size() > 0 ) return path_to_clusters;
 
  // look for non standard clusters path in config file:
-    path_to_clusters = this->getConfigItem("path_to_clusters", QString() )->value().toString();
+    path_to_clusters = this->getSessionConfigItem("path_to_clusters", QString() )->value().toString();
     dir = QDir( path_to_clusters, "*.info");
     if( dir.entryInfoList().size() > 0 ) return path_to_clusters;
 

@@ -18,7 +18,6 @@
     #define ssh2_gai_strerror gai_strerror
 #endif
 
-
 #include <cstring>
 #include <stdexcept>
 
@@ -104,7 +103,9 @@ namespace ssh2
     Session::
     setPrivatePublicKeyPair
       ( QString const& private_key
+#   ifndef NO_PUBLIC_KEY_NEEDED
       , QString const& public_key
+#   endif
       , bool           must_throw
       )
     {
@@ -122,7 +123,9 @@ namespace ssh2
             if(must_throw) { throw_<std::runtime_error>("Private key '%1' does not exist.", private_key ); }
             else           { return false; }
         }
-
+#ifdef NO_PUBLIC_KEY_NEEDED
+        this->private_key_ = private_key.toStdString();
+#else
         QString pub;
         if( public_key.isEmpty() ) {
             pub = private_key;
@@ -137,6 +140,7 @@ namespace ssh2
      // both files exist, store filenames and return true for success§
         this->private_key_ = private_key.toStdString();
         this-> public_key_ = pub        .toStdString();
+#endif
         return true;
     }
  //-----------------------------------------------------------------------------
@@ -168,8 +172,12 @@ namespace ssh2
         if( this->username_.empty() ) {
             throw_<MissingUsername>("Authentication error: Missing username.");
         }
-        if( this->public_key_.empty() ) {
+        if( this->private_key_.empty() ) {
+#ifdef NO_PUBLIC_KEY_NEEDED
+            throw_<MissingKey>( "Missing private key for user %1.", this->username_.c_str() );
+#else
             throw_<MissingKey>( "Missing private/public key pair for user %1.", this->username_.c_str() );
+#endif
         }
 
         int rv;
@@ -245,13 +253,13 @@ namespace ssh2
         if( rv ) {
             throw_<std::runtime_error>("Failed at establishing SSH session, exitcode = %1>", rv );
         }
+/*
         LIBSSH2_KNOWNHOSTS* nh = libssh2_knownhost_init(this->session_);
 
         if( !nh )
-        {// eeek, do cleanup here */
+        {// eeek, do cleanup here
             throw_<std::runtime_error>("Failed at initializing known hosts");
         }
-/*
      // read all hosts from here
         libssh2_knownhost_readfile(nh, "known_hosts", LIBSSH2_KNOWNHOST_FILE_OPENSSH);
 
@@ -288,8 +296,7 @@ namespace ssh2
             throw_<std::runtime_error>("No fingerprint");
         }
         libssh2_knownhost_free(nh);
-*/
-/*
+
         if ( strlen(password) != 0 )
         {// We could authenticate via password
             while( (rv = libssh2_userauth_password(this->session_, username, password)) == LIBSSH2_ERROR_EAGAIN );
@@ -300,10 +307,15 @@ namespace ssh2
         } else
         {// Or by public key
 */
+
         while( ( rv = libssh2_userauth_publickey_fromfile
                         ( this->session_
                         , this->username_   .c_str()
+#                   ifdef NO_PUBLIC_KEY_NEEDED
+                        , nullptr
+#                   else
                         , this->public_key_ .c_str()
+#                   endif
                         , this->private_key_.c_str()
                         , this->passphrase_ .c_str()
                         )
@@ -319,7 +331,11 @@ namespace ssh2
                     throw_<WrongPassphrase>("Could not unlock key '%1' (wrong passphrase?).", this->private_key_.c_str() );
                 }
             } else {
-                throw_<std::runtime_error>("Failed at libssh2_userauth_publickey_fromfile, exitcode=%1.", rv );
+                QString msg = QString("Failed at libssh2_userauth_publickey_fromfile, exitcode=%1.").arg(rv);
+                if( rv==LIBSSH2_ERROR_FILE ) {
+                    msg.append("(LIBSSH2_ERROR_FILE: Note that key pairs generated with PuTTY Key Generator must be converted to openssh format.");
+                }
+                throw_<std::runtime_error>( msg.C_STR() );
             }
         }
         this->isAuthenticated_ = true;

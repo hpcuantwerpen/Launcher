@@ -46,9 +46,19 @@ public:
     explicit MainWindow(QWidget *parent = 0);
     ~MainWindow();
 
+private:
+    void new_session( QString const& path );
+    void save_session_path( QString const& path );
+    QString load_session_path();
+    void open_session( QString const& path );
+    void setup_session();
+    void save_session( QString const& path );
 private slots:
     void about();
     void verbose_logging();
+    void new_session();
+    void open_session();
+    void save_session();
 
     void on_wCluster_currentIndexChanged(const QString &arg1);
 
@@ -177,10 +187,10 @@ public:
     bool saveJobscript( QString const& filepath );
     bool remoteCopyJob();
 
-    cfg::Item* getConfigItem( QString const& name );
+    cfg::Item* getSessionConfigItem( QString const& name );
      // get config item by name and create it (empty) if it does not exist
     template <class T>
-    cfg::Item* getConfigItem( QString const& name, T default_value );
+    cfg::Item* getSessionConfigItem( QString const& name, T default_value );
      // as above but sets a default value (and type) if the item did not exist before.
 
     QString local_subfolder();
@@ -223,8 +233,12 @@ private:
 
     QAction *aboutAction_;
     QAction *verboseAction_;
+    QAction *openSessionAction_;
+    QAction *newSessionAction_;
+    QAction *saveSessionAction_;
 
     QMenu *helpMenu_;
+    QMenu *sessionMenu_;
     QMenu *extraMenu_;
 
     enum PendingRequest {

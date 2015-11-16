@@ -1,9 +1,10 @@
 TODO LIST
+- solve issues noted by franky (on see his email of 2015-11-12)
+- store triplets username/private_key/public_key in .cfg as soon as it authentication was possible
 
 - the config file is in fact a session configuration
   Things would probably be more practical if we had a session configuration file
   (selectable by user) and a Launcher config file
-
 
 - fix compile time warnings on macosx
 
@@ -27,6 +28,9 @@ TODO LIST
 
 DONE (reverse chronological order)
 ==================================
+2015-11-12
+- improved error handling with authentication.
+
 2015-11-11
 - templates:
   . could be implemented as session config files : not a good idea, script is not
