@@ -181,7 +181,8 @@ public:
     bool getPrivatePublicKeyPair();
     void updateResourceItems();
     bool isUserAuthenticated() const;
-
+    bool offline() const;
+    void set_offline(bool);
     void lookForJobscript( QString const& job_folder );
     bool loadJobscript( QString const& filepath );
     bool saveJobscript( QString const& filepath );

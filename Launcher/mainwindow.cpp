@@ -464,7 +464,7 @@
          // we consider this as NO unsaved changes (
             this->launcher_.script.set_has_unsaved_changes(false);
         }
-        if( !this->ui->wOffline->text()==OFFLINE && !this->isUserAuthenticated() ) {
+        if( !this->offline() && !this->isUserAuthenticated() ) {
             this->on_wAuthenticate_clicked();
         }
     }
@@ -1277,6 +1277,17 @@ bool MainWindow::isUserAuthenticated() const
     return this->sshSession_.isAuthenticated();
 }
 
+bool MainWindow::offline() const
+{
+    bool offline = (this->ui->wOffline->text()==OFFLINE);
+    return offline;
+}
+
+void MainWindow::set_offline( bool offline )
+{
+    this->ui->wOffline->setText( (offline ? OFFLINE : "") );
+}
+
 void MainWindow::activateAuthenticateButton (bool activate, QString const& inactive_button_text )
 {
     if( activate ) {
@@ -1460,7 +1471,6 @@ void MainWindow::on_wAuthenticate_clicked()
     }
     if( no_connection )
     {
-        this->ui->wOffline->setText(OFFLINE);
         this->statusBar()->showMessage("Launcher was unable to make a connection. Proceeding offline.");
      // attempt to obtain cluster modules from config file, to enable the user to work offline.
         QString modules_cluster = QString("modules_").append(this->getSessionConfigItem("wCluster")->value().toString() );
@@ -1473,9 +1483,8 @@ void MainWindow::on_wAuthenticate_clicked()
             this->ui->wSelectModule->addItems(modules);
             this->statusBar()->showMessage("Using List of modules from a previous session. Authenticate to update it.");
         }
-    } else {
-        this->ui->wOffline->setText("");
     }
+    this->set_offline( no_connection );
     this->setIgnoreSignals(false);
 }
 

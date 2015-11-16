@@ -1,7 +1,4 @@
 TODO LIST
-
-
-
 - fix compile time warnings on macosx
 
 - win32 version
