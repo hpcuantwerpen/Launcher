@@ -14,6 +14,7 @@
 #include <cmath>
 #include <time.h>
 
+#define OFFLINE "Offline"
 #define INITIAL_VERBOSITY 2
 #define NO_ARGUMENT QString()
 #define LOG_AND_CHECK_IGNORESIGNAL( ARGUMENT ) \
@@ -73,6 +74,11 @@
 
 #define TITLE "Launcher"
 
+    enum {
+        MainWindowUnderConstruction = -2
+      , MainWindowConstructedButNoPreviousPage = -1
+    };
+
     QString short_version(int level=2)
     {
         QString version(VERSION);
@@ -109,7 +115,7 @@
       : QMainWindow(parent)
       , ui(new Ui::MainWindow)
       , ignoreSignals_(false)
-      , previousPage_(0)
+      , previousPage_(MainWindowUnderConstruction)
       , verbosity_(INITIAL_VERBOSITY)
       , pendingRequest_(NoPendingRequest)
     {
@@ -150,6 +156,8 @@
         this->ui->wNotFinished->setFont(font);
         this->ui->wRetrieved  ->setFont(font);
 #endif
+     // keep this the last line
+        previousPage_ = MainWindowConstructedButNoPreviousPage;
     }
 
     void MainWindow::createActions()
@@ -161,12 +169,15 @@
         connect( verboseAction_, SIGNAL(triggered()), this, SLOT( verbose_logging() ) );
 
         openSessionAction_ = new QAction("&Open session ...", this);
+        openSessionAction_ ->setShortcuts(QKeySequence::Open);
         connect( openSessionAction_, SIGNAL(triggered()), this, SLOT( open_session() ) );
 
-        newSessionAction_ = new QAction("&New session", this);
+        newSessionAction_ = new QAction("&New session ...", this);
+        newSessionAction_ ->setShortcuts(QKeySequence::New);
         connect( newSessionAction_, SIGNAL(triggered()), this, SLOT( new_session() ) );
 
-        saveSessionAction_ = new QAction("&Save session", this);
+        saveSessionAction_ = new QAction("&Save session ...", this);
+        saveSessionAction_ ->setShortcuts(QKeySequence::Save);
         connect( saveSessionAction_, SIGNAL(triggered()), this, SLOT( save_session() ) );
     }
 
@@ -257,7 +268,7 @@
         }
     }
 
-    void MainWindow::open_session( )
+    void MainWindow::open_session()
     {
         LOG_AND_CHECK_IGNORESIGNAL( NO_ARGUMENT );
 
@@ -273,12 +284,15 @@
         }
     }
 
-    void MainWindow::open_session( QString const& path )
+    void MainWindow::open_session( QString const& path_to_session_data )
     {
-        LOG_CALLER << QString("\n      path; '%1'").arg(path).C_STR();
+        LOG_CALLER << QString("\n      path; '%1'").arg(path_to_session_data).C_STR();
 
-        this->launcher_.session_config.load(path);
+        this->launcher_.session_config.load(path_to_session_data);
         this->setup_session();
+
+        QString msg = QString("Current Launcher session '%1'.").arg(path_to_session_data);
+        this->statusBar()->showMessage(msg);
     }
 
     void MainWindow::setup_session( )
@@ -450,7 +464,9 @@
          // we consider this as NO unsaved changes (
             this->launcher_.script.set_has_unsaved_changes(false);
         }
-        this->on_wAuthenticate_clicked();
+        if( !this->ui->wOffline->text()==OFFLINE && !this->isUserAuthenticated() ) {
+            this->on_wAuthenticate_clicked();
+        }
     }
 
     void MainWindow::save_session()
@@ -479,6 +495,8 @@
         LOG_CALLER << QString("\n      path: '%1'").arg( path_to_session_data ).C_STR();
         this->launcher_.session_config.save( path_to_session_data );
         this->save_session_path( path_to_session_data );
+        QString msg = QString("Launcher session saved as '%1'.").arg(path_to_session_data);
+        this->statusBar()->showMessage(msg);
     }
 
     QString
@@ -588,7 +606,7 @@
         this->save_session( this->launcher_.session_config.filename() );
 
         if ( this->launcher_.script.has_unsaved_changes() ) {
-            QMessageBox::Button answer = QMessageBox::question(this,TITLE,"The current script has unsaved changes.\nDo you want to save?");
+            QMessageBox::Button answer = QMessageBox::question(this,TITLE,"The current job script has unsaved changes.\nDo you want to save?");
             if(answer==QMessageBox::Yes) {
                 Log(1) << "\n    - Calling on_wSave_clicked()";
                 this->on_wSave_clicked();
@@ -1212,24 +1230,22 @@ void MainWindow::on_wUsername_editingFinished()
         this->statusBar()->showMessage("Invalid username");
      // reset the ssh session
         this->sshSession_.reset();
-     // and forget the keys in the config file
-        this->getSessionConfigItem("privateKey")->set_value( QString() );
-        this->getSessionConfigItem("publicKey" )->set_value( QString() );
         this->activateAuthenticateButton(false);
     } else
     {// valid username
         this->ui->wUsername->setPalette( QApplication::palette(this->ui->wUsername) );
-        cfg::Item* user = this->getSessionConfigItem("wUsername");
-        if( user->value().toString() == username )
+        cfg::Item* ci_user = this->getSessionConfigItem("wUsername");
+        if( ci_user->value().toString() == username )
         {// username is the same as in the config, hence it has not changed!
             if( this->isUserAuthenticated() )
             {// User is still authenticated, there is little to be done.
                 this->activateAuthenticateButton(false,"authenticated");
+                this->statusBar()->showMessage( QString("User %1 is authenticated.").arg( this->sshSession_.username() ) );
                 return;
             } else
             {// Authentication needed
                 this->sshSession_.setUsername(username);
-             // set private/public key pair from config
+             // set private/public key from config
                 if( this->sshSession_.setPrivatePublicKeyPair
                         ( this->getSessionConfigItem("privateKey")->value().toString()
 #                   ifndef NO_PUBLIC_KEY_NEEDED
@@ -1238,17 +1254,17 @@ void MainWindow::on_wUsername_editingFinished()
                         , false
                         )
                   ) {
-                    this->statusBar()->showMessage("Private/public key pair found in config file.");
+                    this->statusBar()->showMessage("Authentication key found in session file.");
+                    if( !this->getSessionConfigItem("passphraseNeeded")->value().toBool() ) {
+                        this->on_wAuthenticate_clicked();
+                        return;
+                    }
                 }
             }
         } else
         {// this is a new username, different from current config value:
-         // store in config
-            user->set_value(username);
-         // clear config values for private/public key pair
-            this->getSessionConfigItem("privateKey")->set_value( QString() );
-            this->getSessionConfigItem("publicKey" )->set_value( QString() );
-         // set the username for the ssh session
+         // prepare this->sshSession_ to open with the new username, but
+         // don't store username/privateKey/... in the session config until a successfull authentication.
             this->sshSession_.setUsername(username);
         }
         this->activateAuthenticateButton(true);
@@ -1283,6 +1299,28 @@ void MainWindow::on_wAuthenticate_clicked()
 {
     LOG_AND_CHECK_IGNORESIGNAL(NO_ARGUMENT);
 
+    if( this->previousPage_==MainWindowUnderConstruction )
+    {// try to authenticate ONLY if no user interaction is required.
+        if( this->ui->wUsername->text().isEmpty() ) {
+            Log() << "\n    Automatic authentication canceled: missing user name.";
+            return;
+        }
+        if( this->getSessionConfigItem("privateKey")->value().toString().isEmpty() ) {
+            Log() << "\n    Automatic authentication canceled: missing private key.";
+            return;
+        } // do we have a private key
+#ifndef NO_PUBLIC_KEY_NEEDED
+        if( this->getSessionConfigItem("publicKey" )->value().toString().isEmpty() ) {
+            Log() << "\n    Automatic authentication canceled: missing public key.";
+            return;
+        }
+#endif
+        if( this->getSessionConfigItem("passphraseNeeded")->value().toBool() ) {
+            Log() << "\n    Automatic authentication canceled: passphrase needed.";
+            return;
+        }
+    }
+
     this->setIgnoreSignals();
     int max_attempts = 3;
     bool no_connection = false;
@@ -1307,14 +1345,16 @@ void MainWindow::on_wAuthenticate_clicked()
                 if( username.isEmpty() ) {
                     this->warn("Invalid username. Expecting 'vscXXXXX'.");
                     result = failed;
-                } else {
+                } else
+                {// if the username in the session config is the same,
+                 // we can try with the key from the session config too.
                     this->sshSession_.setUsername( username );
                     if( this->getSessionConfigItem("wUsername")->value().toString() == username ) {
                         this->sshSession_.setPrivatePublicKeyPair
                                 ( this->getSessionConfigItem("privateKey")->value().toString()
-                        #ifndef NO_PUBLIC_KEY_NEEDED
+#ifndef NO_PUBLIC_KEY_NEEDED
                                 , this->getSessionConfigItem("publicKey" )->value().toString()
-                        #endif
+#endif
                                 , false
                                 );
                     }
@@ -1369,16 +1409,17 @@ void MainWindow::on_wAuthenticate_clicked()
             Log(0) << msg.prepend("\n    ").C_STR();
          // remove keys from ssh session and from config
             this->sshSession_.setUsername( this->getSessionConfigItem("wUsername")->value().toString() );
-            this->getSessionConfigItem("privateKey")->set_value( QString() );
-            this->getSessionConfigItem("publicKey" )->set_value( QString() );
             result = failed;
         }
         if( result==success )
         {
             this->activateAuthenticateButton(false,"authenticated");
-            this->statusBar()->showMessage("Authentication succeeded.");
+            this->statusBar()->showMessage( QString("User %1 is authenticated.").arg( this->sshSession_.username() ) );
             this->getSessionConfigItem("privateKey")->set_value( this->sshSession_.privateKey() );
+#ifndef NO_PUBLIC_KEY_NEEDED
             this->getSessionConfigItem("publicKey" )->set_value( this->sshSession_. publicKey() );
+#endif
+            this->getSessionConfigItem("passphraseNeeded")->set_value( this->sshSession_.hasPassphrase() );
 
             this->resolveRemoteFileLocations_();
 
@@ -1397,29 +1438,29 @@ void MainWindow::on_wAuthenticate_clicked()
             this->getSessionConfigItem(modules_cluster)->set_choices(modules);
 
             break; //out of while loop
-        } else
+        }
         if( result==retry ) {
             continue; // = retry
         }
-        else
         if( result==failed ) {
+            QString msg;
             if( attempts==0 )
-            {// after 3 unsuccesfull attempts to authenticate, we remove the keys from the config
-             // and the session: they are probably wrong
+            {// after 3 unsuccesfull attempts to authenticate, we remove the keys from the session: they are probably wrong
                 this->sshSession_.setUsername( this->getSessionConfigItem("wUsername")->value().toString() );
-                this->getSessionConfigItem("privateKey")->set_value( QString() );
-                this->getSessionConfigItem("publicKey" )->set_value( QString() );
 
-                QString msg = QString("Authentication failed: %1 failed attempts to provide passphrase.").arg(max_attempts);
-                this->statusBar()->showMessage(msg);
-                Log(0) << msg.prepend("\n    ").C_STR()
-                       << "\n    Forgetting keys now.";
+                msg = QString("Authentication failed: %1 failed attempts to provide passphrase.").arg(max_attempts);
+            } else {
+                QString msg = "Authentication failed.";
             }
+            this->statusBar()->showMessage(msg);
+            Log(0) << msg.prepend("\n    ").C_STR();
+
             break; //out of while loop
         }
     }
     if( no_connection )
     {
+        this->ui->wOffline->setText(OFFLINE);
         this->statusBar()->showMessage("Launcher was unable to make a connection. Proceeding offline.");
      // attempt to obtain cluster modules from config file, to enable the user to work offline.
         QString modules_cluster = QString("modules_").append(this->getSessionConfigItem("wCluster")->value().toString() );
@@ -1432,6 +1473,8 @@ void MainWindow::on_wAuthenticate_clicked()
             this->ui->wSelectModule->addItems(modules);
             this->statusBar()->showMessage("Using List of modules from a previous session. Authenticate to update it.");
         }
+    } else {
+        this->ui->wOffline->setText("");
     }
     this->setIgnoreSignals(false);
 }
@@ -1632,10 +1675,10 @@ void MainWindow::on_wJobnameButton_clicked()
     QString remote_folder = this->remote_subfolder_jobname();
     this->ui->wJobname2->setToolTip(remote_folder);
 
-    this->getSessionConfigItem   ( "localFolder")->set_value(selected);
-    this->getSessionConfigItem   ("remoteFolder")->set_value(remote_folder);
-    this->getDataConnector( "localFolder")->value_config_to_script();
-    this->getDataConnector("remoteFolder")->value_config_to_script();
+    this->getSessionConfigItem( "localFolder")->set_value(selected);
+    this->getSessionConfigItem("remoteFolder")->set_value(remote_folder);
+    this->getDataConnector    ( "localFolder")->value_config_to_script();
+    this->getDataConnector    ("remoteFolder")->value_config_to_script();
 
     this->lookForJobscript( selected );
 }
@@ -1643,26 +1686,14 @@ void MainWindow::on_wJobnameButton_clicked()
 void MainWindow::lookForJobscript( QString const& job_folder)
 {
     QString script_file = QString(job_folder).append("/pbs.sh");
+    QString msg;
     if( QFile::exists(script_file) ) {
-
-        QMessageBox::StandardButton answer =
-            QMessageBox::question(this, TITLE
-                                 , QString("The local job directory '%1' already contains a job script 'pbs.sh'.\n"
-                                           "Do you want to load it?")
-                                      .arg( job_folder )
-                                 , QMessageBox::Yes|QMessageBox::No
-                                 , QMessageBox::Yes
-                                 );
-        if( answer == QMessageBox::Yes ) {
-            this->loadJobscript(script_file);
-            this->statusBar()->showMessage( QString("Job script '%1' loaded.").arg(script_file) );
-        } else {
-            QMessageBox::warning( this, TITLE
-                                , QString("The job script '%1' was not loaded. It will be overwritten if you save the current job script under this jobname.")
-                                     .arg( script_file )
-                                );
-        }
+        this->loadJobscript(script_file);
+        msg = QString("Job script '%1' loaded.").arg(script_file);
+    } else {
+        msg = QString("New Job script '%1'.").arg(script_file);
     }
+    this->statusBar()->showMessage(msg);
 }
 
 bool MainWindow::loadJobscript( QString const& filepath )

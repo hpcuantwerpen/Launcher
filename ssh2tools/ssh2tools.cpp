@@ -110,7 +110,9 @@ namespace ssh2
       )
     {
         this->private_key_.clear();
+#ifndef NO_PUBLIC_KEY_NEEDED
         this-> public_key_.clear();
+#endif
         this-> passphrase_.clear();
         this->isAuthenticated_ = false;
 
@@ -151,10 +153,18 @@ namespace ssh2
             if( must_throw ) { throw_<std::runtime_error>("Refused to set password without username."); }
             else             { return false; }
         }
-        if( this->private_key_.empty() || this->public_key_.empty() ) {
-            if( must_throw ) { throw_<std::runtime_error>("Refused to set password without private/public key pair."); }
+        if( this->private_key_.empty()
+          ) {
+            if( must_throw ) { throw_<std::runtime_error>("Refused to set password without private key."); }
             else             { return false; }
         }
+#ifndef NO_PUBLIC_KEY_NEEDED
+        if( this->public_key_.empty()
+          ) {
+            if( must_throw ) { throw_<std::runtime_error>("Refused to set password without public key."); }
+            else             { return false; }
+        }
+#endif
         this->passphrase_ = passphrase.toStdString();
         return true;
     }
@@ -333,7 +343,10 @@ namespace ssh2
             } else {
                 QString msg = QString("Failed at libssh2_userauth_publickey_fromfile, exitcode=%1.").arg(rv);
                 if( rv==LIBSSH2_ERROR_FILE ) {
-                    msg.append("(LIBSSH2_ERROR_FILE: Note that key pairs generated with PuTTY Key Generator must be converted to openssh format.");
+                    msg.append("\n(LIBSSH2_ERROR_FILE: The key file could not be read. Note that key pairs generated with PuTTY Key Generator must be converted to openssh format).");
+                }
+                if( rv==LIBSSH2_ERROR_AUTHENTICATION_FAILED ) {
+                    msg.append("\n(LIBSSH2_ERROR_AUTHENTICATION_FAILED: possible username/key mismatch).");
                 }
                 throw_<std::runtime_error>( msg.C_STR() );
             }
@@ -921,7 +934,9 @@ namespace ssh2
 
         this->   username_.clear();
         this->private_key_.clear();
+#ifndef NO_PUBLIC_KEY_NEEDED
         this-> public_key_.clear();
+#endif
         this-> passphrase_.clear();
         this->isAuthenticated_= false;
 #ifdef Q_OS_WIN
@@ -959,7 +974,9 @@ namespace ssh2
            << "\n    login node  : " << QString( this->login_node_          .c_str() )
            << "\n    username    : " << QString( this->username_            .c_str() )
            << "\n    private key : " << QString( this->private_key_         .c_str() )
+#ifndef NO_PUBLIC_KEY_NEEDED
            << "\n    public  key : " << QString( this->public_key_          .c_str() )
+#endif
            << "\n    passphrase  : '"<< QString( scramble(this->passphrase_).c_str() )<<"'"
            ;
         return s;

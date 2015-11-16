@@ -1,10 +1,6 @@
 TODO LIST
-- solve issues noted by franky (on see his email of 2015-11-12)
-- store triplets username/private_key/public_key in .cfg as soon as it authentication was possible
 
-- the config file is in fact a session configuration
-  Things would probably be more practical if we had a session configuration file
-  (selectable by user) and a Launcher config file
+
 
 - fix compile time warnings on macosx
 
@@ -28,6 +24,13 @@ TODO LIST
 
 DONE (reverse chronological order)
 ==================================
+2015-11-16
+- session management added new/open/save (session = config file, *.data), launcher.cfg used to store
+  the path to the session config.
+- public key no longer needed (solve issues noted by franky, see his email of 2015-11-12)
+- username and private_key are stored in session file only after successfull authentication
+- no user input requested before the main Launcher window is up and running
+
 2015-11-12
 - improved error handling with authentication.
 

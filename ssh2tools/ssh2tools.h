@@ -84,14 +84,17 @@ namespace ssh2
          // Returns true in case of success.
          // If the function fails it returns or throws if must_throw is true.
 
-        const char * privateKey() const { return this->private_key_.c_str(); }
+#ifndef NO_PUBLIC_KEY_NEEDED
         const char *  publicKey() const { return this-> public_key_.c_str(); }
+#endif
+        const char * privateKey() const { return this->private_key_.c_str(); }
          // read only accessors
 
         bool setPassphrase( QString const & passphrase, bool must_throw=true );
          // set the passphrase
          // throws a std::runtime_error if the username or private/public key pair
          // have not been successfully set before.
+        bool hasPassphrase() const { return !this->passphrase_.empty(); }
 
         void authenticate() { this->open(); }
         void open();
@@ -181,9 +184,11 @@ namespace ssh2
         static bool isInitializedLibssh_;
         std::string login_node_
                   , username_
-                  , passphrase_
                   , private_key_
+#ifndef NO_PUBLIC_KEY_NEEDED
                   , public_key_
+#endif
+                  , passphrase_
                   ;
      // set by Session::execute()
         QString qout_, qerr_;
