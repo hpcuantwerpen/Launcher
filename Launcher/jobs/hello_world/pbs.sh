@@ -10,8 +10,6 @@
 #LAU remote_folder = unknown
 #PBS -l nodes=1:ppn=20
 #PBS -l walltime=1:00:00
-#PBS -M engelbert.tijskens@uantwerpen.be
-#PBS -m a
 #PBS -W x=nmatchpolicy:exactnode
 #PBS -N hello_world
 #

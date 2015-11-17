@@ -581,7 +581,7 @@ p, li { white-space: pre-wrap; }
                 </palette>
                </property>
                <property name="text">
-                <string>TextLabel</string>
+                <string/>
                </property>
               </widget>
              </item>

@@ -25,16 +25,20 @@ SOURCES  += main.cpp        \
             launcher.cpp \
             clusterinfo.cpp \
             dataconnector.cpp \
-            job.cpp
+            job.cpp \
+    messagebox.cpp
 
 HEADERS  += mainwindow.h   \
             version.h \
             launcher.h \
             clusterinfo.h \
             dataconnector.h \
-            job.h
+            job.h \
+    messagebox.h
 
 FORMS    += mainwindow.ui
+
+DEFINES  += BETA_RELEASE
 
 # The order below matters!  undefined references may appear if wrong
 # e.g in libtoolbox.a (referenced in libjobscript.a) if toolbox comes before jobscript.

@@ -18,6 +18,7 @@
 
 #include <iostream>
 
+#include "messagebox.h"
 #include "version.h"
 
 namespace Ui {
@@ -94,7 +95,9 @@ private slots:
 
     void on_wNotifyEnd_toggled(bool checked);
 
-    void on_wUsername_editingFinished();
+//    void on_wUsername_editingFinished();
+//    void on_wUsername_returnPressed();
+    void on_wUsername_textChanged(const QString &arg1);
 
     void on_wAuthenticate_clicked();
 
@@ -249,6 +252,7 @@ private:
     } pendingRequest_;
 
     QString selected_job_;
+    MessageBox messages_;
 };
 
 
