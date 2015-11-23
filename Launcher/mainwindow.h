@@ -9,6 +9,7 @@
 #include <QCheckBox>
 #include <QPalette>
 #include <QMap>
+#include <QStringList>
 #include <QtDebug>
 
 #include <launcher.h>
@@ -55,11 +56,6 @@ private:
     void setup_session();
     void save_session( QString const& path );
 private slots:
-    void about();
-    void verbose_logging();
-    void new_session();
-    void open_session();
-    void save_session();
 
     void on_wCluster_currentIndexChanged(const QString &arg1);
 
@@ -97,21 +93,19 @@ private slots:
 
 //    void on_wUsername_editingFinished();
 //    void on_wUsername_returnPressed();
-    void on_wUsername_textChanged(const QString &arg1);
+//    void on_wUsername_textChanged(const QString &arg1);
 
-    void on_wAuthenticate_clicked();
+//    void on_wAuthenticate_clicked();
 
-    void on_wLocalFileLocationButton_clicked();
+    //    void on_wLocalFileLocationButton_clicked();
 
-    void on_wSubfolder_textChanged(const QString &arg1);
+    void on_wProjectFolder_textChanged(const QString &arg1);
 
     void on_wJobname_textChanged(const QString &arg1);
 
-    void on_wSubfolderButton_clicked();
+    void on_wProjectFolderButton_clicked();
 
     void on_wJobnameButton_clicked();
-
-    void on_wRemote_currentIndexChanged(const QString &arg1);
 
     void on_wSave_clicked();
 
@@ -153,9 +147,22 @@ private slots:
 
     void on_wClearSelection_clicked();
 
-    void on_wCreateTemplate_clicked();
+    void aboutAction_triggered();
+    void openSessionAction_triggered();
+    void newSessionAction_triggered();
+    void saveSessionAction_triggered();
+    void authenticateAction_triggered();
+    void localFileLocationAction_triggered();
+    void remoteFileLocationAction_triggered();
+    void verboseAction_triggered();
+    void selectTemplateAction_triggered();
+    void createTemplateAction_triggered();
 
-    void on_wSelectTemplate_clicked();
+    void on_wShowFilelocations_clicked();
+
+    void on_wShowLocalJobFolder_clicked();
+
+    void on_wShowRemoteJobFolder_clicked();
 
 public:
     void setupHome();
@@ -175,17 +182,15 @@ public:
      // retrieve the job (if finished) and update status_
     void retrieveAll( bool local, bool vsc_data ) const;
 
-
     void      clusterDependencies( bool updateWidgets );
     void      nodesetDependencies( bool updateWidgets );
     void walltimeUnitDependencies( bool updateWidgets );
 
     void update_abe( QChar c, bool checked );
-    bool getPrivatePublicKeyPair();
+    bool authenticate(bool silent = true);
+    bool requiresAuthentication(const QString &action = QString() );
+
     void updateResourceItems();
-    bool isUserAuthenticated() const;
-    bool offline() const;
-    void set_offline(bool);
     void lookForJobscript( QString const& job_folder );
     bool loadJobscript( QString const& filepath );
     bool saveJobscript( QString const& filepath );
@@ -197,19 +202,25 @@ public:
     cfg::Item* getSessionConfigItem( QString const& name, T default_value );
      // as above but sets a default value (and type) if the item did not exist before.
 
+    QString local_file_location();
+    QString remote_file_location();
+
     QString local_subfolder();
     QString local_subfolder_jobname();
     QString remote_subfolder();
     QString remote_subfolder_jobname();
+    enum LocalOrRemote {LOCAL,REMOTE};
+    QString jobs_project_path( LocalOrRemote local_or_remote, bool resolve=true );
+    QString jobs_project_job_path( LocalOrRemote local_or_remote, bool resolve=true );
 
-    void resolveRemoteFileLocations_();
+    void getRemoteFileLocations_();
 
     QString get_path_to_clusters();
 
     void createActions();
     void createMenus();
 
-    void activateAuthenticateButton( bool activate, QString const& inactive_button_text="authenticate..." );
+//    void activateAuthenticateButton( bool activate, QString const& inactive_button_text="authenticate..." );
 
     QString selectedJob( QTextEdit* qTextEdit );
     void clearSelection( QTextEdit* qTextEdit );
@@ -220,6 +231,10 @@ public:
     void warn( QString const& msg1, QString const& msg2=QString() );
     // msg1 -> status bar
     // msg1+msg2 -> QMessageBox::warning
+
+    QString username();
+    bool can_authenticate();
+    void update_WindowTitle();
 
 private:
     Ui::MainWindow *ui;
@@ -235,15 +250,23 @@ private:
     QMap<QString,QString> remote_env_vars_;
     int verbosity_;
 
-    QAction *aboutAction_;
-    QAction *verboseAction_;
-    QAction *openSessionAction_;
-    QAction *newSessionAction_;
-    QAction *saveSessionAction_;
+    QMenu* helpMenu_;
+    QAction*aboutAction_;
 
-    QMenu *helpMenu_;
-    QMenu *sessionMenu_;
-    QMenu *extraMenu_;
+    QMenu* sessionMenu_;
+    QAction* openSessionAction_;
+    QAction* newSessionAction_;
+    QAction* saveSessionAction_;
+
+    QMenu* extraMenu_;
+    QAction* authenticateAction_;
+    QAction* localFileLocationAction_;
+    QAction* remoteFileLocationAction_;
+    QAction* verboseAction_;
+
+    QMenu* templatesMenu_;
+    QAction* selectTemplateAction_;
+    QAction* createTemplateAction_;
 
     enum PendingRequest {
         NoPendingRequest=0
@@ -253,6 +276,8 @@ private:
 
     QString selected_job_;
     MessageBox messages_;
+    QString is_uptodate_for_;
+    QStringList remote_file_locations_;
 };
 
 

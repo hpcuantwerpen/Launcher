@@ -128,11 +128,7 @@
         {// This must be the first time after installation...
             this->setupHome();
         }
-#ifdef QT_DEBUG
-        this->setWindowTitle(QString("%1 %2").arg(TITLE).arg(VERSION));
-#else
-        this->setWindowTitle(QString("%1 %2").arg(TITLE).arg(short_version(3)));
-#endif
+        this->update_WindowTitle();
         qsrand( time(nullptr) );
 
      // read the cfg::Config object from file
@@ -165,22 +161,37 @@
     void MainWindow::createActions()
     {
         aboutAction_ = new QAction("&About", this);
-        connect( aboutAction_, SIGNAL(triggered()), this, SLOT( about() ) );
+        connect( aboutAction_, SIGNAL(triggered()), this, SLOT( aboutAction_triggered() ) );
 
         verboseAction_ = new QAction("Verbose logging", this);
-        connect( verboseAction_, SIGNAL(triggered()), this, SLOT( verbose_logging() ) );
+        connect( verboseAction_, SIGNAL(triggered()), this, SLOT( verboseAction_triggered() ) );
 
         openSessionAction_ = new QAction("&Open session ...", this);
         openSessionAction_ ->setShortcuts(QKeySequence::Open);
-        connect( openSessionAction_, SIGNAL(triggered()), this, SLOT( open_session() ) );
+        connect( openSessionAction_, SIGNAL(triggered()), this, SLOT( openSessionAction_triggered() ) );
 
         newSessionAction_ = new QAction("&New session ...", this);
         newSessionAction_ ->setShortcuts(QKeySequence::New);
-        connect( newSessionAction_, SIGNAL(triggered()), this, SLOT( new_session() ) );
+        connect( newSessionAction_, SIGNAL(triggered()), this, SLOT( newSessionAction_triggered() ) );
 
         saveSessionAction_ = new QAction("&Save session ...", this);
         saveSessionAction_ ->setShortcuts(QKeySequence::Save);
-        connect( saveSessionAction_, SIGNAL(triggered()), this, SLOT( save_session() ) );
+        connect( saveSessionAction_, SIGNAL(triggered()), this, SLOT( saveSessionAction_triggered() ) );
+
+        authenticateAction_ = new QAction("authenticate ...", this);
+        connect( authenticateAction_, SIGNAL(triggered()), this, SLOT( authenticateAction_triggered() ) );
+
+        localFileLocationAction_ = new QAction("Choose new local file location ...", this);
+        connect( localFileLocationAction_, SIGNAL(triggered()), this, SLOT( localFileLocationAction_triggered() ) );
+
+        remoteFileLocationAction_ = new QAction("Choose new remote file location ...", this);
+        connect( remoteFileLocationAction_, SIGNAL(triggered()), this, SLOT( remoteFileLocationAction_triggered() ) );
+
+        createTemplateAction_ = new QAction("Create a job template ...", this);
+        connect( createTemplateAction_, SIGNAL(triggered()), this, SLOT( createTemplateAction_triggered() ) );
+
+        selectTemplateAction_ = new QAction("Select a job template ...", this);
+        connect( selectTemplateAction_, SIGNAL(triggered()), this, SLOT( selectTemplateAction_triggered() ) );
     }
 
     void MainWindow::createMenus()
@@ -192,13 +203,22 @@
         sessionMenu_ ->addAction( newSessionAction_);
         sessionMenu_ ->addAction(openSessionAction_);
         sessionMenu_ ->addAction(saveSessionAction_);
+        sessionMenu_ ->addAction(authenticateAction_);
+        sessionMenu_ ->addAction(localFileLocationAction_);
+        sessionMenu_ ->addAction(remoteFileLocationAction_);
+
+        templatesMenu_ = menuBar()->addMenu("&Templates");
+        templatesMenu_ ->addAction(selectTemplateAction_);
+        templatesMenu_ ->addAction(createTemplateAction_);
 
         extraMenu_ = menuBar()->addMenu("&Extra");
         extraMenu_ ->addAction(verboseAction_);
     }
 
-    void MainWindow::about()
+    void MainWindow::aboutAction_triggered()
     {
+        LOG_AND_CHECK_IGNORESIGNAL(NO_ARGUMENT);
+
         QString msg;
         msg.append( QString("program : %1\n").arg(TITLE  ) )
            .append( QString("version : %1\n").arg(VERSION) )
@@ -207,12 +227,13 @@
         QMessageBox::about(this,TITLE,msg);
     }
 
-    void MainWindow::verbose_logging()
+    void MainWindow::verboseAction_triggered()
     {
+        LOG_AND_CHECK_IGNORESIGNAL(NO_ARGUMENT);
         this->verbosity_ = ( this->verboseAction_->isChecked() ? 2 : 0 );
     }
 
-    void MainWindow::new_session()
+    void MainWindow::newSessionAction_triggered()
     {
         LOG_AND_CHECK_IGNORESIGNAL( NO_ARGUMENT );
 
@@ -270,7 +291,7 @@
         }
     }
 
-    void MainWindow::open_session()
+    void MainWindow::openSessionAction_triggered()
     {
         LOG_AND_CHECK_IGNORESIGNAL( NO_ARGUMENT );
 
@@ -320,6 +341,14 @@
 
         this->setIgnoreSignals();
         cfg::Item* ci = nullptr;
+
+     // username and keys
+        this->getSessionConfigItem("username"  , QString() );
+        this->getSessionConfigItem("privateKey", QString() );
+#ifndef NO_PUBLIC_KEY_NEEDED
+        this->getSessionConfigItem("publicKey" , QString() );
+#endif
+        this->getSessionConfigItem("passphraseNeeded", true );
      // wWalltimeUnit
         ci = this->getSessionConfigItem("wWalltimeUnit");
         if( !ci->isInitialized() ) {
@@ -367,6 +396,7 @@
         }
         if( !ci->isInitialized() )
             ci->set_value( ci->default_value() );
+
         this->clusterDependencies(false);
 
         this->data_.append( dc::newDataConnector( this->ui->wCluster       , "wCluster"       , "cluster"    ) );
@@ -380,67 +410,43 @@
 
         this->storeResetValues();
 
-        this->data_.append( dc::newDataConnector( this->ui->wUsername, "wUsername", "" ) );
-        bool can_authenticate = !this->getSessionConfigItem("wUsername")->value().toString().isEmpty();
-        this->activateAuthenticateButton( can_authenticate );
-
      //=====================================
-     // wRemote/wLocal/wSubfolder/wJobname
-     // wRemote
-        ci = this->getSessionConfigItem("wRemote");
+     // remote file location/local file location/wProjectFolder/wJobname
+     // Remote file location
+        ci = this->getSessionConfigItem("remoteFileLocation");
         if( !ci->isInitialized() ) {
-            ci->set_choices( QStringList({"$VSC_SCRATCH","$VSC_DATA"}) );
-            ci->set_value("$VSC_SCRATCH");
+            QStringList options({"$VSC_SCRATCH/Launcher-jobs","$VSC_DATA/Launcher-jobs"});
+            ci->set_choices(options);
+            ci->set_value(options[0]);
         }
-        this->data_.append( dc::newDataConnector( this->ui->wRemote, "wRemote", "") );
-     // wLocal
-        ci = this->getSessionConfigItem("wLocal");
-        if( !ci->isInitialized() ) {
-            ci                               ->set_value_and_type( this->launcher_.homePath() );
-            this->getSessionConfigItem("wSubfolder")->set_value_and_type("jobs");
-            this->getSessionConfigItem("wJobname"  )->set_value_and_type("hello_world");
-        }
-        this->data_.append( dc::newDataConnector( this->ui->wLocal, "wLocal", "") );
-     // Subfolder
-        QString value = this->getSessionConfigItem("wSubfolder")->value().toString();
-        if( !value.isEmpty() ) {
-            this->ui->wSubfolder ->setText(value);
-            this->ui->wSubfolder2->setText(value);
-        }
+
+     // local file location
+        this->getSessionConfigItem("localFileLocation", this->launcher_.homePath("jobs") );
+     // project folder
+        this->getSessionConfigItem("wProjectFolder", "");
      // wJobname
-        value = this->getSessionConfigItem("wJobname")->value().toString();
-        if( !value.isEmpty() ) {
-            this->ui->wJobname ->setText(value);
-            this->ui->wJobname2->setText(value);
-            this->ui->wCreateTemplate->setEnabled(true);
-        } else {
-            this->ui->wCreateTemplate->setEnabled(false);
+        this->getSessionConfigItem("wJobname","hello_world");
+
+        this->data_.append( dc::newDataConnector( this->ui->wJobname      , "wJobname"      , "-N"           ) );
+        this->data_.append( dc::newDataConnector( this->ui->wProjectFolder, "wProjectFolder", ""             ) );
+        this->data_.append( dc::newDataConnector(                           "localFolder"   , "local_folder" ) );
+        this->data_.append( dc::newDataConnector(                           "remoteFolder"  , "remote_folder") );
+
+     // verify existence of local_file_location[/project_folder[/jobname]]
+        QString path;
+        try {
+            path = this->jobs_project_job_path(LOCAL);
+            this->getSessionConfigItem("localFolder" )->set_value_and_type( path );
+            this->getSessionConfigItem("remoteFolder")->set_value_and_type( this->jobs_project_job_path( REMOTE, false ) ); // no need to store resolved path
+        } catch (std::runtime_error &e ) {
+            Log() << "\n    Error: "<< e.what();
         }
-
-     // verify existence of local file location (if present) and set tooltips
-        QString local_subfolder_jobname = this->local_subfolder_jobname();
-        this->ui->wSubfolder ->setToolTip( this-> local_subfolder() );
-        this->ui->wSubfolder2->setToolTip( this->remote_subfolder() );
-        this->ui->wJobname   ->setToolTip(        local_subfolder_jobname   );
-        this->ui->wJobname2  ->setToolTip( this->remote_subfolder_jobname() );
-
-        this->data_.append( dc::newDataConnector( this->ui->wJobname  , "wJobname"    , "-N" ) );
-        this->data_.append( dc::newDataConnector( this->ui->wSubfolder, "wSubfolder"  , ""   ) );
-        this->data_.append( dc::newDataConnector( this->ui->wLocal    , "wLocal"      , ""   ) );
-        this->data_.append( dc::newDataConnector(                       "localFolder" , "local_folder" ) );
-        this->data_.append( dc::newDataConnector(                       "remoteFolder", "remote_folder") );
-
         QString qs;
-        qs = this->getSessionConfigItem("wSubfolder")->value().toString();
-        this->ui->wSubfolder ->setText(qs);
-        this->ui->wSubfolder2->setText(qs);
+        qs = this->getSessionConfigItem("wProjectFolder")->value().toString();
+        this->ui->wProjectFolder->setText(qs);
 
         qs = this->getSessionConfigItem("wJobname")->value().toString();
-        this->ui->wJobname ->setText(qs);
-        this->ui->wJobname2->setText(qs);
-
-        this->getSessionConfigItem("wEmptyRemoteFolder", true );
-        this->data_.append( dc::newDataConnector( this->ui->wEmptyRemoteFolder, "wEmptyRemoteFolder", "") );
+        this->ui->wJobname->setText(qs);
 
         this->getSessionConfigItem("wCheckCopyToDesktop", true );
         this->data_.append( dc::newDataConnector( this->ui->wCheckCopyToDesktop, "wCheckCopyToDesktop", "") );
@@ -462,18 +468,15 @@
         this->paletteRedForeground_->setColor(QPalette::Text,Qt::red);
 
         if( !this->getSessionConfigItem("wJobname")->value().toString().isEmpty() ) {
-            this->lookForJobscript( local_subfolder_jobname );
+            this->lookForJobscript( path );
         } else
         {// no jobname - all values are either default, or come from the config file
          // we consider this as NO unsaved changes (
             this->launcher_.script.set_has_unsaved_changes(false);
         }
-        if( !this->offline() && !this->isUserAuthenticated() ) {
-            this->on_wAuthenticate_clicked();
-        }
     }
 
-    void MainWindow::save_session()
+     void MainWindow::saveSessionAction_triggered()
     {
         LOG_AND_CHECK_IGNORESIGNAL( NO_ARGUMENT );
 
@@ -507,18 +510,18 @@
     MainWindow::
     local_subfolder()
     {
-        cfg::Item* ci = this->getSessionConfigItem("wLocal");
+        cfg::Item* ci = this->getSessionConfigItem("localFileLocation");
         QString path = ci->value().toString();
         if( path.isEmpty() || !QFile::exists(path) ) {
             if( !path.isEmpty() )
                 this->statusBar()->showMessage( QString("Local file location '%1' was not found").arg(path) );
             QString empty;
             ci->set_value(empty);
-            this->getSessionConfigItem("wSubfolder")->set_value(empty);
+            this->getSessionConfigItem("wProjectFolder")->set_value(empty);
             this->getSessionConfigItem("wJobname"  )->set_value(empty);
             return empty;
         }
-        ci = this->getSessionConfigItem("wSubfolder");
+        ci = this->getSessionConfigItem("wProjectFolder");
         QString s = ci->value().toString();
         path.append("/").append(s);
         if( s.isEmpty() || !QFile::exists(path) ) {
@@ -555,12 +558,77 @@
 
     QString
     MainWindow::
+    jobs_project_path( LocalOrRemote local_or_remote, bool resolve )
+    {
+        QString fileLocation = ( local_or_remote==LOCAL ? "localFileLocation" : "remoteFileLocation" );
+        QString path = QString( this->getSessionConfigItem( fileLocation   )->value().toString() ).append("/")
+                       .append( this->getSessionConfigItem("wProjectFolder")->value().toString() );
+        QDir qdir(path);
+        path = qdir.cleanPath(path);
+        if( local_or_remote==REMOTE ) {
+            if( resolve && path.startsWith('$') && this->sshSession_.isAuthenticated() ) {
+                QString envvar = path.split('/')[0];
+                QString cmd("echo %1");
+                try {
+                    this->sshSession_.execute_remote_command(cmd,envvar);
+                    QString resolved = this->sshSession_.qout().trimmed();
+                    path.replace(envvar,resolved);
+                } catch(std::runtime_error &e ) {
+                 // pass
+                }
+            }
+            return path;
+        } else {
+            if( qdir.exists() ) {
+                return path;
+            } else {
+                throw_<std::runtime_error>("Local project folder does not exist: '%1'", path );
+            }
+        }
+        return QString(); // keep compiler happy
+    }
+
+    QString
+    MainWindow::
+    jobs_project_job_path( LocalOrRemote local_or_remote, bool resolve )
+    {
+        QString fileLocation = ( local_or_remote==LOCAL ? "localFileLocation" : "remoteFileLocation" );
+        QString path = QString( this->getSessionConfigItem( fileLocation   )->value().toString() ).append("/")
+                       .append( this->getSessionConfigItem("wProjectFolder")->value().toString() ).append("/")
+                       .append( this->getSessionConfigItem("wJobname"      )->value().toString() );
+        QDir qdir(path);
+        path = qdir.cleanPath(path);
+        if( local_or_remote==REMOTE ) {
+            if( resolve && path.startsWith('$') && this->sshSession_.isAuthenticated() ) {
+                QString envvar = path.split('/')[0];
+                QString cmd("echo %1");
+                try {
+                    this->sshSession_.execute_remote_command(cmd,envvar);
+                    QString resolved = this->sshSession_.qout().trimmed();
+                    path.replace(envvar,resolved);
+                } catch(std::runtime_error &e ) {
+                 // pass
+                }
+            }
+            return path;
+        } else {
+            if( qdir.exists() ) {
+                return path;
+            } else {
+                throw_<std::runtime_error>("Local job folder does not exist: '%1'", path );
+            }
+        }
+        return QString(); // keep compiler happy
+    }
+
+    QString
+    MainWindow::
     remote_subfolder()
     {
         QString path = this->getSessionConfigItem("wRemote")->value().toString();
         if( this->remote_env_vars_.contains(path) )
             path = this->remote_env_vars_[path];
-        QString s = this->getSessionConfigItem("wSubfolder")->value().toString();
+        QString s = this->getSessionConfigItem("wProjectFolder")->value().toString();
         if( s.isEmpty() )
             return s;
         path.append("/").append(s);
@@ -683,7 +751,7 @@
     getSessionConfigItem( QString const& name, T default_value )
     {
         cfg::Item* ci = this->launcher_.session_config.getItem(name);
-        if( ci->type() == QVariant::Invalid )
+        if( ci->value() == QVariant::Invalid )
             ci->set_value_and_type( default_value );
         return ci;
     }
@@ -713,8 +781,9 @@
     }
  //------------------------------------------------------------------------------
     void MainWindow::clusterDependencies( bool updateWidgets )
-    {// act on config items only...
-        {
+    {
+        LOG_CALLER_INFO;
+        {// act on config items only...
             IgnoreSignals ignoreSignals( this );
             QString cluster = this->getSessionConfigItem("wCluster")->value().toString();
             ClusterInfo& clusterInfo = *(this->launcher_.clusters.find( cluster ) );
@@ -734,11 +803,17 @@
 
             this->sshSession_.setLoginNode( clusterInfo.loginNodes()[0] );
             this->sshSession_.execute_remote_command.set_remote_commands( clusterInfo.remote_commands() );
-        }
+        }       
      // try to authenticate to refresh the list of available modules and the
      // remote file locations $VSC_DATA and $VSC_SCRATCH
-        this->on_wAuthenticate_clicked();
-    }
+        this->sshSession_.setUsername( this->username() );
+        this->sshSession_.setPrivatePublicKeyPair( this->getSessionConfigItem("privateKey")->value().toString()
+#ifndef NO_PUBLIC_KEY_NEEDED
+                                                 , this->getSessionConfigItem("publicKey")->value().toString()
+#endif
+                                                 , /*must_throw=*/ false );
+        this->authenticate();
+   }
  //-----------------------------------------------------------------------------
     double round( double x, int decimals )
     {
@@ -1022,9 +1097,22 @@ void MainWindow::on_wRequestCores_clicked()
     this->pendingRequest_ = NoPendingRequest;
 }
 
+bool MainWindow::can_authenticate()
+{
+    bool ok = !this->getSessionConfigItem("username"  )->value().toString().isEmpty()
+            &&!this->getSessionConfigItem("privateKey")->value().toString().isEmpty()
+#ifndef NO_PUBLIC_KEY_NEEDED
+            &&!this->getSessionConfigItem("publicKey" )->value().toString().isEmpty()
+#endif
+            ;
+    return ok;
+}
+
 void MainWindow::on_wPages_currentChanged(int index_current_page)
 {
     LOG_AND_CHECK_IGNORESIGNAL( QString().setNum(index_current_page) );
+
+    this->authenticate( /*silent=*/ this->can_authenticate() && this->sshSession_.isConnected() );
 
     this->selected_job_.clear();
 
@@ -1040,7 +1128,6 @@ void MainWindow::on_wPages_currentChanged(int index_current_page)
         }
         break;
     case 1:        
-        //if( this->previousPage_==0)
         {
             switch( this->pendingRequest_ ) {
               case NodesAndCoresPerNode:
@@ -1065,7 +1152,7 @@ void MainWindow::on_wPages_currentChanged(int index_current_page)
         break;
     case 2:
         {
-            bool ok = this->isUserAuthenticated();
+            bool ok = this->sshSession_.isAuthenticated();
             if( !ok ) {
                 QMessageBox::warning(this,TITLE,"Since you are not authenticated, you have no access to the remote host. Remote functionality on this tab is disabled.");
             }
@@ -1176,339 +1263,10 @@ void MainWindow::on_wNotifyEnd_toggled(bool checked)
     this->update_abe('e', checked );
 }
 
-bool MainWindow::getPrivatePublicKeyPair()
-{
-    QString start_in;
-#if defined(Q_OS_MAC)||defined(Q_OS_LINUX)
-    QDir home = QDir::home();
-    if( home.exists(".ssh") ) {
-        start_in = home.filePath(".ssh");
-    } else {
-        start_in = this->launcher_.homePath();
-    }
-#else
-    start_in = this->launcher_.homePath();
-#endif
-    QString msg("To authenticate you need to provide your private ssh key.");
-#ifdef Q_OS_WIN
-    msg+="\n[Windows users should be aware that PuTTY keys are NOT in openssh format. "
-         "Consult the VSC website for how to convert your PuTTY keys.]\n";
-#endif
-    int answer = QMessageBox::question( this, TITLE, msg
-                                      , "Authenticate Later"            // button0
-                                      , "Continue authentication ..."   // button1
-                                      , QString()                       // button2
-                                      , 1                               // default button
-                                      );
-    QString private_key;
-    switch( answer ) {
-      case 1:
-        private_key = QFileDialog::getOpenFileName( this, "Select your PRIVATE key file:", start_in );
-        if( !QFileInfo( private_key ).exists() ) {
-            this->statusBar()->showMessage( QString( "Private key '%1' not found.").arg(private_key) );
-            return false;
-        }
-        break;
-      default:
-        this->statusBar()->showMessage("Authentication postponed.");
-        return false;
-    }
-
-#ifdef NO_PUBLIC_KEY_NEEDED
-    this->statusBar()->showMessage( QString("Authenticating with private key: '%1'").arg(private_key) );
-    this->sshSession_.setPrivatePublicKeyPair(private_key);
-#else
- // private key is provided, now public key
-    QString public_key = private_key;
-    public_key.append(".pub"); // make an educated guess...
-    if( !QFileInfo( public_key ).exists() )
-    {
-        answer = QMessageBox::question(this,TITLE,"You must also provide the corresponding PUBLIC key file.\n Continue?", QMessageBox::Ok|QMessageBox::No,QMessageBox::Ok);
-        if( answer==QMessageBox::Ok ) {
-            public_key = QFileDialog::getOpenFileName( this, "Select PUBLIC key file:", start_in );
-            if( public_key.isEmpty() || !QFileInfo(public_key).exists() )
-            {// not provided or inexisting
-                this->statusBar()->showMessage(QString("Public key '%1' not found or not provided.").arg(public_key) );
-                return false;
-            }
-        }
-    }
-    this->statusBar()->showMessage("Private/public key pair found.");
-    this->sshSession_.setPrivatePublicKeyPair( private_key, public_key );
-#endif
-    return true;
-}
-
-void MainWindow::on_wUsername_textChanged(const QString &arg1)
-//void MainWindow::on_wUsername_returnPressed()
-//void MainWindow::on_wUsername_editingFinished()
-{
-    QString username = validateUsername( arg1.trimmed() );
-    if( username.isEmpty() )
-    {// invalid or incomplete
-        LOG_CALLER(2) << "\n    invalid (or incomplete) username: " << arg1.C_STR();
-        this->ui->wUsername->setPalette(*this->paletteRedForeground_);
-        this->statusBar()->showMessage("Invalid or incomplete username");
-     // reset the ssh session
-        this->sshSession_.reset();
-        this->activateAuthenticateButton(false);
-        return;
-    }
-
- // valid username
-    LOG_AND_CHECK_IGNORESIGNAL(arg1);
-
-    this->ui->wUsername->setPalette( QApplication::palette(this->ui->wUsername) );
-    cfg::Item* ci_user = this->getSessionConfigItem("wUsername");
-    if( ci_user->value().toString() == username )
-    {// username is the same as in the config, hence it has not changed!
-        if( this->isUserAuthenticated() )
-        {// User is still authenticated, there is little to be done.
-            this->activateAuthenticateButton(false,"authenticated");
-            this->statusBar()->showMessage( QString("User %1 is authenticated.").arg( this->sshSession_.username() ) );
-            return;
-        } else
-        {// Authentication needed
-            this->sshSession_.setUsername(username);
-         // set private/public key from config
-            if( this->sshSession_.setPrivatePublicKeyPair( this->getSessionConfigItem("privateKey")->value().toString()
-#ifndef NO_PUBLIC_KEY_NEEDED
-                                                         , this->getSessionConfigItem("publicKey" )->value().toString()
-#endif
-                                                         , false ) )
-            {
-                this->statusBar()->showMessage("Authentication key found in session file.");
-                if( !this->getSessionConfigItem("passphraseNeeded")->value().toBool() ) {
-                    this->on_wAuthenticate_clicked();
-                    return;
-                }
-            }// else no keys set...
-        }
-    } else
-    {// this is a new username, different from current config value:
-     // prepare this->sshSession_ to open with the new username, but
-     // don't store username/privateKey/... in the session config until a successfull authentication.
-        this->sshSession_.setUsername(username);
-        this->on_wAuthenticate_clicked();
-    }
-    this->activateAuthenticateButton(true);
-    this->statusBar()->showMessage("Ready to authenticate");
-}
-
-bool MainWindow::isUserAuthenticated() const
-{
-    return this->sshSession_.isAuthenticated();
-}
-
-bool MainWindow::offline() const
-{
-    bool offline = (this->ui->wOffline->text()==OFFLINE);
-    return offline;
-}
-
-void MainWindow::set_offline( bool offline )
-{
-    this->ui->wOffline->setText( (offline ? OFFLINE : "") );
-}
-
-void MainWindow::activateAuthenticateButton (bool activate, QString const& inactive_button_text )
-{
-    if( activate ) {
-        this->ui->wAuthenticate->setText("authenticate...");
-        this->ui->wAuthenticate->setEnabled(true);
-    } else {
-        this->ui->wAuthenticate->setText(inactive_button_text);
-        this->ui->wAuthenticate->setEnabled(false);
-    }
-}
-
 void MainWindow::warn( QString const& msg1, QString const& msg2 )
 {
     this->statusBar()->showMessage(msg1);
     QMessageBox::warning(this,TITLE,QString(msg1).append(msg2));
-}
-
-
-void MainWindow::on_wAuthenticate_clicked()
-{
-    LOG_AND_CHECK_IGNORESIGNAL(NO_ARGUMENT);
-
-    if( this->previousPage_==MainWindowUnderConstruction )
-    {// try to authenticate ONLY if no user interaction is required.
-        if( this->ui->wUsername->text().isEmpty() ) {
-            Log() << "\n    Automatic authentication canceled: missing user name.";
-            return;
-        }
-        if( this->getSessionConfigItem("privateKey")->value().toString().isEmpty() ) {
-            Log() << "\n    Automatic authentication canceled: missing private key.";
-            return;
-        } // do we have a private key
-#ifndef NO_PUBLIC_KEY_NEEDED
-        if( this->getSessionConfigItem("publicKey" )->value().toString().isEmpty() ) {
-            Log() << "\n    Automatic authentication canceled: missing public key.";
-            return;
-        }
-#endif
-        if( this->getSessionConfigItem("passphraseNeeded")->value().toBool() ) {
-            Log() << "\n    Automatic authentication canceled: passphrase needed.";
-            return;
-        }
-    }
-
-    this->setIgnoreSignals();
-    int max_attempts = 3;
-    bool no_connection = false;
-    int attempts = max_attempts;
-    enum {
-        success, retry, failed
-    } result;
-    while( attempts )
-    {
-        try {
-            this->sshSession_.open();
-            result = success;
-        }
-        catch( ssh2::MissingUsername& e )
-        {// It is the ssh2::Session which has no username sofar (not the gui)            
-            QString username = this->ui->wUsername->text();
-            if( username.isEmpty() )
-            {// no need to tell the user that an empty username is invalid as a username
-                result = failed;
-            } else {
-                username = validateUsername( this->ui->wUsername->text() );
-                if( username.isEmpty() ) {
-                    this->warn("Invalid username. Expecting 'vscXXXXX'.");
-                    result = failed;
-                } else
-                {// if the username in the session config is the same,
-                 // we can try with the key from the session config too.
-                    this->sshSession_.setUsername( username );
-                    if( this->getSessionConfigItem("wUsername")->value().toString() == username ) {
-                        this->sshSession_.setPrivatePublicKeyPair
-                                ( this->getSessionConfigItem("privateKey")->value().toString()
-#ifndef NO_PUBLIC_KEY_NEEDED
-                                , this->getSessionConfigItem("publicKey" )->value().toString()
-#endif
-                                , false
-                                );
-                    }
-                    result = retry;
-                }
-            }
-        }
-        catch( ssh2::MissingKey& e ) {
-            result = ( this->getPrivatePublicKeyPair() ? retry : failed );
-        }
-        catch( ssh2::PassphraseNeeded& e ) {
-            QString msg = QString("Enter passphrase for unlocking key '%1':").arg( this->sshSession_.privateKey() );
-            QString passphrase = QInputDialog::getText( 0, TITLE, msg, QLineEdit::Password );
-            this->sshSession_.setPassphrase( passphrase );
-            result = retry;
-        }
-        catch( ssh2::WrongPassphrase& e ) {
-            if( attempts ) {
-                QString msg = QString("Could not unlock private key.\n%1 attempts left.\nEnter passphrase for unlocking key '%2':")
-                              .arg(attempts).arg( this->sshSession_.privateKey() );
-                QString passphrase = QInputDialog::getText( 0, "Passphrase needed", msg );
-                this->sshSession_.setPassphrase( passphrase );
-                --attempts;
-                result = retry;
-            } else {
-                result = failed;
-            }
-        }
-        catch( ssh2::NoAddrInfo &e ) {
-            QString msg= QString("Could not getaddrinfo for %1.").arg( this->sshSession_.loginNode() );
-            this->statusBar()->showMessage(msg);
-            QMessageBox::warning( this,TITLE,msg.append("\n  . Check your internet connection."
-                                                        "\n  . Check the availability of the cluster."
-                                                        ) );
-            no_connection=true;
-            result = failed;
-        }
-        catch( ssh2::ConnectTimedOut &e ) {
-            QString msg= QString("Could not reach  %1.").arg( this->ui->wCluster->currentText() );
-            this->statusBar()->showMessage(msg);
-            QMessageBox::warning( this,TITLE,msg.append("\n  . Check your internet connection."
-                                                        "\n  . Check your VPN connection if you are outside the university."
-                                                        "\n  . Check the availability of the cluster."
-                                                        ) );
-            result = failed;
-            no_connection=true;
-        }
-        catch( std::runtime_error& e ) {
-            QString msg = QString("Error attempting to authenticate on %1: ").append( e.what() )
-                             .arg( this->ui->wCluster->currentText() );
-            this->warn(msg);
-            Log(0) << msg.prepend("\n    ").C_STR();
-         // remove keys from ssh session and from config
-            this->sshSession_.setUsername( this->getSessionConfigItem("wUsername")->value().toString() );
-            result = failed;
-        }
-        if( result==success )
-        {
-            this->activateAuthenticateButton(false,"authenticated");
-            this->statusBar()->showMessage( QString("User %1 is authenticated.").arg( this->sshSession_.username() ) );
-            this->getSessionConfigItem("privateKey")->set_value( this->sshSession_.privateKey() );
-#ifndef NO_PUBLIC_KEY_NEEDED
-            this->getSessionConfigItem("publicKey" )->set_value( this->sshSession_. publicKey() );
-#endif
-            this->getSessionConfigItem("passphraseNeeded")->set_value( this->sshSession_.hasPassphrase() );
-
-            this->resolveRemoteFileLocations_();
-
-            QString qs = this->ui->wRemote->currentText();
-            if( this->remote_env_vars_.contains(qs) ) {
-                this->ui->wRemote->setToolTip( this->remote_env_vars_[qs] );
-            }
-            QString cmd("__module_avail");
-            this->sshSession_.execute_remote_command(cmd);
-            QStringList modules = this->sshSession_.qout().split("\n");
-            modules.prepend("--- select a module below ---");
-            this->ui->wSelectModule->clear();
-            this->ui->wSelectModule->addItems(modules);
-
-            QString modules_cluster = QString("modules_").append(this->getSessionConfigItem("wCluster")->value().toString() );
-            this->getSessionConfigItem(modules_cluster)->set_choices(modules);
-
-            break; //out of while loop
-        }
-        if( result==retry ) {
-            continue; // = retry
-        }
-        if( result==failed ) {
-            QString msg;
-            if( attempts==0 )
-            {// after 3 unsuccesfull attempts to authenticate, we remove the keys from the session: they are probably wrong
-                this->sshSession_.setUsername( this->getSessionConfigItem("wUsername")->value().toString() );
-
-                msg = QString("Authentication failed: %1 failed attempts to provide passphrase.").arg(max_attempts);
-            } else {
-                QString msg = "Authentication failed.";
-            }
-            this->statusBar()->showMessage(msg);
-            Log(0) << msg.prepend("\n    ").C_STR();
-
-            break; //out of while loop
-        }
-    }
-    if( no_connection )
-    {
-        this->statusBar()->showMessage("Launcher was unable to make a connection. Proceeding offline.");
-     // attempt to obtain cluster modules from config file, to enable the user to work offline.
-        QString modules_cluster = QString("modules_").append(this->getSessionConfigItem("wCluster")->value().toString() );
-        QStringList modules = this->getSessionConfigItem(modules_cluster)->choices_as_QStringList();
-        if( modules.isEmpty() ) {
-            this->statusBar()->showMessage("List of modules not available for current cluster ");
-        } else {
-            this->ui->wSelectModule->clear();
-            this->ui->wSelectModule->addItems({"--- select a module below ---"});
-            this->ui->wSelectModule->addItems(modules);
-            this->statusBar()->showMessage("Using List of modules from a previous session. Authenticate to update it.");
-        }
-    }
-    this->set_offline( no_connection );
-    this->setIgnoreSignals(false);
 }
 
 bool MainWindow::isFinished( Job const& job ) const
@@ -1598,51 +1356,53 @@ bool MainWindow::retrieve( Job const& job, bool local, bool vsc_data )
     return job.status()==Job::Retrieved;
 }
 
-void MainWindow::resolveRemoteFileLocations_()
+void MainWindow::getRemoteFileLocations_()
 {
     this->remote_env_vars_.clear();
-    for ( int i=0; i<this->ui->wRemote->count(); ++i ) {
-        QString env = this->ui->wRemote->itemText(i);
-        QString cmd("echo %1");
-        try {
-            this->sshSession_.execute_remote_command( cmd, env );
-            this->remote_env_vars_[env] = this->sshSession_.qout().trimmed();
-        } catch(std::runtime_error &e )
-        {}
-   }
-}
-
-void MainWindow::on_wLocalFileLocationButton_clicked()
-{
-    LOG_AND_CHECK_IGNORESIGNAL(NO_ARGUMENT);
-
-    QString directory = QFileDialog::getExistingDirectory( this, "Select local file location:", this->launcher_.homePath() );
-    if( directory.isEmpty() ) return;
-
-    this->getSessionConfigItem("wLocal")->set_value(directory);
-
-    this->getDataConnector("wLocal")->value_config_to_widget();
-
-    this->getSessionConfigItem   ("wSubfolder")->set_value("");
-    this->getDataConnector("wSubfolder")->value_config_to_widget();
-
-    this->ui->wSubfolder ->setToolTip("");
-    this->ui->wSubfolder2->setToolTip("");
-}
-
-void MainWindow::on_wSubfolderButton_clicked()
-{
-    LOG_AND_CHECK_IGNORESIGNAL(NO_ARGUMENT);
-
-    if( this->ui->wLocal->text().isEmpty() ) {
-        QMessageBox::warning( this, TITLE, "You must select a local file location first.");
-        return;
+    if( !this->remote_file_locations_.isEmpty() ) {
+        this->remote_file_locations_ = this->getSessionConfigItem("wRemote")->choices_as_QStringList();
     }
+    this->authenticate();
+    if( this->sshSession_.isAuthenticated() ) {
+        for ( QStringList::Iterator iter = this->remote_file_locations_.begin()
+            ; iter!=this->remote_file_locations_.end(); ++iter )
+        {
+            if( iter->startsWith('$') ) {
+                QString cmd("echo %1");
+                try {
+                    this->sshSession_.execute_remote_command( cmd, *iter );
+                    *iter = this->sshSession_.qout().trimmed();
+                } catch(std::runtime_error &e ) {
+                 // pass
+                }
+            }
+        }
+    }
+}
 
-    QString parent = this->ui->wLocal->text();
-    QString folder = QFileDialog::getExistingDirectory( this, "Select subfolder:", parent );
+//void MainWindow::on_wLocalFileLocationButton_clicked()
+//{
+//    LOG_AND_CHECK_IGNORESIGNAL(NO_ARGUMENT);
+
+//    QString directory = QFileDialog::getExistingDirectory( this, "Select local file location:", this->launcher_.homePath() );
+//    if( directory.isEmpty() ) return;
+
+//    this->getSessionConfigItem("localFileLocation")->set_value(directory);
+
+//    this->getDataConnector("localFileLocation")->value_config_to_widget();
+
+//    this->getSessionConfigItem   ("wProjectFolder")->set_value("");
+//    this->getDataConnector("wProjectFolder")->value_config_to_widget();
+//}
+
+void MainWindow::on_wProjectFolderButton_clicked()
+{
+    LOG_AND_CHECK_IGNORESIGNAL(NO_ARGUMENT);
+
+    QString parent = this->local_file_location();
+    QString folder = QFileDialog::getExistingDirectory( this, "Select or create a project folder:", parent );
     if( folder.isEmpty() ) {
-        QMessageBox::warning( this, TITLE, "No directory selected.");
+        this->statusBar()->showMessage("No project folder selected.");
         return;
     }
     folder = QDir::cleanPath(folder);
@@ -1657,31 +1417,24 @@ void MainWindow::on_wSubfolderButton_clicked()
     QString relative = folder;
             relative.remove(parent);
 
-    this->getSessionConfigItem   ("wSubfolder")->set_value( relative );
-    this->getDataConnector("wSubfolder")->value_config_to_widget(); // also triggers wSubfolder2
-
-    this->ui->wSubfolder ->setToolTip(this-> local_subfolder() );
-    this->ui->wSubfolder2->setToolTip(this->remote_subfolder() );
-    this->ui->wJobname   ->setToolTip("");
-    this->ui->wJobname2  ->setToolTip("");
+    this->getSessionConfigItem   ("wProjectFolder")->set_value( relative );
+    this->getDataConnector("wProjectFolder")->value_config_to_widget();
 }
 
 void MainWindow::on_wJobnameButton_clicked()
 {
     LOG_AND_CHECK_IGNORESIGNAL(NO_ARGUMENT);
 
-    this->ui->wCreateTemplate->setEnabled(false);
+//    if( this->ui->wLocal->text().isEmpty() ) {
+//        QMessageBox::warning( this, TITLE, "You must select a local file location first.");
+//        return;
+//    }
+//    if( this->ui->wProjectFolder->text().isEmpty() ) {
+//        QMessageBox::warning( this, TITLE, "You must select a subfolder first.");
+//        return;
+//    }
 
-    if( this->ui->wLocal->text().isEmpty() ) {
-        QMessageBox::warning( this, TITLE, "You must select a local file location first.");
-        return;
-    }
-    if( this->ui->wSubfolder->text().isEmpty() ) {
-        QMessageBox::warning( this, TITLE, "You must select a subfolder first.");
-        return;
-    }
-
-    QString parent = this->local_subfolder();
+    QString parent = this->jobs_project_path(LOCAL);
     QString selected = QFileDialog::getExistingDirectory( this, "Select subfolder:", parent );
     if( selected.isEmpty() ) {
         QMessageBox::warning( this, TITLE, "No directory selected.");
@@ -1694,8 +1447,6 @@ void MainWindow::on_wJobnameButton_clicked()
                                                     "least one level above this folder.").arg(parent) );
         return;
     }
-    this->ui->wCreateTemplate->setEnabled(true);
-
     this->statusBar()->clearMessage();
     parent.append("/");
     QString selected_leaf = selected;
@@ -1703,9 +1454,7 @@ void MainWindow::on_wJobnameButton_clicked()
     this->getSessionConfigItem   ("wJobname")->set_value(selected_leaf);
     this->getDataConnector("wJobname")->value_config_to_widget(); // also triggers wJobname2
 
-    this->ui->wJobname ->setToolTip(selected);
     QString remote_folder = this->remote_subfolder_jobname();
-    this->ui->wJobname2->setToolTip(remote_folder);
 
     this->getSessionConfigItem( "localFolder")->set_value(selected);
     this->getSessionConfigItem("remoteFolder")->set_value(remote_folder);
@@ -1723,14 +1472,14 @@ void MainWindow::lookForJobscript( QString const& job_folder)
         this->loadJobscript(script_file);
         msg = QString("Job script '%1' loaded.").arg(script_file);
     } else {
-        msg = QString("New Job script '%1'.").arg(script_file);
+        msg = QString("Created new job folder '%1'.").arg(job_folder);
     }
     this->statusBar()->showMessage(msg);
 }
 
 bool MainWindow::loadJobscript( QString const& filepath )
 {
-    Log(1) << QString("\n    loading job script '%1'.").arg(filepath).C_STR();
+    LOG_CALLER_INFO << QString("\n    loading job script '%1'.").arg(filepath).C_STR();
     try
     {
         Log(1) << "\n    reading the job script ... ";
@@ -1789,11 +1538,11 @@ bool MainWindow::loadJobscript( QString const& filepath )
         this->getDataConnector("wNotifyBegin")->value_config_to_widget();
         this->getDataConnector("wNotifyEnd"  )->value_config_to_widget();
 
-        if( !this->ui->wUsername->text().isEmpty() ) {
-            //this->on_wUsername_editingFinished();
-            //this->on_wUsername_returnPressed();
-            this->on_wUsername_textChanged( this->ui->wUsername->text() );
-        }
+//        if( !this->username().isEmpty() ) {
+//            //this->on_username_editingFinished();
+//            //this->on_username_returnPressed();
+//            this->on_username_textChanged( this->username() );
+//        }
     }
     catch( std::runtime_error& e )
     {
@@ -1813,7 +1562,7 @@ bool MainWindow::saveJobscript( QString const& filepath )
 {
     Log() << QString ("\n    writing script '%1' ... ").arg(filepath).C_STR();
     try {
-        this->launcher_.script.write( filepath );
+        this->launcher_.script.write( filepath, false );
         Log() << "done.";
     } catch( pbs::WarnBeforeOverwrite &e ) {
         QMessageBox::StandardButton answer =
@@ -1842,11 +1591,9 @@ bool MainWindow::saveJobscript( QString const& filepath )
     return true;
 }
 
-void MainWindow::on_wSubfolder_textChanged(const QString &arg1)
+void MainWindow::on_wProjectFolder_textChanged(const QString &arg1)
 {
     LOG_AND_CHECK_IGNORESIGNAL( arg1 );
-
-    this->ui->wSubfolder2->setText(arg1);
 
     this->getSessionConfigItem   ("wJobname" )->set_value("");
     this->getDataConnector("wJobname" )->value_config_to_widget();
@@ -1856,25 +1603,9 @@ void MainWindow::on_wJobname_textChanged(const QString &arg1)
 {
     LOG_AND_CHECK_IGNORESIGNAL( arg1 );
 
-    this->ui->wJobname2->setText(arg1);
+//    this->ui->wJobname2->setText(arg1);
 
     this->getSessionConfigItem("wJobname" )->set_value( arg1 );
-}
-
-
-void MainWindow::on_wRemote_currentIndexChanged(const QString &arg1)
-{
-    LOG_AND_CHECK_IGNORESIGNAL( arg1 );
-
-    this->getSessionConfigItem("wRemote")->set_value(arg1);
-
-    QString tooltip = arg1;
-    if( this->remote_env_vars_.contains(arg1) ) {
-        tooltip = this->remote_env_vars_[arg1];
-    }
-    this->ui->wRemote    ->setToolTip( tooltip );
-    this->ui->wSubfolder2->setToolTip( this->remote_subfolder() );
-    this->ui->wJobname2  ->setToolTip( this->remote_subfolder_jobname() );
 }
 
 void MainWindow::on_wSave_clicked()
@@ -1914,46 +1645,90 @@ void MainWindow::on_wSubmit_clicked()
 {
     LOG_AND_CHECK_IGNORESIGNAL(NO_ARGUMENT);
 
+    if( !this->requiresAuthentication("Submit job") ) {
+        return;
+    }
+
     if(  this->launcher_.script.has_unsaved_changes()
      || !this->launcher_.script.touch_finished_found()
       )
     {
-        QString filepath = QString( this->local_subfolder_jobname() ).append("/pbs.sh");
-        if( !this->saveJobscript(filepath) ) {
+        QMessageBox::Button answer = QMessageBox::question(this,TITLE,"The job script has unsaved changes.\nSave Job script?"
+                                                          , QMessageBox::Yes|QMessageBox::No|QMessageBox::Cancel
+                                                          , QMessageBox::Cancel
+                                                          );
+        if( answer==QMessageBox::Cancel ) {
+            this->statusBar()->showMessage( QString("Submit job '%1' CANCELED!").arg( this->ui->wJobname->text() ) );
             return;
+        } else
+        if( answer==QMessageBox::No ) {
+            this->statusBar()->showMessage("Job script not saved.");
+        } else {// Yes
+            QString filepath = QString( this->jobs_project_job_path(LOCAL) ).append("/pbs.sh");
+            if( !this->saveJobscript(filepath) ) {
+                return;
+            }
         }
-    }
-    if( !this->isUserAuthenticated() ) {
-        QMessageBox::critical( this, TITLE, "You must authenticate first...");
-        return;
     }
     QString cmd;
-    if( this->ui->wEmptyRemoteFolder->isChecked() )
+    QMessageBox::Button answer = QMessageBox::question(this,TITLE,"Erase remote job folder contents first?\n"
+                                                                  "(If you answer No, new files are added and "
+                                                                  "existing files are overwritten)"
+                                                      , QMessageBox::Yes|QMessageBox::No|QMessageBox::Cancel
+                                                      , QMessageBox::Cancel
+                                                      );
+    if( answer==QMessageBox::Cancel ) {
+        this->statusBar()->showMessage( QString("Submit job '%1' CANCELED!").arg( this->ui->wJobname->text() ) );
+        return;
+    } else
+    if( answer==QMessageBox::No ) {
+        this->statusBar()->showMessage("Remote job folder not erased. Files are added or overwritten.");
+    } else // Yes
     {
-        QMessageBox::Button answer = QMessageBox::question(this,TITLE,"OK to erase remote job folder contents?");
-        if( answer==QMessageBox::Yes ) {
-            cmd = QString("rm -rf %1/*");
-            this->sshSession_.execute_remote_command( cmd, this->remote_subfolder_jobname() );
+        cmd = QString("rm -rf %1/*").arg( this->jobs_project_job_path(REMOTE,false) );
+        int rc = this->sshSession_.execute_remote_command( cmd );
+
+        if( rc==0 ) {
             this->statusBar()->showMessage("Erased remote job folder.");
         } else {
-            this->statusBar()->showMessage("Remote job folder not erased.");
+            while( rc != 0 )
+            {
+                int answer = QMessageBox::question( this,TITLE,"An error occurred while erasing remote job folder contents"
+                                                  ,"Retry"          // button0
+                                                  ,"Ignore"         // button1
+                                                  ,"Cancel submit"  // button2
+                                                  , 0 );             // default button
+                switch(answer) {
+                  case 0: // retry
+                    rc = this->sshSession_.execute_remote_command( cmd );
+                    break; // out of switch, but continue with while loop
+                  case 1: // ignore
+                    rc = 0; // break out of while loop
+                    break;  // break out of switch
+                  case 2:
+                  default:
+                    this->statusBar()->showMessage( QString("Submit job '%1' CANCELED!").arg( this->ui->wJobname->text() ) );
+                    return;
+                }
+            }
         }
     }
-    this->sshSession_.sftp_put_dir( this->local_subfolder_jobname(), this->remote_subfolder_jobname(), true );
+
+    QString remote_job_folder = this->jobs_project_job_path(REMOTE);
+    this->sshSession_.sftp_put_dir( this->jobs_project_job_path(LOCAL), remote_job_folder, true );
 
     cmd = QString("cd %1 && qsub pbs.sh");
-    this->sshSession_.execute_remote_command( cmd, this->remote_subfolder_jobname() );
+    this->sshSession_.execute_remote_command( cmd, remote_job_folder );
     QString job_id = this->sshSession_.qout().trimmed();
     this->statusBar()->showMessage(QString("Job submitted: %1").arg(job_id));
     cfg::Item* ci_job_list = this->getSessionConfigItem("job_list");
     if( ci_job_list->value().type()==QVariant::Invalid )
         ci_job_list->set_value_and_type( QStringList() );
     QStringList job_list = ci_job_list->value().toStringList();
-    QString remote = this->ui->wRemote->currentText();
-    if( remote.startsWith('$') )
-        remote = this->remote_env_vars_[remote];
-    Job job( job_id, this->ui->wLocal->text(), remote, this->ui->wSubfolder->text(), this->ui->wJobname->text(), Job::Submitted );
+
+    Job job( job_id, this->local_file_location(), this->remote_file_location(), this->ui->wProjectFolder->text(), this->ui->wJobname->text(), Job::Submitted );
     job_list.append( job.toString() );
+
     ci_job_list->set_value( job_list );
 }
 
@@ -2075,7 +1850,7 @@ void MainWindow::refreshJobs( JobList const& joblist )
     this->ui->wFinished->setText( joblist.toString(Job::Finished) );
 
     QString text = joblist.toString(Job::Submitted);
-    QString username = this->ui->wUsername->text();
+    QString username = this->username();
     if( !username.isEmpty() ) {
         QString cmd = QString("qstat -u %1");
         this->sshSession_.execute_remote_command( cmd, username );
@@ -2380,59 +2155,439 @@ bool isNonEmptyDir( QString const& dirpath ) {
     return isNonEmptyDir( QDir(dirpath) );
 }
 
-QString MainWindow::select_template_location()
-{
-    QString msg("Select new template location:");
-    this->statusBar()->showMessage(msg);
-    QString template_folder = QFileDialog::getExistingDirectory
-            ( this, "Select template location (existing or new directory):"
-            , this->launcher_.homePath("templates")
-            );
 
-    if( !template_folder.isEmpty() )
-    {// the user has selected a directory
-     // verify that the selected directory is not the templates directory itself.
-        if( template_folder==this->launcher_.homePath("templates") )
-        {
-            msg = QString("Directory '%1' must not be used as a template location. \nYou must select a subdirectory.");
-            QMessageBox::warning(this,TITLE,msg);
-            template_folder.clear();
+ void MainWindow::authenticateAction_triggered()
+{/* ask for a username
+  * if it is a valid username, store it in the sshSession_
+  * otherwise cancel the authentication
+  * ask for a private key
+  * if we get one store it in the sshSession_
+  * otherwise cancel the authentication
+  * authenticate()
+  */
+    LOG_AND_CHECK_IGNORESIGNAL(NO_ARGUMENT)
+
+    if( this->sshSession_.isAuthenticated() ) {
+        QString msg = QString("This session is already authenticated:"
+                              "\n  user: %1"
+                              "\n  key : %2"
+                              "\n\nDo you want to re-authenticate?")
+                         .arg( this->sshSession_.username() )
+                         .arg( this->sshSession_.privateKey() );
+        QMessageBox::StandardButton answer = QMessageBox::question(this,TITLE,msg);
+        if( answer!=QMessageBox::Yes ) return;
+    }
+
+ // Ask for username username
+    QString msg = "Enter authentication details ...\nusername [vscXXXXX]:";
+    cfg::Item* ci = this->getSessionConfigItem("username");
+    bool ok;
+    QString username;
+    while(1) {
+        username = QInputDialog::getText(this, TITLE, msg, QLineEdit::Normal, ci->value().toString(), &ok );
+        if( ok && !username.isEmpty() ) {
+            username = validateUsername(username);
+            if( !username.isEmpty() )
+            {// username is ok
+                this->sshSession_.setUsername(username);
+                break;
+            }
+        } else {
+            this->statusBar()->showMessage("Authentication canceled by user.");
+            return;
         }
-        else
-        {// the user has selected a valid directory,
-            QDir qdir_template_folder(template_folder);
-            if( !qdir_template_folder.exists() )
-            {// non-existing directory selected, this shouldn't happen, though
-                qdir_template_folder.mkpath( QString() );
-            } else {// make sure that the directory is empty
-                if( isNonEmptyDir(qdir_template_folder) )
-                {// ask permission to overwrite
-                    msg = QString("Directory '%1' is not empty.\n"
-                                  "Overwrite?").arg(template_folder);
-                    QMessageBox::Button answer =
-                    QMessageBox::question( this,TITLE,msg
-                                         , QMessageBox::Cancel|QMessageBox::Yes
-                                         , QMessageBox::Yes );
-                    if( answer==QMessageBox::Yes )
-                    {// clear the selected folder
-                        msg = QString("Overwriting directory '%1' ... ").arg(template_folder);
-                        this->statusBar()->showMessage(msg);
-                     // remove the directory and its contents
-                        qdir_template_folder.removeRecursively();
-                     // create the directory again, now empty
-                        qdir_template_folder.mkpath( QString() );
-                    } else {
-                        template_folder.clear();
-                    }
-                }
+    }
+
+ // aks for openssh key(s)
+    QString start_in;
+#if defined(Q_OS_MAC)||defined(Q_OS_LINUX)
+    QDir home = QDir::home();
+    if( home.exists(".ssh") ) {
+        start_in = home.filePath(".ssh");
+    } else {
+        start_in = this->launcher_.homePath();
+    }
+#else
+    start_in = this->launcher_.homePath();
+#endif
+    msg = QString("Enter authentication details ...\nProvide private openssh key for user %1:").arg(username);
+//#ifdef Q_OS_WIN
+//    msg+="\n((Windows users should be aware that PuTTY keys are NOT in openssh format. "
+//         "Consult the VSC website for how to convert your PuTTY keys.]\n";
+//#endif
+    int answer = QMessageBox::question( this, TITLE, msg
+                                      , "Cancel"    // button0
+                                      , "Continue ..."          // button1
+                                      , QString()               // button2
+                                      , 1                       // default button
+                                      );
+    QString private_key;
+    switch( answer ) {
+      case 1:
+        private_key = QFileDialog::getOpenFileName( this, QString("Select your (%1) PRIVATE key file :").arg(username), start_in );
+        if( !QFileInfo( private_key ).exists() ) {
+            this->statusBar()->showMessage( QString( "Authentication canceled : private key '%1' not found.").arg(private_key) );
+            return;
+        }
+        break;
+      default:
+        this->statusBar()->showMessage("Authentication canceled by user.");
+        return;
+    }
+
+#ifdef NO_PUBLIC_KEY_NEEDED
+    this->sshSession_.setPrivatePublicKeyPair(private_key);
+#else
+ // private key is provided, now public key
+    QString public_key = private_key;
+    public_key.append(".pub"); // make an educated guess...
+    if( !QFileInfo( public_key ).exists() )
+    {
+        answer = QMessageBox::question(this,TITLE,"You must also provide the corresponding PUBLIC key file.\n Continue?", QMessageBox::Ok|QMessageBox::No,QMessageBox::Ok);
+        if( answer==QMessageBox::Ok ) {
+            public_key = QFileDialog::getOpenFileName( this, "Select PUBLIC key file:", start_in );
+            if( public_key.isEmpty() || !QFileInfo(public_key).exists() )
+            {// not provided or inexisting
+                this->statusBar()->showMessage(QString("Public key '%1' not found or not provided.").arg(public_key) );
+                return false;
             }
         }
     }
-    return template_folder; // an empty string implies Cancel template creation.
+    this->statusBar()->showMessage("Private/public key pair found.");
+    this->sshSession_.setPrivatePublicKeyPair( private_key, public_key );
+#endif
+    this->authenticate( /*silent=*/false );
 }
 
-void MainWindow::on_wCreateTemplate_clicked()
+bool MainWindow::authenticate(bool silent)
 {
+//    LOG_AND_CHECK_IGNORESIGNAL(silent)
+
+    if( this->sshSession_.isAuthenticated() ) {
+        LOG_CALLER_INFO << "\n    already authenticated.";
+        return true;
+    }
+
+    LOG_CALLER_INFO;
+
+    if( this->previousPage_==MainWindowUnderConstruction )
+    {// try to authenticate ONLY if no user interaction is required.
+        QString uname = this->username();
+        if( uname.isEmpty() ) {
+            Log() << "\n    Automatic authentication canceled: missing user name.";
+            return false;
+        }
+        if( this->getSessionConfigItem("privateKey")->value().toString().isEmpty() ) {
+            Log() << QString("\n    Automatic authentication canceled for '%1': missing private key.").arg(uname).C_STR();
+            return false;
+        } // do we have a private key
+#ifndef NO_PUBLIC_KEY_NEEDED
+        if( this->getSessionConfigItem("publicKey" )->value().toString().isEmpty() ) {
+            Log() << QStrng("\n    Automatic authentication canceled for '%1': missing public key.").arg(uname).C_STR();
+            return false;
+        }
+#endif
+        if( this->getSessionConfigItem("passphraseNeeded")->value().toBool() ) {
+            Log() << QString("\n    Automatic authentication canceled  for '%1': passphrase needed.").arg(uname).C_STR();
+            return false;
+        }
+    }
+
+    IGNORE_SIGNALS_UNTIL_END_OF_SCOPE;
+
+    int max_attempts = 3;
+    bool no_connection = false;
+    int attempts = max_attempts;
+    enum {
+        success, retry, failed
+    } result;
+    while( attempts )
+    {
+        try {
+            this->sshSession_.open();
+            result = success;
+        }
+        catch( ssh2::NoAddrInfo &e ) {
+            if( !silent ) {
+                QString msg= QString("Could not getaddrinfo for %1.").arg( this->sshSession_.loginNode() );
+                this->statusBar()->showMessage(msg);
+                QMessageBox::warning( this,TITLE,msg.append("\n  . Check your internet connection."
+                                                            "\n  . Check the availability of the cluster."
+                                                            ) );
+            }
+            no_connection=true;
+            result = failed;
+        }
+        catch( ssh2::ConnectTimedOut &e ) {
+            if( !silent ) {
+                QString msg= QString("Could not reach  %1.").arg( this->ui->wCluster->currentText() );
+                this->statusBar()->showMessage(msg);
+                QMessageBox::warning( this,TITLE,msg.append("\n  . Check your internet connection."
+                                                            "\n  . Check your VPN connection if you are outside the university."
+                                                            "\n  . Check the availability of the cluster."
+                                                            ) );
+            }
+            result = failed;
+            no_connection=true;
+        }
+        catch( ssh2::MissingUsername& e ) {
+            if( !silent )
+                this->warn("You must authenticate first (extra/authenticate...)");
+            result = failed;
+        }
+        catch( ssh2::MissingKey& e ) {
+            if( !silent )
+                this->warn("You must authenticate first (extra/authenticate...)");
+            result = failed;
+        }
+        catch( ssh2::PassphraseNeeded& e ) {
+            QString msg = QString("Enter passphrase for unlocking %1 key '%2':")
+                             .arg( this->sshSession_.username() )
+                             .arg( this->sshSession_.privateKey() );
+            QString passphrase = QInputDialog::getText( 0, TITLE, msg, QLineEdit::Password );
+            this->sshSession_.setPassphrase( passphrase );
+            result = retry;
+        }
+        catch( ssh2::WrongPassphrase& e ) {
+            if( attempts ) {
+                QString msg = QString("Could not unlock %1 key.\n"
+                                      "%2 attempts left.\n"
+                                      "Enter passphrase for unlocking key '%3':")
+                                 .arg( this->sshSession_.username() )
+                                 .arg( attempts )
+                                 .arg( this->sshSession_.privateKey() );
+                QString passphrase = QInputDialog::getText( 0, "Passphrase needed", msg );
+                this->sshSession_.setPassphrase( passphrase );
+                --attempts;
+                result = retry;
+            } else {
+                if( !silent )
+                    this->warn( QString("Cannot authenticate: failed to provide passphrase after %n attempts.")
+                                   .arg(max_attempts)
+                              );
+                result = failed;
+            }
+        }
+        catch( std::runtime_error& e ) {
+            QString msg = QString("Error attempting to authenticate on %1: ").append( e.what() )
+                             .arg( this->ui->wCluster->currentText() );
+            if( !silent ) {
+                this->warn(msg);
+            }
+            Log(0) << msg.prepend("\n    ").C_STR();
+         // remove keys from ssh session (but keep the username)
+            this->sshSession_.setUsername( this->getSessionConfigItem("username")->value().toString() );
+            result = failed;
+        }
+        if( result==success )
+        {
+            this->update_WindowTitle();
+
+            this->statusBar()->showMessage( QString("User %1 is authenticated.").arg( this->sshSession_.username() ) );
+            this->getSessionConfigItem("username"  )->set_value( this->sshSession_.username  () );
+            this->getSessionConfigItem("privateKey")->set_value( this->sshSession_.privateKey() );
+#ifndef NO_PUBLIC_KEY_NEEDED
+            this->getSessionConfigItem("publicKey" )->set_value( this->sshSession_. publicKey() );
+#endif
+            this->getSessionConfigItem("passphraseNeeded")->set_value( this->sshSession_.hasPassphrase() );
+
+            if( this->is_uptodate_for_!=this->ui->wCluster->currentText() )
+            {
+                Log()<< "automatic authentication succeeded.";
+                this->getRemoteFileLocations_();
+             // get list of available cluster modules
+                QString cmd("__module_avail");
+                this->sshSession_.execute_remote_command(cmd);
+                QStringList modules = this->sshSession_.qout().split("\n");
+                modules.prepend("--- select a module below ---");
+                this->ui->wSelectModule->clear();
+                this->ui->wSelectModule->addItems(modules);
+
+                QString modules_cluster = QString("modules_").append(this->getSessionConfigItem("wCluster")->value().toString() );
+                this->getSessionConfigItem(modules_cluster)->set_choices(modules);
+
+                this->is_uptodate_for_ = this->ui->wCluster->currentText();
+            }
+            break; //out of while loop
+        }
+        if( result==retry ) {
+            continue; // = retry
+        }
+        if( result==failed )
+        {
+            this->update_WindowTitle();
+
+            QString msg;
+            if( attempts==0 )
+            {// after 3 unsuccesfull attempts to authenticate, we remove the keys from the session as they are probably wrong
+             // (but we keep the username)
+                this->sshSession_.setUsername( this->getSessionConfigItem("username")->value().toString() );
+
+                msg = QString("Authentication failed: %1 failed attempts to provide passphrase.").arg(max_attempts);
+            } else {
+                QString msg = "Authentication failed.";
+            }
+            this->statusBar()->showMessage(msg);
+            Log(0) << msg.prepend("\n    ").C_STR();
+
+            break; //out of while loop
+        }
+    }
+    if( no_connection )
+    {
+        this->update_WindowTitle();
+
+        this->is_uptodate_for_.clear();
+
+        this->statusBar()->showMessage("Launcher was unable to make a connection. Proceeding offline.");
+        {// attempt to obtain cluster modules from config file, to enable the user to work offline.
+            QString modules_cluster = QString("modules_").append(this->getSessionConfigItem("wCluster")->value().toString() );
+            QStringList modules = this->getSessionConfigItem(modules_cluster)->choices_as_QStringList();
+            if( modules.isEmpty() ) {
+                this->statusBar()->showMessage("List of modules not available for current cluster ");
+            } else {
+                this->ui->wSelectModule->clear();
+                this->ui->wSelectModule->addItems({"--- select a module below ---"});
+                this->ui->wSelectModule->addItems(modules);
+                this->statusBar()->showMessage("Using List of modules from a previous session. Authenticate to update it.");
+            }
+        }
+    }
+
+    return result==success;
+}
+
+bool MainWindow::requiresAuthentication(QString const& action )
+{
+    if( !this->sshSession_.isAuthenticated() ) {
+        if( !this->authenticate() )
+        {// automatic authentication fails
+            if( this->sshSession_.isConnected() ) {
+                int answer = QMessageBox::question( this, TITLE, "This action requires that you authenticate."
+                                                  , QString("Cancel '%1'").arg(action)  // button0
+                                                  ,"Authenticate now..."                // button1
+                                                  , 0                                   // default button
+                                                  );
+                switch( answer ) {
+                  case 1: {
+                    this->authenticateAction_triggered();
+                    return this->sshSession_.isAuthenticated();
+                  }
+                  default:
+                    this->statusBar()->showMessage("Not authenticated, but authentication required to complete.");
+                    break;
+                }
+
+            } else {
+                QString msg = QString("Authentication is required to complete, but\n"
+                                      "Cluster %1 cannot be reached. Possible causes are:\n"
+                                      "  - you have no internet connection\n"
+                                      "  - you are outside the university and VPN is not connected\n"
+                                      "  - the cluster is down\n"
+                                      "Actions requiring identification are not available.")
+                                 ,arg( this->ui->wCluster->currentText() );
+                QMessageBox::critical( this, TITLE, msg );
+                return false;
+            }
+        }
+    }
+    return true;
+}
+
+void MainWindow::localFileLocationAction_triggered()
+{
+    LOG_AND_CHECK_IGNORESIGNAL(NO_ARGUMENT);
+
+ // warn the user of unsaved changes to current script
+    if(  this->launcher_.script.has_unsaved_changes()
+     || !this->launcher_.script.touch_finished_found()
+      )
+    {
+        QMessageBox::Button answer = QMessageBox::question
+                (this,TITLE
+                , QString("The current job script %1 has unsaved changes.\n"
+                          "(Changes will be lost if you do not save).\n"
+                          "Save Job script?")
+                 .arg( this->ui->wJobname->text() )
+                , QMessageBox::Yes|QMessageBox::No|QMessageBox::Cancel
+                , QMessageBox::Cancel
+                );
+        if( answer==QMessageBox::Cancel ) {
+            this->statusBar()->showMessage("Local file location is unchanged.");
+            return;
+        } else if( answer==QMessageBox::No ) {
+            this->statusBar()->showMessage("Current job script %1 NOT saved.");
+        } else {// answer==QMessageBox::Yes
+            QString filepath = QString( this->jobs_project_job_path(LOCAL) ).append("/pbs.sh");
+            if( !this->saveJobscript(filepath) ) {
+                return;
+            }
+        }
+    }
+    
+    this->statusBar()->showMessage("Select an existing directory as a new local file location ...");
+
+    QString new_local_file_location = QFileDialog::getExistingDirectory
+            ( this, "Select new local file location...", this->launcher_.homePath("..") );
+
+    if( new_local_file_location.isEmpty()
+     || new_local_file_location==this->local_file_location() )
+    {// cancel pressed, or same folder selected
+        this->statusBar()->showMessage("Local file location is unchanged.");
+    } else
+    {// new folder selected
+        IGNORE_SIGNALS_UNTIL_END_OF_SCOPE;
+        this->getSessionConfigItem("localFileLocation")->set_value( new_local_file_location );
+        this->getSessionConfigItem("wJobname")->set_value("");
+        this->getDataConnector    ("wJobname")->value_config_to_widget();
+
+        this->statusBar()->showMessage( QString("Local file location is now '%1'.").arg(new_local_file_location) );
+    }
+}
+
+void MainWindow::remoteFileLocationAction_triggered()
+{
+    LOG_AND_CHECK_IGNORESIGNAL(NO_ARGUMENT);
+
+    cfg::Item* ci = this->getSessionConfigItem("remoteFileLocation");
+    QStringList options = ci->choices_as_QStringList();
+    QString     current = ci->value().toString();
+    int icurrent = options.indexOf(current);
+    bool ok;
+    QString choice = QInputDialog::getItem( this, TITLE, "Select new remote location:", options, icurrent, /*editable=*/ false, &ok );
+    if( ok && !choice.isEmpty() && choice!=current ) {
+        ci->set_value(choice);
+        this->statusBar()->showMessage( QString("New Remote location is '%1'.").arg(choice) );
+    } else {
+        this->statusBar()->showMessage( QString("Remote file location is unchanged.") );
+    }
+}
+
+QString MainWindow::username()  {
+    return this->getSessionConfigItem("username")->value().toString();
+}
+
+void MainWindow::update_WindowTitle()
+{
+    QString arg3;
+    if( this->sshSession_.isAuthenticated() ) {
+        arg3 = this->username();
+    } else if( !this->sshSession_.isConnected() ) {
+        arg3 = "offline";
+    } else {
+        arg3 = "not authenticated";
+    }
+#ifdef QT_DEBUG
+    this->setWindowTitle( QString("%1 %2 [%3]").arg(TITLE).arg(VERSION        ).arg(arg3) );
+#else
+    this->setWindowTitle( QString("%1 %2 [%3]").arg(TITLE).arg(short_version(3).arg(arg3) );
+#endif
+}
+
+ void MainWindow::createTemplateAction_triggered()
+{
+    LOG_AND_CHECK_IGNORESIGNAL(NO_ARGUMENT);
+
     if( this->ui->wJobname->text().isEmpty() ) {
         this->statusBar()->showMessage("No job folder, cannot create template.");
         return;
@@ -2495,8 +2650,11 @@ void MainWindow::on_wCreateTemplate_clicked()
     this->statusBar()->showMessage( msg.append( QString("'%1' created.").arg(template_folder) ) );
 }
 
-void MainWindow::on_wSelectTemplate_clicked()
+
+void MainWindow::selectTemplateAction_triggered()
 {
+    LOG_AND_CHECK_IGNORESIGNAL(NO_ARGUMENT);
+
     QString msg;
     if( this->local_subfolder().isEmpty() ) {
         msg = "You must select a local file location and a subfolder first!";
@@ -2535,3 +2693,89 @@ void MainWindow::on_wSelectTemplate_clicked()
     return;
 }
 
+QString MainWindow::select_template_location()
+{
+    QString msg("Select new template location:");
+    this->statusBar()->showMessage(msg);
+    QString template_folder = QFileDialog::getExistingDirectory
+            ( this, "Select template location (existing or new directory):"
+            , this->launcher_.homePath("templates")
+            );
+
+    if( !template_folder.isEmpty() )
+    {// the user has selected a directory
+     // verify that the selected directory is not the templates directory itself.
+        if( template_folder==this->launcher_.homePath("templates") )
+        {
+            msg = QString("Directory '%1' must not be used as a template location. \nYou must select a subdirectory.");
+            QMessageBox::warning(this,TITLE,msg);
+            template_folder.clear();
+        }
+        else
+        {// the user has selected a valid directory,
+            QDir qdir_template_folder(template_folder);
+            if( !qdir_template_folder.exists() )
+            {// non-existing directory selected, this shouldn't happen, though
+                qdir_template_folder.mkpath( QString() );
+            } else {// make sure that the directory is empty
+                if( isNonEmptyDir(qdir_template_folder) )
+                {// ask permission to overwrite
+                    msg = QString("Directory '%1' is not empty.\n"
+                                  "Overwrite?").arg(template_folder);
+                    QMessageBox::Button answer =
+                    QMessageBox::question( this,TITLE,msg
+                                         , QMessageBox::Cancel|QMessageBox::Yes
+                                         , QMessageBox::Yes );
+                    if( answer==QMessageBox::Yes )
+                    {// clear the selected folder
+                        msg = QString("Overwriting directory '%1' ... ").arg(template_folder);
+                        this->statusBar()->showMessage(msg);
+                     // remove the directory and its contents
+                        qdir_template_folder.removeRecursively();
+                     // create the directory again, now empty
+                        qdir_template_folder.mkpath( QString() );
+                    } else {
+                        template_folder.clear();
+                    }
+                }
+            }
+        }
+    }
+    return template_folder; // an empty string implies Cancel template creation.
+}
+
+QString MainWindow::local_file_location() {
+    return this->getSessionConfigItem("localFileLocation")->value().toString();
+}
+
+QString MainWindow::remote_file_location() {
+    return this->getSessionConfigItem("remoteFileLocation")->value().toString();
+}
+
+void MainWindow::on_wShowFilelocations_clicked()
+{
+    LOG_AND_CHECK_IGNORESIGNAL(NO_ARGUMENT);
+
+    QString job = this->ui->wJobname->text();
+    if( job.isEmpty() ) {
+        job = "<None>";
+    }
+    QString msg = QString("File locations for job name '%1':").arg(job)
+                  .append("\n\nlocal: \n  ").append( this->jobs_project_job_path(LOCAL) )
+                  .append("\n\nremote;\n  ").append( this->jobs_project_job_path(REMOTE,false) );
+    QMessageBox::information(this, TITLE, msg, QMessageBox::Close, QMessageBox::Close );
+}
+
+void MainWindow::on_wShowLocalJobFolder_clicked()
+{
+    if( this->ui->wJobname->text().isEmpty() ) {
+        this->statusBar()->showMessage("No job folder is selected, there is nothing to show.");
+    } else {
+        QFileDialog::getOpenFileName( this, TITLE, this->jobs_project_job_path(LOCAL) );
+    }
+}
+
+void MainWindow::on_wShowRemoteJobFolder_clicked()
+{
+    this->statusBar()->showMessage("This feature is not yet available.");
+}

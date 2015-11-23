@@ -6,12 +6,12 @@
    <rect>
     <x>0</x>
     <y>0</y>
-    <width>920</width>
-    <height>707</height>
+    <width>916</width>
+    <height>907</height>
    </rect>
   </property>
   <property name="sizePolicy">
-   <sizepolicy hsizetype="Preferred" vsizetype="Preferred">
+   <sizepolicy hsizetype="Preferred" vsizetype="Minimum">
     <horstretch>0</horstretch>
     <verstretch>0</verstretch>
    </sizepolicy>
@@ -496,360 +496,179 @@ p, li { white-space: pre-wrap; }
          </layout>
         </item>
         <item>
-         <widget class="QGroupBox" name="wJobManagementGroup">
+         <spacer name="verticalSpacer_5">
+          <property name="orientation">
+           <enum>Qt::Vertical</enum>
+          </property>
+          <property name="sizeType">
+           <enum>QSizePolicy::Minimum</enum>
+          </property>
+          <property name="sizeHint" stdset="0">
+           <size>
+            <width>20</width>
+            <height>10</height>
+           </size>
+          </property>
+         </spacer>
+        </item>
+        <item>
+         <widget class="QGroupBox" name="wGroupJobManagement">
+          <property name="sizePolicy">
+           <sizepolicy hsizetype="Preferred" vsizetype="Preferred">
+            <horstretch>0</horstretch>
+            <verstretch>0</verstretch>
+           </sizepolicy>
+          </property>
+          <property name="font">
+           <font>
+            <pointsize>13</pointsize>
+           </font>
+          </property>
           <property name="title">
            <string>Job management</string>
           </property>
-          <layout class="QVBoxLayout" name="verticalLayout_8">
-           <property name="spacing">
-            <number>0</number>
-           </property>
-           <property name="leftMargin">
-            <number>0</number>
-           </property>
-           <property name="topMargin">
-            <number>0</number>
-           </property>
-           <property name="rightMargin">
-            <number>0</number>
-           </property>
-           <property name="bottomMargin">
-            <number>0</number>
-           </property>
+          <property name="alignment">
+           <set>Qt::AlignBottom|Qt::AlignLeading|Qt::AlignLeft</set>
+          </property>
+          <layout class="QVBoxLayout" name="verticalLayout_2">
            <item>
             <layout class="QHBoxLayout" name="horizontalLayout_6">
              <item>
-              <widget class="QLabel" name="label_2">
+              <widget class="QPushButton" name="wShowFilelocations">
                <property name="text">
-                <string>username</string>
+                <string>Show file locations...</string>
                </property>
               </widget>
              </item>
              <item>
-              <widget class="QLineEdit" name="wUsername"/>
-             </item>
-             <item>
-              <spacer name="horizontalSpacer">
-               <property name="orientation">
-                <enum>Qt::Horizontal</enum>
-               </property>
-               <property name="sizeHint" stdset="0">
-                <size>
-                 <width>40</width>
-                 <height>20</height>
-                </size>
-               </property>
-              </spacer>
-             </item>
-             <item>
-              <widget class="QLabel" name="wOffline">
-               <property name="palette">
-                <palette>
-                 <active>
-                  <colorrole role="WindowText">
-                   <brush brushstyle="SolidPattern">
-                    <color alpha="255">
-                     <red>255</red>
-                     <green>0</green>
-                     <blue>0</blue>
-                    </color>
-                   </brush>
-                  </colorrole>
-                 </active>
-                 <inactive>
-                  <colorrole role="WindowText">
-                   <brush brushstyle="SolidPattern">
-                    <color alpha="255">
-                     <red>255</red>
-                     <green>0</green>
-                     <blue>0</blue>
-                    </color>
-                   </brush>
-                  </colorrole>
-                 </inactive>
-                 <disabled>
-                  <colorrole role="WindowText">
-                   <brush brushstyle="SolidPattern">
-                    <color alpha="255">
-                     <red>127</red>
-                     <green>127</green>
-                     <blue>127</blue>
-                    </color>
-                   </brush>
-                  </colorrole>
-                 </disabled>
-                </palette>
+              <widget class="QPushButton" name="wShowLocalJobFolder">
+               <property name="toolTip">
+                <string>&lt;html&gt;&lt;head/&gt;&lt;body&gt;&lt;p&gt;Open a &amp;quot;file manager&amp;quot; view on the local job folder. &lt;/p&gt;&lt;/body&gt;&lt;/html&gt;</string>
                </property>
                <property name="text">
-                <string/>
+                <string>Show local job folder</string>
                </property>
               </widget>
              </item>
              <item>
-              <widget class="QPushButton" name="wAuthenticate">
+              <widget class="QPushButton" name="wShowRemoteJobFolder">
+               <property name="toolTip">
+                <string>&lt;html&gt;&lt;head/&gt;&lt;body&gt;&lt;p&gt;Open a view on the remote job folder.&lt;/p&gt;&lt;/body&gt;&lt;/html&gt;</string>
+               </property>
                <property name="text">
-                <string>authenticate</string>
+                <string>Show remote job folder</string>
                </property>
               </widget>
              </item>
             </layout>
            </item>
            <item>
-            <layout class="QHBoxLayout" name="horizontalLayout_7">
-             <item>
-              <widget class="QFrame" name="verticalFrame">
-               <layout class="QVBoxLayout" name="verticalLayout_9">
-                <property name="spacing">
-                 <number>0</number>
-                </property>
-                <item>
-                 <widget class="QLabel" name="label_4">
-                  <property name="text">
-                   <string/>
-                  </property>
-                 </widget>
-                </item>
-                <item>
-                 <widget class="QLabel" name="label">
-                  <property name="text">
-                   <string>Local</string>
-                  </property>
-                  <property name="alignment">
-                   <set>Qt::AlignRight|Qt::AlignTrailing|Qt::AlignVCenter</set>
-                  </property>
-                 </widget>
-                </item>
-                <item>
-                 <widget class="QLabel" name="label_3">
-                  <property name="text">
-                   <string>Remote</string>
-                  </property>
-                  <property name="alignment">
-                   <set>Qt::AlignRight|Qt::AlignTrailing|Qt::AlignVCenter</set>
-                  </property>
-                 </widget>
-                </item>
-               </layout>
-              </widget>
-             </item>
-             <item>
-              <widget class="QSplitter" name="splitter">
-               <property name="orientation">
-                <enum>Qt::Horizontal</enum>
-               </property>
-               <widget class="QFrame" name="verticalFrame_2">
-                <property name="frameShape">
-                 <enum>QFrame::StyledPanel</enum>
-                </property>
-                <layout class="QVBoxLayout" name="verticalLayout_10">
-                 <property name="spacing">
-                  <number>0</number>
-                 </property>
-                 <item>
-                  <widget class="QPushButton" name="wLocalFileLocationButton">
-                   <property name="toolTip">
-                    <string>&lt;html&gt;&lt;head/&gt;&lt;body&gt;&lt;p&gt;Use 'File location' together with 'Subfolder' to organise your jobs. Your job scripts are prepared in a local directory and executed in the corresponding remote directory. The directory structure is kept identical on the local and remote file location. &lt;/p&gt;&lt;/body&gt;&lt;/html&gt;</string>
-                   </property>
-                   <property name="text">
-                    <string>File location</string>
-                   </property>
-                  </widget>
-                 </item>
-                 <item>
-                  <widget class="QLineEdit" name="wLocal">
-                   <property name="enabled">
-                    <bool>false</bool>
-                   </property>
-                   <property name="alignment">
-                    <set>Qt::AlignCenter</set>
-                   </property>
-                  </widget>
-                 </item>
-                 <item>
-                  <widget class="QComboBox" name="wRemote"/>
-                 </item>
-                 <item>
-                  <spacer name="verticalSpacer_3">
-                   <property name="orientation">
-                    <enum>Qt::Vertical</enum>
-                   </property>
-                   <property name="sizeHint" stdset="0">
-                    <size>
-                     <width>20</width>
-                     <height>40</height>
-                    </size>
-                   </property>
-                  </spacer>
-                 </item>
-                </layout>
-               </widget>
-               <widget class="QFrame" name="verticalFrame_3">
-                <property name="frameShape">
-                 <enum>QFrame::StyledPanel</enum>
-                </property>
-                <layout class="QVBoxLayout" name="verticalLayout_11">
-                 <property name="spacing">
-                  <number>0</number>
-                 </property>
-                 <item>
-                  <widget class="QPushButton" name="wSubfolderButton">
-                   <property name="toolTip">
-                    <string>&lt;html&gt;&lt;head/&gt;&lt;body&gt;&lt;p&gt;Use 'Subfolder' together with 'File location' to organise your jobs. 'Subfolder' must be a descendant (possibly several levels deep) of the local 'File location'. When the job is submitted this directory will also be created in the selected remote 'File location'. &lt;/p&gt;&lt;/body&gt;&lt;/html&gt;</string>
-                   </property>
-                   <property name="text">
-                    <string>Subfolder</string>
-                   </property>
-                  </widget>
-                 </item>
-                 <item>
-                  <widget class="QLineEdit" name="wSubfolder">
-                   <property name="enabled">
-                    <bool>false</bool>
-                   </property>
-                   <property name="alignment">
-                    <set>Qt::AlignCenter</set>
-                   </property>
-                  </widget>
-                 </item>
-                 <item>
-                  <widget class="QLineEdit" name="wSubfolder2">
-                   <property name="enabled">
-                    <bool>false</bool>
-                   </property>
-                   <property name="alignment">
-                    <set>Qt::AlignCenter</set>
-                   </property>
-                  </widget>
-                 </item>
-                 <item>
-                  <spacer name="verticalSpacer_2">
-                   <property name="orientation">
-                    <enum>Qt::Vertical</enum>
-                   </property>
-                   <property name="sizeHint" stdset="0">
-                    <size>
-                     <width>20</width>
-                     <height>40</height>
-                    </size>
-                   </property>
-                  </spacer>
-                 </item>
-                </layout>
-               </widget>
-               <widget class="QFrame" name="verticalFrame_4">
-                <property name="frameShape">
-                 <enum>QFrame::StyledPanel</enum>
-                </property>
-                <layout class="QVBoxLayout" name="verticalLayout_13">
-                 <property name="spacing">
-                  <number>0</number>
-                 </property>
-                 <item>
-                  <widget class="QPushButton" name="wJobnameButton">
-                   <property name="toolTip">
-                    <string>&lt;html&gt;&lt;head/&gt;&lt;body&gt;&lt;p&gt;A directory with this name will be created in subfolder. When you save your script it will be stored in the job script file pbs.sh. When you submit, your job will be executed in directory &amp;lt;&lt;span style=&quot; font-weight:600; font-style:italic;&quot;&gt;remote &lt;/span&gt;&lt;span style=&quot; font-style:italic;&quot;&gt;file location&lt;/span&gt;&amp;gt;/&amp;lt;&lt;span style=&quot; font-style:italic;&quot;&gt;subfolder&lt;/span&gt;&amp;gt;/&amp;lt;&lt;span style=&quot; font-style:italic;&quot;&gt;jobname&lt;/span&gt;&amp;gt;. You can copy the results back to &amp;lt;&lt;span style=&quot; font-weight:600;&quot;&gt;l&lt;/span&gt;&lt;span style=&quot; font-weight:600; font-style:italic;&quot;&gt;ocal&lt;/span&gt;&lt;span style=&quot; font-style:italic;&quot;&gt; file location&lt;/span&gt;&amp;gt;/&amp;lt;&lt;span style=&quot; font-style:italic;&quot;&gt;subfolder&lt;/span&gt;&amp;gt;/&amp;lt;&lt;span style=&quot; font-style:italic;&quot;&gt;jobname&lt;/span&gt;&amp;gt; on the retrieve page when the job is finished, for back up or post-processing.&lt;/p&gt;&lt;/body&gt;&lt;/html&gt;</string>
-                   </property>
-                   <property name="text">
-                    <string>Job name</string>
-                   </property>
-                  </widget>
-                 </item>
-                 <item>
-                  <widget class="QLineEdit" name="wJobname">
-                   <property name="enabled">
-                    <bool>false</bool>
-                   </property>
-                   <property name="alignment">
-                    <set>Qt::AlignCenter</set>
-                   </property>
-                  </widget>
-                 </item>
-                 <item>
-                  <widget class="QLineEdit" name="wJobname2">
-                   <property name="enabled">
-                    <bool>false</bool>
-                   </property>
-                   <property name="alignment">
-                    <set>Qt::AlignCenter</set>
-                   </property>
-                  </widget>
-                 </item>
-                 <item>
-                  <layout class="QHBoxLayout" name="horizontalLayout_15">
-                   <property name="bottomMargin">
-                    <number>0</number>
-                   </property>
-                   <item>
-                    <widget class="QPushButton" name="wSelectTemplate">
-                     <property name="font">
-                      <font>
-                       <pointsize>11</pointsize>
-                      </font>
-                     </property>
-                     <property name="toolTip">
-                      <string>&lt;html&gt;&lt;head/&gt;&lt;body&gt;&lt;p&gt;Select a template for your job&lt;/p&gt;&lt;/body&gt;&lt;/html&gt;</string>
-                     </property>
-                     <property name="text">
-                      <string>select template</string>
-                     </property>
-                    </widget>
-                   </item>
-                   <item>
-                    <widget class="QPushButton" name="wCreateTemplate">
-                     <property name="font">
-                      <font>
-                       <pointsize>11</pointsize>
-                      </font>
-                     </property>
-                     <property name="toolTip">
-                      <string>&lt;html&gt;&lt;head/&gt;&lt;body&gt;&lt;p&gt;Use the current job folder as a template&lt;/p&gt;&lt;/body&gt;&lt;/html&gt;</string>
-                     </property>
-                     <property name="text">
-                      <string>create template</string>
-                     </property>
-                    </widget>
-                   </item>
-                  </layout>
-                 </item>
-                </layout>
-               </widget>
-              </widget>
-             </item>
-            </layout>
-           </item>
-           <item>
-            <layout class="QGridLayout" name="gridLayout_4">
+            <layout class="QGridLayout" name="gridLayout_5">
              <item row="1" column="0">
-              <widget class="QPushButton" name="wReload">
+              <widget class="QLabel" name="label_9">
+               <property name="toolTip">
+                <string>&lt;html&gt;&lt;head/&gt;&lt;body&gt;&lt;p&gt;The &lt;span style=&quot; font-weight:600;&quot;&gt;project folder&lt;/span&gt; is optional. You can use it to organize jobs that belong to the same project. You must first create the project folder and then the jobs that belong to it. Note that you can reorganize your jobs (locally) outside launcher, using a file manager e.g. However, this breaks the link between the local job folder and the remote job folder and should be avoided except for jobs that are not yet submitted or already retrieved.&lt;/p&gt;&lt;/body&gt;&lt;/html&gt;</string>
+               </property>
                <property name="text">
-                <string>Reload</string>
+                <string>Project folder (optional) </string>
+               </property>
+               <property name="alignment">
+                <set>Qt::AlignRight|Qt::AlignTrailing|Qt::AlignVCenter</set>
                </property>
               </widget>
              </item>
-             <item row="1" column="2">
-              <widget class="QPushButton" name="wSubmit">
+             <item row="2" column="0">
+              <widget class="QLabel" name="label_10">
+               <property name="toolTip">
+                <string>&lt;html&gt;&lt;head/&gt;&lt;body&gt;&lt;p&gt;The &lt;span style=&quot; font-weight:600;&quot;&gt;job folder &lt;/span&gt;coincides by design with the &lt;span style=&quot; font-weight:600;&quot;&gt;job name&lt;/span&gt; as defined by the PBS directive '#PBS -N &lt;span style=&quot; font-style:italic;&quot;&gt;jobname&lt;/span&gt;'.&lt;/p&gt;&lt;/body&gt;&lt;/html&gt;</string>
+               </property>
                <property name="text">
-                <string>Submit</string>
+                <string>Job folder and name</string>
+               </property>
+               <property name="alignment">
+                <set>Qt::AlignRight|Qt::AlignTrailing|Qt::AlignVCenter</set>
                </property>
               </widget>
              </item>
              <item row="1" column="1">
+              <widget class="QLineEdit" name="wProjectFolder">
+               <property name="enabled">
+                <bool>false</bool>
+               </property>
+               <property name="alignment">
+                <set>Qt::AlignLeading|Qt::AlignLeft|Qt::AlignVCenter</set>
+               </property>
+              </widget>
+             </item>
+             <item row="1" column="2">
+              <widget class="QPushButton" name="wProjectFolderButton">
+               <property name="sizePolicy">
+                <sizepolicy hsizetype="Minimum" vsizetype="Fixed">
+                 <horstretch>0</horstretch>
+                 <verstretch>0</verstretch>
+                </sizepolicy>
+               </property>
+               <property name="toolTip">
+                <string>&lt;html&gt;&lt;head/&gt;&lt;body&gt;&lt;p&gt;Select an existing project folder ror create a new one. &lt;/p&gt;&lt;/body&gt;&lt;/html&gt;</string>
+               </property>
+               <property name="text">
+                <string>...</string>
+               </property>
+              </widget>
+             </item>
+             <item row="2" column="1">
+              <widget class="QLineEdit" name="wJobname">
+               <property name="enabled">
+                <bool>false</bool>
+               </property>
+               <property name="alignment">
+                <set>Qt::AlignLeading|Qt::AlignLeft|Qt::AlignVCenter</set>
+               </property>
+              </widget>
+             </item>
+             <item row="2" column="2">
+              <widget class="QPushButton" name="wJobnameButton">
+               <property name="font">
+                <font>
+                 <kerning>true</kerning>
+                </font>
+               </property>
+               <property name="toolTip">
+                <string>&lt;html&gt;&lt;head/&gt;&lt;body&gt;&lt;p&gt;Select an existing job folder or create a new one.&lt;/p&gt;&lt;/body&gt;&lt;/html&gt;</string>
+               </property>
+               <property name="text">
+                <string>...</string>
+               </property>
+               <property name="flat">
+                <bool>false</bool>
+               </property>
+              </widget>
+             </item>
+            </layout>
+           </item>
+           <item>
+            <layout class="QHBoxLayout" name="horizontalLayout_16">
+             <item>
+              <widget class="QPushButton" name="wReload">
+               <property name="text">
+                <string>Reload job script</string>
+               </property>
+              </widget>
+             </item>
+             <item>
               <widget class="QPushButton" name="wSave">
                <property name="toolTip">
                 <string>Save the current script locally</string>
                </property>
                <property name="text">
-                <string>Save</string>
+                <string>Save job script</string>
                </property>
               </widget>
              </item>
-             <item row="0" column="2">
-              <widget class="QCheckBox" name="wEmptyRemoteFolder">
-               <property name="toolTip">
-                <string>&lt;html&gt;&lt;head/&gt;&lt;body&gt;&lt;p&gt;Erase the remote job folder to avoid the old results interfering with your computation. &lt;/p&gt;&lt;/body&gt;&lt;/html&gt;</string>
-               </property>
+             <item>
+              <widget class="QPushButton" name="wSubmit">
                <property name="text">
-                <string>erase remote job folder first</string>
+                <string>Submit job</string>
                </property>
               </widget>
              </item>
@@ -859,14 +678,17 @@ p, li { white-space: pre-wrap; }
          </widget>
         </item>
         <item>
-         <spacer name="verticalSpacer">
+         <spacer name="verticalSpacer_2">
           <property name="orientation">
            <enum>Qt::Vertical</enum>
+          </property>
+          <property name="sizeType">
+           <enum>QSizePolicy::MinimumExpanding</enum>
           </property>
           <property name="sizeHint" stdset="0">
            <size>
             <width>20</width>
-            <height>40</height>
+            <height>10</height>
            </size>
           </property>
          </spacer>
@@ -1108,7 +930,7 @@ p, li { white-space: pre-wrap; }
     <rect>
      <x>0</x>
      <y>0</y>
-     <width>920</width>
+     <width>916</width>
      <height>22</height>
     </rect>
    </property>

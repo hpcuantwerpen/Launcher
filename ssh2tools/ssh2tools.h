@@ -96,38 +96,49 @@ namespace ssh2
          // have not been successfully set before.
         bool hasPassphrase() const { return !this->passphrase_.empty(); }
 
-        void authenticate() { this->open(); }
         void open();
-         /* tries to open a ssh session with the current username, private/public
-          * key pair and passprhase. If unsuccessfull throws
+         /* tries to make ssh connection and authenticate
+          *     connect()
+          *     authenticate()
+          */
+        bool isOpen() const;
+
+        void connect();
+         /* tries to make a ssh connection to the current login node
+          * If unsuccessful throws
+          *   . MissingLoginNode
+          *   . WinSockFailure (on windows)
+          *   . NoAddrInfo
+          *   . ConnectTimedOut
+          *   . Libssh2Error
+          * if successful isConnected() will return true;
+          */
+        bool isConnected() const { return isConnected_; }
+
+        void authenticate();
+         /* tries twith the current username, private/public
+          * key pair and passprhase. If unsuccessful throws
           *   . MissingUsername
           *   . MissingKey
           *   . PassphraseNeeded
           *   . WrongPassphrase
           *   . std::runtime_error
-          * If successfull, the session is left open if Session::autoClose is false,
+          * If successful, the session is left open if Session::autoClose is false,
           * and the session is ready to execute commands. If Session::autoClose is
           * true the session is closed.
           */
-        bool isOpen() const;
-         /* returns true if the session was successfully opened, and is ready to
-          * execute commands (exec())
-          */
         bool isAuthenticated() const { return this->isAuthenticated_; }
-         /* returns true if the session was successfully opened, and is ready to
-          * execute commands (exec())
-          */
 
         void close( bool keep_libssh_init=true );
         void reset();
-         // close and clear authentication members
+         // close() and clear authentication members
 
         static bool autoOpen;
         static bool autoClose;
         static int  verbose;
 
         static void cleanup();
-        //void print( std::ostream& ostrm = std::cout ) const;
+
         QString toString() const;
 
         int execute(QString const& cmd );
@@ -196,7 +207,8 @@ namespace ssh2
         int   cmd_exit_code_;
         char* cmd_exit_signal_;
         int bytecount_[2];
-        bool isAuthenticated_;
+        bool isAuthenticated_
+           , isConnected_;
     public:
         ssh2::ExecuteRemoteCommand execute_remote_command;
 
@@ -208,19 +220,25 @@ namespace ssh2
     };
  //=============================================================================
     SUBCLASS_EXCEPTION( MissingLoginNode       , std::runtime_error )
+#ifdef Q_OS_WIN
+    SUBCLASS_EXCEPTION( WinSockFailure         , std::runtime_error )
+#endif
+    SUBCLASS_EXCEPTION( NoAddrInfo             , std::runtime_error )
+    SUBCLASS_EXCEPTION( ConnectTimedOut        , std::runtime_error )
+    SUBCLASS_EXCEPTION( Libssh2Error           , std::runtime_error )
+
+    SUBCLASS_EXCEPTION( NotConnected           , std::runtime_error )
     SUBCLASS_EXCEPTION( MissingUsername        , std::runtime_error )
     SUBCLASS_EXCEPTION( MissingKey             , std::runtime_error )
     SUBCLASS_EXCEPTION( PassphraseNeeded       , std::runtime_error )
     SUBCLASS_EXCEPTION( WrongPassphrase        , std::runtime_error )
+    SUBCLASS_EXCEPTION( Libssh2AuthError       , std::runtime_error )
+
     SUBCLASS_EXCEPTION( RemoteExecutionFailed  , std::runtime_error )
+
     SUBCLASS_EXCEPTION( FileOpenError          , std::runtime_error )
-    SUBCLASS_EXCEPTION( SshOpenError           , std::runtime_error )
-    SUBCLASS_EXCEPTION( ConnectTimedOut        , std::runtime_error )
-    SUBCLASS_EXCEPTION( NoAddrInfo             , std::runtime_error )
+    SUBCLASS_EXCEPTION( SshOpenError           , std::runtime_error ) // used by exec_
     SUBCLASS_EXCEPTION( InexistingRemoteCommand, std::runtime_error )
-#ifdef Q_OS_WIN
-    SUBCLASS_EXCEPTION( WinSockFailure         , std::runtime_error )
-#endif
  //=============================================================================
 }// namespace ssh2
 

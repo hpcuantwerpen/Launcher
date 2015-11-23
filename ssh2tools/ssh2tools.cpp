@@ -88,8 +88,12 @@ namespace ssh2
  //-----------------------------------------------------------------------------
     bool Session::isInitializedLibssh_ = false;
  //-----------------------------------------------------------------------------
-    void Session::setLoginNode( QString const& login ) {
+    void Session::setLoginNode( QString const& login )
+    {
         this->login_node_ = login.toStdString();
+     // make sure that we re-connect and re-authenticate when the cluster is changed!
+        this->isConnected_     = false;
+        this->isAuthenticated_ = false;
     }
  //-----------------------------------------------------------------------------
     bool Session::setUsername( QString const& user )
@@ -175,21 +179,20 @@ namespace ssh2
         if( this->isOpen() ) {
             return;
         }
-        this->isAuthenticated_ = false;
+
+        this->connect();
+        this->authenticate();
+    }
+ //-----------------------------------------------------------------------------
+    void Session::connect()
+    {
+     // precondition
         if( this->login_node_.empty() ) {
-            throw_<MissingLoginNode>("Authentication error: Missing login node.");
-        }
-        if( this->username_.empty() ) {
-            throw_<MissingUsername>("Authentication error: Missing username.");
-        }
-        if( this->private_key_.empty() ) {
-#ifdef NO_PUBLIC_KEY_NEEDED
-            throw_<MissingKey>( "Missing private key for user %1.", this->username_.c_str() );
-#else
-            throw_<MissingKey>( "Missing private/public key pair for user %1.", this->username_.c_str() );
-#endif
+            throw_<MissingLoginNode>("Connection error: Missing login node (don't know what to connect to.");
         }
 
+        this->isConnected_     = false;
+        this->isAuthenticated_ = false;
         int rv;
 #ifdef Q_OS_WIN
      // see http://www.cplusplus.com/forum/windows/41339/
@@ -214,6 +217,7 @@ namespace ssh2
             throw_<WinSockFailure>("Could not find a usable version of Winsock.dll (version 2.2 needed).");
         }
 #endif
+
         struct addrinfo hints, *servinfo, *p;
 
         memset(&hints, 0, sizeof hints);
@@ -230,7 +234,7 @@ namespace ssh2
                 WARN << "\n    socket(...):" << strerror(errno);
                 continue; // try next element in the list
             }
-            if( connect( this->sock_, p->ai_addr, p->ai_addrlen ) == -1 ) {
+            if( ::connect( this->sock_, p->ai_addr, p->ai_addrlen ) == -1 ) {
                 ::close( this->sock_ );
                 WARN << "\n    connect(...):"<<strerror(errno);
                 continue; // try next element in the list
@@ -246,13 +250,13 @@ namespace ssh2
         if( !Session::isInitializedLibssh_ )
         {
             if( (rv=libssh2_init(0)) != 0 ) {
-                throw_<std::runtime_error>("Faild at initializing libssh2, exitcode = %1.", rv );
+                throw_<Libssh2Error>("Failed at initializing libssh2, exitcode = %1.", rv );
             }
             Session::isInitializedLibssh_ = true;
         }
         this->session_ = libssh2_session_init();
         if( !this->session_ ) {
-            throw_<std::runtime_error>("Failed at initializing ssh2 session.");
+            throw_<Libssh2Error>("Failed at initializing ssh2 session.");
         }
      // tell libssh2 we want it all done non-blocking
         libssh2_session_set_blocking(this->session_, 0);
@@ -261,8 +265,9 @@ namespace ssh2
      // and setup crypto, compression, and MAC layers
         while( (rv = libssh2_session_handshake(this->session_, this->sock_)) == LIBSSH2_ERROR_EAGAIN);
         if( rv ) {
-            throw_<std::runtime_error>("Failed at establishing SSH session, exitcode = %1>", rv );
+            throw_<Libssh2Error>("Failed at establishing SSH session, exitcode = %1>", rv );
         }
+        this->isConnected_  = true;
 /*
         LIBSSH2_KNOWNHOSTS* nh = libssh2_knownhost_init(this->session_);
 
@@ -317,15 +322,23 @@ namespace ssh2
         } else
         {// Or by public key
 */
-
+    }
+ //-----------------------------------------------------------------------------
+    void Session::authenticate()
+    {
+        this->isAuthenticated_ = false;
+        if( !this->isConnected() ) {
+            throw_<NotConnected>("Attempt to authenticate without ssh2 connection.");
+        }
+        int rv;
         while( ( rv = libssh2_userauth_publickey_fromfile
                         ( this->session_
                         , this->username_   .c_str()
-#                   ifdef NO_PUBLIC_KEY_NEEDED
+#ifdef NO_PUBLIC_KEY_NEEDED
                         , nullptr
-#                   else
+#else
                         , this->public_key_ .c_str()
-#                   endif
+#endif
                         , this->private_key_.c_str()
                         , this->passphrase_ .c_str()
                         )
@@ -343,16 +356,17 @@ namespace ssh2
             } else {
                 QString msg = QString("Failed at libssh2_userauth_publickey_fromfile, exitcode=%1.").arg(rv);
                 if( rv==LIBSSH2_ERROR_FILE ) {
-                    msg.append("\n(LIBSSH2_ERROR_FILE: The key file could not be read. Note that key pairs generated with PuTTY Key Generator must be converted to openssh format).");
+                    msg.append("\n(LIBSSH2_ERROR_FILE: The key file could not be read. Note that "
+                               "key pairs generated with PuTTY Key Generator must be converted to "
+                               "openssh format).");
                 }
                 if( rv==LIBSSH2_ERROR_AUTHENTICATION_FAILED ) {
                     msg.append("\n(LIBSSH2_ERROR_AUTHENTICATION_FAILED: possible username/key mismatch).");
                 }
-                throw_<std::runtime_error>( msg.C_STR() );
+                throw_<Libssh2AuthError>( msg.C_STR() );
             }
         }
         this->isAuthenticated_ = true;
-        return;
 //      }
     }
  //-----------------------------------------------------------------------------
@@ -495,6 +509,7 @@ namespace ssh2
             }
         } catch( std::runtime_error& e ) {
             std::cerr << e.what();
+            return -9999;
         }
         return this->cmd_exit_code_;
     }
