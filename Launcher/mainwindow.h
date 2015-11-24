@@ -91,14 +91,6 @@ private slots:
 
     void on_wNotifyEnd_toggled(bool checked);
 
-//    void on_wUsername_editingFinished();
-//    void on_wUsername_returnPressed();
-//    void on_wUsername_textChanged(const QString &arg1);
-
-//    void on_wAuthenticate_clicked();
-
-    //    void on_wLocalFileLocationButton_clicked();
-
     void on_wProjectFolder_textChanged(const QString &arg1);
 
     void on_wJobname_textChanged(const QString &arg1);
@@ -157,6 +149,13 @@ private slots:
     void verboseAction_triggered();
     void selectTemplateAction_triggered();
     void createTemplateAction_triggered();
+    void newJobscriptAction_triggered();
+    void saveJobscriptAction_triggered();
+    void openJobscriptAction_triggered();
+    void submitJobscriptAction_triggered();
+    void showFileLocationsAction_triggered();
+    void showLocalJobFolderAction_triggered();
+    void showRemoteJobFolderAction_triggered();
 
     void on_wShowFilelocations_clicked();
 
@@ -205,10 +204,10 @@ public:
     QString local_file_location();
     QString remote_file_location();
 
-    QString local_subfolder();
-    QString local_subfolder_jobname();
-    QString remote_subfolder();
-    QString remote_subfolder_jobname();
+//    QString local_subfolder();
+//    QString local_subfolder_jobname();
+//    QString remote_subfolder();
+//    QString remote_subfolder_jobname();
     enum LocalOrRemote {LOCAL,REMOTE};
     QString jobs_project_path( LocalOrRemote local_or_remote, bool resolve=true );
     QString jobs_project_job_path( LocalOrRemote local_or_remote, bool resolve=true );
@@ -251,7 +250,18 @@ private:
     int verbosity_;
 
     QMenu* helpMenu_;
-    QAction*aboutAction_;
+    QAction* aboutAction_;
+
+    QMenu* jobMenu_;
+    QAction* newJobscriptAction_;
+    QAction* saveJobscriptAction_;
+    QAction* openJobscriptAction_;
+    QAction* submitJobscriptAction_;
+    QAction* showFileLocationsAction_;
+    QAction* showLocalJobFolderAction_;
+    QAction* showRemoteJobFolderAction_;
+    QAction* selectTemplateAction_;
+    QAction* createTemplateAction_;
 
     QMenu* sessionMenu_;
     QAction* openSessionAction_;
@@ -264,9 +274,6 @@ private:
     QAction* remoteFileLocationAction_;
     QAction* verboseAction_;
 
-    QMenu* templatesMenu_;
-    QAction* selectTemplateAction_;
-    QAction* createTemplateAction_;
 
     enum PendingRequest {
         NoPendingRequest=0

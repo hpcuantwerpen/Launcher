@@ -121,7 +121,7 @@ namespace pbs
         for( ScriptLines_t::iterator iter=this->lines_.begin(); iter < this->lines_.end(); ++iter ) {
             ShellCommand* line = *iter;
             QString line_text = line->text();
-            if( !line->hidden() ) {
+            if( !line->hidden() /*&& line_text!=FINISHED*/ ) {
                 script_text.append( line_text );
             }
         }
@@ -149,8 +149,6 @@ namespace pbs
         this->set_has_unsaved_changes(false);
     }
  //-----------------------------------------------------------------------------
-    #define FINISHED QString("touch $PBS_O_WORKDIR/finished.$PBS_JOBID #Launcher needs this to be the LAST line. Do NOT move or delete!")
- //-----------------------------------------------------------------------------
     void
     Script::
     write( QString const& filepath, bool warn_before_overwrite) const
@@ -173,12 +171,11 @@ namespace pbs
         f.open(QIODevice::Truncate/*|QIODevice::Text*/|QIODevice::WriteOnly);
         QTextStream out(&f);
 
-        const_cast<Script*>(this)->add( QString(FINISHED), /*hidden=*/false, /*position=*/types::LastPosition );
-         // this line will be removed when reading back in
-         // the user only see this line if he opens the file with another editor.
-
         QString const& txt = this->text();
-        out << txt;
+        out << txt
+            << '\n' << FINISHED;
+             // this line will be removed when reading back in
+             // the user only see this line if he opens the file with another editor.
         non_const_this->filepath_ = new_filepath;
 
      // obviously, since we just saved:

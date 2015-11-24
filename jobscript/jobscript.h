@@ -81,6 +81,8 @@ namespace pbs
     SUBCLASS_EXCEPTION( WarnBeforeOverwrite, std::runtime_error );
     SUBCLASS_EXCEPTION( InexistingFile     , std::runtime_error );
  //=============================================================================
+    #define FINISHED QString("touch $PBS_O_WORKDIR/finished.$PBS_JOBID #Launcher needs this to be the LAST line. Do NOT move or delete!")
+ //-----------------------------------------------------------------------------
 }// namespace pbs
 
 

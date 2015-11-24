@@ -1,4 +1,18 @@
 TODO LIST
+- dont show joblist, qstat -u output is sufficient and appears on single line -> simple selection...
+- bug fix: templates folder is missing.
+- add job script menu/[ new job script | save job script | load job script | file locations | show job folder contents ]
+  and remove the job management items
+
+? bring script and resource parameters together on same page. Perhaps not a good idea. Now there is a clear mechanism
+  to update either of the pages when the other has changed (i.e. the page change). connecting the resources update to
+  the textChange() signal is perhaps not a very good idea and there is not much added value. ...
+
+- must retrieve be a tab page or a menu item? or both?
+
+- add checkpointing of jobs
+- show contents local+remote job folder
+- progress bar for obtaining connection, copying back and forth
 - fix compile time warnings on macosx
 
 - win32 version
@@ -14,13 +28,22 @@ TODO LIST
 
 - add mpi functionality
 
-- add checkpointing of jobs
 
 - add icon to mac application
   https://iconverticons.com/online/
 
 DONE (reverse chronological order)
 ==================================
+2015-11-24
+- bug fix: save button shows unsaved changes at startup
+- remove automatic save on submit
+- bug fix in window title (user not shown in title after authentication)
+- bug fix FINISHED line shown in script after save.
+
+2015-11-20
+- hide authentication details
+- hide local+remote file location
+- "project folder" rather than "subfolder".
 2015-11-16
 - session management added new/open/save (session = config file, *.data), launcher.cfg used to store
   the path to the session config.
