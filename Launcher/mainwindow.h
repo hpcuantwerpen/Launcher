@@ -11,6 +11,7 @@
 #include <QMap>
 #include <QStringList>
 #include <QtDebug>
+#include <QTime>
 
 #include <launcher.h>
 #include <ssh2tools.h>
@@ -38,6 +39,7 @@ namespace Ui {
       , int level=1
       );
  //-----------------------------------------------------------------------------
+    bool is_absolute_path( QString const& folder );
 
 
 class MainWindow : public QMainWindow
@@ -79,9 +81,9 @@ private slots:
 
     void on_wEnforceNNodes_toggled(bool checked);
 
-    void on_wWalltimeUnit_currentTextChanged(const QString &arg1);
+//    void on_wWalltimeUnit_currentTextChanged(const QString &arg1);
 
-    void on_wWalltime_valueChanged(double arg1);
+//    void on_wWalltime_valueChanged(double arg1);
 
     void on_wNotifyAddress_editingFinished();
 
@@ -91,9 +93,9 @@ private slots:
 
     void on_wNotifyEnd_toggled(bool checked);
 
-    void on_wProjectFolder_textChanged(const QString &arg1);
+//    void on_wProjectFolder_textChanged(const QString &arg1);
 
-    void on_wJobname_textChanged(const QString &arg1);
+//    void on_wJobname_textChanged(const QString &arg1);
 
     void on_wProjectFolderButton_clicked();
 
@@ -163,6 +165,8 @@ private slots:
 
     void on_wShowRemoteJobFolder_clicked();
 
+    void on_wWalltime_editingFinished();
+
 public:
     void setupHome();
     void setIgnoreSignals( bool ignore=true );
@@ -190,7 +194,7 @@ public:
     bool requiresAuthentication(const QString &action = QString() );
 
     void updateResourceItems();
-    void lookForJobscript( QString const& job_folder );
+    bool lookForJobscript(QString const& job_folder, bool ask_to_load=false, bool create_if_inexistent=false );
     bool loadJobscript( QString const& filepath );
     bool saveJobscript( QString const& filepath );
     bool remoteCopyJob();
@@ -203,6 +207,8 @@ public:
 
     QString local_file_location();
     QString remote_file_location();
+    bool is_in_local_file_location(QString const& folder, QString *absolute_folder);
+
 
 //    QString local_subfolder();
 //    QString local_subfolder_jobname();
@@ -234,6 +240,7 @@ public:
     QString username();
     bool can_authenticate();
     void update_WindowTitle();
+    void update_StatusbarWidgets();
 
 private:
     Ui::MainWindow *ui;
@@ -274,7 +281,11 @@ private:
     QAction* remoteFileLocationAction_;
     QAction* verboseAction_;
 
+    QLabel *wAuthentIndicator_
+         , *wJobnameIndicator_
+         , *wProjectIndicator_;
 
+    QTime walltime_;
     enum PendingRequest {
         NoPendingRequest=0
       , NodesAndCoresPerNode

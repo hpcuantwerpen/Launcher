@@ -378,7 +378,7 @@ p, li { white-space: pre-wrap; }
               <number>0</number>
              </property>
              <item>
-              <widget class="QDoubleSpinBox" name="wWalltime">
+              <widget class="QDoubleSpinBox" name="wWalltime_0">
                <property name="sizePolicy">
                 <sizepolicy hsizetype="Minimum" vsizetype="Fixed">
                  <horstretch>0</horstretch>
@@ -676,6 +676,9 @@ p, li { white-space: pre-wrap; }
            </item>
           </layout>
          </widget>
+        </item>
+        <item>
+         <widget class="QLineEdit" name="wWalltime"/>
         </item>
         <item>
          <spacer name="verticalSpacer_2">

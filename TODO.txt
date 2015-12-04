@@ -1,6 +1,7 @@
 TODO LIST
 - dont show joblist, qstat -u output is sufficient and appears on single line -> simple selection...
 - bug fix: templates folder is missing.
+- convert jobs between clusters...
 - add job script menu/[ new job script | save job script | load job script | file locations | show job folder contents ]
   and remove the job management items
 
