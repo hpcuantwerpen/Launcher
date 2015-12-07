@@ -63,7 +63,7 @@
  //-----------------------------------------------------------------------------
     QString validateUsername( QString const & username )
     {
-        QString result = username.toLower();
+        QString result = username .toLower();
         QRegularExpressionMatch m;
         QRegularExpression re("^vsc\\d{5}$");
         m = re.match( username );
@@ -72,6 +72,24 @@
         }
         return result;
     }
+ //-----------------------------------------------------------------------------
+    class IgnoreSignals
+    {
+    public:
+        IgnoreSignals( MainWindow* mainWindow )
+          : previousValue_( mainWindow->getIgnoreSignals() )
+          , mainWindow_(mainWindow)
+        {
+            mainWindow->setIgnoreSignals();
+        }
+        ~IgnoreSignals() {
+            mainWindow_->setIgnoreSignals(this->previousValue_);
+        }
+    private:
+        bool previousValue_;
+        MainWindow* mainWindow_;
+    };
+    #define IGNORE_SIGNALS_UNTIL_END_OF_SCOPE IgnoreSignals ignoreSignals(this)
  //-----------------------------------------------------------------------------
 #define TITLE "Launcher"
 
@@ -118,6 +136,7 @@
       , ignoreSignals_(false)
       , previousPage_(MainWindowUnderConstruction)
       , verbosity_(INITIAL_VERBOSITY)
+      , walltime_(nullptr)
       , pendingRequest_(NoPendingRequest)
       , messages_(TITLE)
     {
@@ -394,16 +413,9 @@
         this->getSessionConfigItem("publicKey" , QString() );
 #endif
         this->getSessionConfigItem("passphraseNeeded", true );
-     // wWalltimeUnit
-        ci = this->getSessionConfigItem("wWalltimeUnit");
-        if( !ci->isInitialized() ) {
-            QStringList units;
-            units <<"seconds"<<"minutes"<<"hours"<<"days"<<"weeks";
-            ci->set_choices(units);
-            ci->set_value("hours");
-        }
 
-        ci = this->getSessionConfigItem("walltimeSeconds","1:00:00");
+        ci = this->getSessionConfigItem("wWalltime","1:00:00");
+        this->walltime_ = new Walltime(this->ui->wWalltime,ci);
 
         ci = this->getSessionConfigItem("wNotifyAddress", QString() );
         ci = this->getSessionConfigItem("notifyWhen");
@@ -416,8 +428,6 @@
 
         dc::DataConnectorBase::config = &(this->launcher_.session_config);
         dc::DataConnectorBase::script = &(this->launcher_.script);
-        this->data_.append( dc::newDataConnector( this->ui->wWalltimeUnit , "wWalltimeUnit"  , ""         ) );
-        this->data_.append( dc::newDataConnector(                           "walltimeSeconds", "walltime" ) );
         this->data_.append( dc::newDataConnector( this->ui->wNotifyAddress, "wNotifyAddress" , "-M"       ) );
         this->data_.append( dc::newDataConnector(                           "notifyWhen"     , "-m"       ) );
         this->data_.append( dc::newDataConnector( this->ui->wNotifyAbort  , "wNotifyAbort"   , ""         ) );
@@ -451,7 +461,8 @@
         this->data_.append( dc::newDataConnector( this->ui->wNCores        , "wNCores"        , "n_cores"    ) );
         this->data_.append( dc::newDataConnector( this->ui->wGbPerCore     , "wGbPerCore"     , "GB_per_core") );
         this->data_.append( dc::newDataConnector( this->ui->wGbTotal       , "wGbTotal"       , "GB_total"   ) );
-        this->data_.append( dc::newDataConnector( this->ui->wWalltime      , "wWalltime"      , ""           ) );
+//        this->data_.append( dc::newDataConnector( this->ui->wWalltime      , "wWalltime"      , ""           ) );
+        //this->walltime_->
 
         this->storeResetValues();
 
@@ -639,6 +650,11 @@
             delete (*iter);
         }
 
+        if( this->walltime_ ) {
+            delete this->walltime_;
+            this->walltime_ = nullptr;
+        }
+
         QSize windowSize = this->size();
         this->getSessionConfigItem("windowWidth" )->set_value( windowSize.width () );
         this->getSessionConfigItem("windowHeight")->set_value( windowSize.height() );
@@ -664,6 +680,7 @@
 
         delete this->paletteRedForeground_;
         Log() << "\n    Launcher closed.";
+
     }
  //-----------------------------------------------------------------------------
     void MainWindow::setIgnoreSignals( bool ignore )
@@ -678,22 +695,6 @@
         this->ignoreSignals_ = ignore;
     }
  //-----------------------------------------------------------------------------
-    class IgnoreSignals
-    {
-    public:
-        IgnoreSignals( MainWindow* mainWindow )
-          : previousValue_( mainWindow->getIgnoreSignals() )
-          , mainWindow_(mainWindow)
-        {
-            mainWindow->setIgnoreSignals();
-        }
-        ~IgnoreSignals() {
-            mainWindow_->setIgnoreSignals(this->previousValue_);
-        }
-    private:
-        bool previousValue_;
-        MainWindow* mainWindow_;
-    };
  //-----------------------------------------------------------------------------
     dc::DataConnectorBase*
     MainWindow::
@@ -747,7 +748,7 @@
     {
         LOG_CALLER_INFO;
         {// act on config items only...
-            IgnoreSignals ignoreSignals( this );
+            IGNORE_SIGNALS_UNTIL_END_OF_SCOPE;
             QString cluster = this->getSessionConfigItem("wCluster")->value().toString();
             ClusterInfo& clusterInfo = *(this->launcher_.clusters.find( cluster ) );
          // Initialize Config items that depend on the cluster
@@ -827,7 +828,7 @@
         this->getSessionConfigItem("wGbTotal")->set_value( QString().setNum( gbTotal, 'g', 3 ) );
 
         if( updateWidgets ) {
-            IgnoreSignals ignoreSignals( this );
+            IGNORE_SIGNALS_UNTIL_END_OF_SCOPE;
             this->getDataConnector("wNNodes"       )->choices_config_to_widget();
             this->getDataConnector("wNNodes"       )->  value_config_to_widget();
             this->getDataConnector("wNCoresPerNode")->choices_config_to_widget();
@@ -839,61 +840,17 @@
             this->getDataConnector("wGbTotal"      )->  value_config_to_widget();
         }
     }
-  //-----------------------------------------------------------------------------
-    QString formatWalltimeSeconds( int seconds )
-    {
-        int h,m,s;
-        h       = seconds/3600;
-        seconds = seconds%3600;
-        m       = seconds/60;
-        s       = seconds%60;
-        QString format("%1:%2:%3");
-        QString formatted = format.arg(h).arg(m,2,10,QLatin1Char('0')).arg(s,2,10,QLatin1Char('0'));
-        return formatted;
-    }
- //-----------------------------------------------------------------------------
-    int unformatWalltimeSeconds( QString formatted_seconds )
-    {
-        QRegularExpression re("^(\\d+):(\\d\\d):(\\d\\d)$");
-        QRegularExpressionMatch match;
-        match = re.match(formatted_seconds);
-        if( !match.hasMatch() ) {
-            throw_<std::runtime_error>("Could not convert walltime '%1' to seconds.", formatted_seconds );
-        }
-        int s = match.captured(3).toInt();
-        int m = match.captured(2).toInt();
-        int h = match.captured(1).toInt();
-        s += 60*( m + 60*h );
-        return s;
-    }
  //-----------------------------------------------------------------------------
     void MainWindow::walltimeUnitDependencies( bool updateWidgets )
     {
-        QString unit = this->getSessionConfigItem("wWalltimeUnit")->value().toString();
-        this->walltimeUnitSeconds_ = nSecondsPerUnit(unit);
-        double step = ( unit=="weeks" ? 1.0/7.0 :
-                      ( unit=="days"  ? 0.25    :
-                      ( unit=="hours" ? 0.25    : 10.0 )));
-        double walltime_limit = (double) this->clusterInfo().walltimeLimit();
-        walltime_limit /= this->walltimeUnitSeconds_;
-        QList<QVariant> range;
-        range.append( 0. );
-        range.append( walltime_limit );
-        range.append( step );
+        IGNORE_SIGNALS_UNTIL_END_OF_SCOPE;
 
-        cfg::Item* ci_wWalltime = this->getSessionConfigItem("wWalltime");
-        try {
-            ci_wWalltime->set_choices(range,true);
-        } catch( cfg::InvalidConfigItemValue& e) {}
-        double w = (double) unformatWalltimeSeconds( this->getSessionConfigItem("walltimeSeconds")->value().toString() );
-        w /= this->walltimeUnitSeconds_;
-        ci_wWalltime->set_value(w);
-
-        if( updateWidgets ) {
-            IgnoreSignals ignoreSignals( this );
-            this->getDataConnector("wWalltime")->choices_config_to_widget();
-            this->getDataConnector("wWalltime")->  value_config_to_widget();
+        this->walltime_->set_limit( this->clusterInfo().walltimeLimit() );
+        if( !this->walltime_->validate() ) {
+            this->walltime_->set_seconds( this->walltime_->limit() );
         }
+        this->walltime_->config_to_widget();
+        if( updateWidgets ) {}
     }
  //-----------------------------------------------------------------------------
     QString MainWindow::check_script_unsaved_changes()
@@ -927,7 +884,6 @@
  // SLOTS
  //-----------------------------------------------------------------------------
 
-#define IGNORE_SIGNALS_UNTIL_END_OF_SCOPE IgnoreSignals ignoreSignals(this)
 
 
 void MainWindow::on_wCluster_currentIndexChanged( QString const& arg1 )
@@ -1171,68 +1127,16 @@ void MainWindow::on_wSingleJob_toggled(bool checked)
 
 void MainWindow::on_wWalltime_editingFinished()
 {
-    QString input = this->ui->wWalltime->text();
-    QStringList input_items = input.split(':');
-    int sz = input_items.size();
-    switch  (sz) {
-        case 1:
-        {// expecting "integer d|h|m|s"
-            if( input_items.isEmpty() ) break;
+    LOG_AND_CHECK_IGNORESIGNAL(NO_ARGUMENT);
 
-            input = input_items.at(0);
-            input_items = input.split(' ',QString::SkipEmptyParts);
-            try {
-                int n = input_items.at(0).toInt();
-                int sz1 = input_items.size();
-                switch(sz1) {
-                case 1:
-                {// only one item, no unit, use hour as walltime unit
-                    n *= 3600;
-                    this->walltime_ = QTime().addSecs(n);
-                } break;
-                case 2:
-                {// second item is unit
-                 // interpret unit:
-                    QString unit = input_items.at(1).toLower();
-                    if     ( unit=="d" ) n*=24*3600;
-                    else if( unit=="h" ) n*=3600;
-                    else if( unit=="m" ) n*=60;
-                    else if( unit=="s" ) n*=1;
-                    else break; // bad input
-                    this->walltime_ = QTime().addSecs(n);
-                } break;
-                default:
-                {// bad input. don't change the walltime
-                } break;
-                }// end of switch(sz1)
-            } catch (...) {
-                break;
-            }
-        } break;
-        default:
-        {// expecting "hh:mm[:ss]"
-            if( sz>=4 ) break; //bad input
-            int hhmmss[3];
-            for( int i=0; i<sz; ++i ) {
-                if( input_items.at(i).isEmpty() ) {
-                    hhmmss[i] = 0;
-                } else {
-                    try {
-                        hhmmss[i] = input_items.at(i).toInt();
-                    } catch(...) {
-                        break; // bad input
-                    }
-                }
-            }
-            hhmmss[2]+=hhmmss[1]*60;
-            hhmmss[2]+=hhmmss[0]*3600;
-            this->walltime_ = QTime().addSecs( hhmmss[2] );
-        }
+    QString input = this->ui->wWalltime->text();
+    int s = this->walltime_->toInt(input);
+    if( s < 0 ) {
+        this->statusBar()->showMessage("Bad input for walltime. Expecting 'hh:mm[:ss]' or 'N d|h|m|s'.");
+    } else {
+        IGNORE_SIGNALS_UNTIL_END_OF_SCOPE;
+        this->walltime_->set_seconds(s);
     }
-    IGNORE_SIGNALS_UNTIL_END_OF_SCOPE;
-    input = this->walltime_.toString("hh:mm:ss");
-    this->getSessionConfigItem("wWalltime")->set_value(input);
-    this->getDataConnector("wWalltime")->value_config_to_widget();
 }
 
 void MainWindow::on_wNotifyAddress_editingFinished()

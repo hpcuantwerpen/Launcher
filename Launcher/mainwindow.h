@@ -17,6 +17,7 @@
 #include <ssh2tools.h>
 #include <job.h>
 #include <dataconnector.h>
+#include <walltime.h>
 
 #include <iostream>
 
@@ -241,7 +242,6 @@ public:
     bool can_authenticate();
     void update_WindowTitle();
     void update_StatusbarWidgets();
-
 private:
     Ui::MainWindow *ui;
     Launcher launcher_;
@@ -249,7 +249,6 @@ private:
     int previousPage_;
     QList<dc::DataConnectorBase*> data_;
     dc::DataConnectorBase* getDataConnector( QString const& name );
-    int walltimeUnitSeconds_; // #seconds in walltime unit as given by this->ui->wWalltimeUnit
     QPalette* paletteRedForeground_;
 
     ssh2::Session sshSession_;
@@ -284,8 +283,8 @@ private:
     QLabel *wAuthentIndicator_
          , *wJobnameIndicator_
          , *wProjectIndicator_;
+    Walltime *walltime_;
 
-    QTime walltime_;
     enum PendingRequest {
         NoPendingRequest=0
       , NodesAndCoresPerNode

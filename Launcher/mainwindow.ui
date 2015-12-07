@@ -378,20 +378,17 @@ p, li { white-space: pre-wrap; }
               <number>0</number>
              </property>
              <item>
-              <widget class="QDoubleSpinBox" name="wWalltime_0">
-               <property name="sizePolicy">
-                <sizepolicy hsizetype="Minimum" vsizetype="Fixed">
-                 <horstretch>0</horstretch>
-                 <verstretch>0</verstretch>
-                </sizepolicy>
-               </property>
-               <property name="decimals">
-                <number>2</number>
-               </property>
-              </widget>
+              <widget class="QLineEdit" name="wWalltime"/>
              </item>
              <item>
-              <widget class="QComboBox" name="wWalltimeUnit"/>
+              <widget class="QLabel" name="label">
+               <property name="enabled">
+                <bool>false</bool>
+               </property>
+               <property name="text">
+                <string>hh:mm[:ss] or x d|h|m|s </string>
+               </property>
+              </widget>
              </item>
             </layout>
            </widget>
@@ -676,9 +673,6 @@ p, li { white-space: pre-wrap; }
            </item>
           </layout>
          </widget>
-        </item>
-        <item>
-         <widget class="QLineEdit" name="wWalltime"/>
         </item>
         <item>
          <spacer name="verticalSpacer_2">
