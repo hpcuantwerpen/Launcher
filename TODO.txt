@@ -1,9 +1,11 @@
 TODO LIST
+- add file location views
 - dont show joblist, qstat -u output is sufficient and appears on single line -> simple selection...
+- test template
+- test session new/open/save/save as
 - bug fix: templates folder is missing.
+
 - convert jobs between clusters...
-- add job script menu/[ new job script | save job script | load job script | file locations | show job folder contents ]
-  and remove the job management items
 
 ? bring script and resource parameters together on same page. Perhaps not a good idea. Now there is a clear mechanism
   to update either of the pages when the other has changed (i.e. the page change). connecting the resources update to
@@ -35,6 +37,9 @@ TODO LIST
 
 DONE (reverse chronological order)
 ==================================
+2015-12-18
+- new gui with menu and new/open/save/save as menu items
+- removed the job management items
 2015-11-24
 - bug fix: save button shows unsaved changes at startup
 - remove automatic save on submit

@@ -19,10 +19,12 @@ HEADERS += orderedmap.h     \
            throw_.h         \
            toolbox.h \
     datetime_now.h \
-    log.h
+    log.h \
+    verify.h
 
 SOURCES += orderedmap.cpp   \
            warn_.cpp \
     datetime_now.cpp \
-    log.cpp
+    log.cpp \
+    verify.cpp
 

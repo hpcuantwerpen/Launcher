@@ -8,6 +8,7 @@
 #include "orderedmap.h"
 #include "datetime_now.h"
 #include "log.h"
+#include "verify.h"
 
 #endif // TOOLBOX_H
 

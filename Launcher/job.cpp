@@ -46,14 +46,28 @@
  //-----------------------------------------------------------------------------
     QString Job::toStringFormatted() const
     {
-        QString result = QString("\n>>> ").append( this->job_id_          )
-                         .append("\n    local  location : ").append( this-> local_location_)
-                         .append("\n    remote location : ").append( this->remote_location_)
-                         .append("\n    subfolder       : ").append( this->subfolder_      )
-                         .append("\n    jobname         : ").append( this->jobname_        )
-                         .append("\n    status          : ").append( this->status_text()   )
-                         .append("\n")
-                         ;
+//        QString result = QString("\n>>> ").append( this->job_id_          )
+//                         .append("\n    local  location : ").append( this-> local_location_)
+//                         .append("\n    remote location : ").append( this->remote_location_)
+//                         .append("\n    subfolder       : ").append( this->subfolder_      )
+//                         .append("\n    jobname         : ").append( this->jobname_        )
+//                         .append("\n    status          : ").append( this->status_text()   )
+//                         .append("\n")
+//                         ;
+        QString result(this->job_id_);
+        switch(this->status()) {
+        case Finished:
+            result.append(": FINISHED in remote location: ").append( this->remote_job_folder() );
+            break;
+        case Retrieved:
+            result.append(": RETRIEVED to local location: ").append( this->local_job_folder() );
+            break;
+        default:
+        case Submitted:
+            result.append(": SUBMITTED in remote location: ").append( this->remote_job_folder() );
+            break;
+        }
+        result.append('\n');
         return result;
     }
  //-----------------------------------------------------------------------------
@@ -64,7 +78,7 @@
     }
  //-----------------------------------------------------------------------------
     QString Job::local_job_folder() const {
-        QString result = this->append_subfolder_jobname_( QString(this->local_location_) );
+        QString result = QDir::cleanPath( this->append_subfolder_jobname_( QString(this->local_location_) ) );
         return result;
     }
  //-----------------------------------------------------------------------------
@@ -87,7 +101,7 @@
 //        if( remote_location.startsWith('$') ) {
 //            remote_location = this->sshSession->get_env( remote_location );
 //        }
-        QString result = this->append_subfolder_jobname_(remote_location);
+        QString result = QDir::cleanPath( this->append_subfolder_jobname_(remote_location) );
         return result;
     }
  //-----------------------------------------------------------------------------
@@ -124,7 +138,7 @@
         }
     }
  //-----------------------------------------------------------------------------
-    QStringList JobList::toStringList(unsigned select ) const
+    QStringList JobList::toStringList( unsigned select ) const
     {
         QStringList strings;
         for ( List_t::const_iterator iter=this->job_list_.cbegin()
@@ -137,7 +151,7 @@
         return strings;
     }
  //-----------------------------------------------------------------------------
-    QString JobList::toString(unsigned select ) const
+    QString JobList::toString( unsigned select ) const
     {
         QString string;
         for ( List_t::const_iterator iter=this->job_list_.cbegin()

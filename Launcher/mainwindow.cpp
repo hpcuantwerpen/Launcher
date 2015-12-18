@@ -14,6 +14,7 @@
 #include <cmath>
 #include <time.h>
 
+#define NEWJOB "__new_job__"
 #define STAY_IN_LOCAL_FILE_LOCATION
 #define OFFLINE "Offline"
 #define INITIAL_VERBOSITY 2
@@ -134,14 +135,18 @@
       : QMainWindow(parent)
       , ui(new Ui::MainWindow)
       , ignoreSignals_(false)
-      , previousPage_(MainWindowUnderConstruction)
+      , current_page_(MainWindowUnderConstruction)
       , verbosity_(INITIAL_VERBOSITY)
       , walltime_(nullptr)
       , pendingRequest_(NoPendingRequest)
       , messages_(TITLE)
+      , proceed_offline_(false)
     {
         LOG_CALLER_INFO << "\n    Running Launcher version = "<<VERSION;
         ui->setupUi(this);
+
+        createActions();
+        createMenus();
 
         ssh2::Session::autoOpen = true;
 
@@ -176,9 +181,6 @@
             this->open_session( path_to_session_data );
         }
 
-        createActions();
-        createMenus();
-
 #if defined(QT_DEBUG) || defined(BETA_RELEASE)
         this->verbosity_= 2;
 #endif
@@ -191,7 +193,7 @@
         this->ui->wRetrieved  ->setFont(font);
 #endif
      // keep this the last line
-        previousPage_ = MainWindowConstructedButNoPreviousPage;
+        current_page_ = MainWindowConstructedButNoPreviousPage;
     }
 
     void MainWindow::createActions()
@@ -202,52 +204,66 @@
         verboseAction_ = new QAction("Verbose logging", this);
         connect( verboseAction_, SIGNAL(triggered()), this, SLOT( verboseAction_triggered() ) );
 
-        openSessionAction_ = new QAction("&Open session ...", this);
-        openSessionAction_ ->setShortcuts(QKeySequence::Open);
+        openSessionAction_ = new QAction("&Open...", this);
+        openSessionAction_ ->setShortcut(QKeySequence("SHIFT+CTRL+O"));
         connect( openSessionAction_, SIGNAL(triggered()), this, SLOT( openSessionAction_triggered() ) );
 
-        newSessionAction_ = new QAction("&New session ...", this);
-        newSessionAction_ ->setShortcuts(QKeySequence::New);
+        newSessionAction_ = new QAction("New", this);
+        newSessionAction_ ->setShortcut(QKeySequence("SHIFT+CTRL+N"));
         connect( newSessionAction_, SIGNAL(triggered()), this, SLOT( newSessionAction_triggered() ) );
 
-        saveSessionAction_ = new QAction("&Save session ...", this);
-        saveSessionAction_ ->setShortcuts(QKeySequence::Save);
+        saveSessionAction_ = new QAction("Save", this);
+           saveSessionAction_ ->setShortcut(QKeySequence("SHIFT+CTRL+S"));
         connect( saveSessionAction_, SIGNAL(triggered()), this, SLOT( saveSessionAction_triggered() ) );
 
-        authenticateAction_ = new QAction("authenticate ...", this);
+        saveAsSessionAction_ = new QAction("Save As...", this);
+        connect( saveAsSessionAction_, SIGNAL(triggered()), this, SLOT( saveAsSessionAction_triggered() ) );
+
+        authenticateAction_ = new QAction("Authenticate...", this);
+        authenticateAction_ ->setShortcut(QKeySequence("SHIFT+CTRL+L"));
         connect( authenticateAction_, SIGNAL(triggered()), this, SLOT( authenticateAction_triggered() ) );
 
-        localFileLocationAction_ = new QAction("Choose new local file location ...", this);
+        localFileLocationAction_ = new QAction("Change local file location...", this);
         connect( localFileLocationAction_, SIGNAL(triggered()), this, SLOT( localFileLocationAction_triggered() ) );
 
-        remoteFileLocationAction_ = new QAction("Choose new remote file location ...", this);
+        remoteFileLocationAction_ = new QAction("Change remote file location...", this);
         connect( remoteFileLocationAction_, SIGNAL(triggered()), this, SLOT( remoteFileLocationAction_triggered() ) );
 
-        createTemplateAction_ = new QAction("Create a job template ...", this);
+        createTemplateAction_ = new QAction("Create a job template...", this);
         connect( createTemplateAction_, SIGNAL(triggered()), this, SLOT( createTemplateAction_triggered() ) );
 
-        selectTemplateAction_ = new QAction("Select a job template ...", this);
+        selectTemplateAction_ = new QAction("Select a job template...", this);
         connect( selectTemplateAction_, SIGNAL(triggered()), this, SLOT( selectTemplateAction_triggered() ) );
 
-        newJobscriptAction_ = new QAction("New job script ...", this);
+        newJobscriptAction_ = new QAction("&New", this);
+        newJobscriptAction_ ->setShortcut(QKeySequence::New);
         connect( newJobscriptAction_, SIGNAL(triggered()), this, SLOT( newJobscriptAction_triggered() ) );
 
-        saveJobscriptAction_ = new QAction("Save the job script", this);
+        saveJobscriptAction_ = new QAction("&Save", this);
+        saveJobscriptAction_ ->setShortcut(QKeySequence::Save);
         connect( saveJobscriptAction_, SIGNAL(triggered()), this, SLOT( saveJobscriptAction_triggered() ) );
 
-        openJobscriptAction_ = new QAction("Open a job script ...", this);
+        saveAsJobscriptAction_ = new QAction("Save as...", this);
+        connect( saveAsJobscriptAction_, SIGNAL(triggered()), this, SLOT( saveAsJobscriptAction_triggered() ) );
+
+        openJobscriptAction_ = new QAction("Open...", this);
+        openJobscriptAction_ ->setShortcut(QKeySequence::Open);
         connect( openJobscriptAction_, SIGNAL(triggered()), this, SLOT( openJobscriptAction_triggered() ) );
 
-        submitJobscriptAction_ = new QAction("Submit current job script", this);
+        reloadJobscriptAction_ = new QAction("reload", this);
+        connect( reloadJobscriptAction_, SIGNAL(triggered()), this, SLOT( reloadJobscriptAction_triggered() ) );
+
+        submitJobscriptAction_ = new QAction("Submit", this);
+        submitJobscriptAction_ ->setShortcut(QKeySequence("CTRL+R"));
         connect( submitJobscriptAction_, SIGNAL(triggered()), this, SLOT( submitJobscriptAction_triggered() ) );
 
-        showFileLocationsAction_ = new QAction("Show file locations ...", this);
+        showFileLocationsAction_ = new QAction("Show file locations...", this);
         connect( showFileLocationsAction_, SIGNAL(triggered()), this, SLOT( showFileLocationsAction_triggered() ) );
 
-        showLocalJobFolderAction_ = new QAction("Show local jobfolder contents ...", this);
+        showLocalJobFolderAction_ = new QAction("Show local jobfolder contents...", this);
         connect( showLocalJobFolderAction_, SIGNAL(triggered()), this, SLOT( showLocalJobFolderAction_triggered() ) );
 
-        showRemoteJobFolderAction_ = new QAction("Show remote job folder contents ...", this);
+        showRemoteJobFolderAction_ = new QAction("Show remote job folder contents...", this);
         connect( showRemoteJobFolderAction_, SIGNAL(triggered()), this, SLOT( showRemoteJobFolderAction_triggered() ) );
     }
 
@@ -256,21 +272,27 @@
         helpMenu_ = menuBar()->addMenu("&Help");
         helpMenu_->addAction(aboutAction_);
 
-        jobMenu_ = menuBar()->addMenu("Job");
+        jobMenu_ = menuBar()->addMenu("Job script");
         jobMenu_ ->addAction(newJobscriptAction_);
-        jobMenu_ ->addAction(saveJobscriptAction_);
         jobMenu_ ->addAction(openJobscriptAction_);
+        jobMenu_ ->addAction(saveJobscriptAction_);
+        jobMenu_ ->addAction(saveAsJobscriptAction_);
+        jobMenu_ ->addAction(reloadJobscriptAction_);
         jobMenu_ ->addAction(submitJobscriptAction_);
         jobMenu_ ->addAction(showFileLocationsAction_);
         jobMenu_ ->addAction(showLocalJobFolderAction_);
         jobMenu_ ->addAction(showRemoteJobFolderAction_);
-        jobMenu_ ->addAction(selectTemplateAction_);
-        jobMenu_ ->addAction(createTemplateAction_);
+
+        templatesMenu_ = menuBar()->addMenu("templates");
+         // todo : test these
+//        templatesMenu_ ->addAction(selectTemplateAction_);
+//        templatesMenu_ ->addAction(createTemplateAction_);
 
         sessionMenu_ = menuBar()->addMenu("&Session");
-        sessionMenu_ ->addAction( newSessionAction_);
-        sessionMenu_ ->addAction(openSessionAction_);
-        sessionMenu_ ->addAction(saveSessionAction_);
+         // todo : test these
+//        sessionMenu_ ->addAction( newSessionAction_);
+//        sessionMenu_ ->addAction(openSessionAction_);
+//        sessionMenu_ ->addAction(saveSessionAction_);
         sessionMenu_ ->addAction(authenticateAction_);
         sessionMenu_ ->addAction(localFileLocationAction_);
         sessionMenu_ ->addAction(remoteFileLocationAction_);
@@ -401,8 +423,6 @@
       * Hence, we first create and initialize the cfg::Items, next we
       * create the corresponding DataConnector<W> objects.
       */
-        //this->ui->wOffline->setText("");
-
         this->setIgnoreSignals();
         cfg::Item* ci = nullptr;
 
@@ -476,37 +496,56 @@
             ci->set_value(options[0]);
         }
 
-     // local file location
-        this->getSessionConfigItem("localFileLocation", this->launcher_.homePath("jobs") );
-     // project folder
+     // project folder and job name
         this->getSessionConfigItem("wProjectFolder", "");
-     // wJobname
-        ci = this->getSessionConfigItem("wJobname","hello_world");
-
-//        if( ci->value().toString().isEmpty() ) {
-//            this->ui->wClusterGroup->hide();
+        this->getSessionConfigItem("wJobname"      , "");
+     // local file location
+        ci = this->getSessionConfigItem("localFileLocation", this->launcher_.homePath("jobs") );
+        {
+            QString s = ci->value().toString();
+            QDir dir;
+            if( dir.cd(s) )
+            {
+                QString jobname = this->job_folder();
+                if( !jobname.isEmpty() ) {
+                    if( dir.cd(jobname) ) {
+                        if( dir.exists("pbs.sh") ) {
+                             this->loadJobscript( dir.absoluteFilePath("pbs.sh") );
+                        }
+                    } else {
+                        this->getSessionConfigItem("wJobname")->set_value("");
+                    }
+                }
+            } else
+            {// the local file location is not existing => also clear the job name
+                this->getSessionConfigItem("wJobname")->set_value("");
+             // try the standard local file location
+                QString msg = QString("Inexisting local file location '%1'.").arg( s );
+                QString s2 = this->launcher_.homePath("jobs");
+                if( QDir().mkpath(s2) ) {
+                    msg.append(QString("\nReverting to '%2'").arg( s2 ) );
+                } else {
+                    msg.append("\nNo alternative available :(");
+                    s2.clear();
+                 }
+                ci->set_value(s2);// empty if inexisting and no alternative
+                this->statusBar()->showMessage(msg);
+            }
+        }
+//        QString path;
+//        try {
+//            path = this->jobs_project_job_path(LOCAL);
+//            this->getSessionConfigItem("localFolder" )->set_value_and_type( path );
+//            this->getSessionConfigItem("remoteFolder")->set_value_and_type( this->jobs_project_job_path( REMOTE, false ) ); // no need to store resolved path
+//        } catch (std::runtime_error &e ) {
+//            Log() << "\n    Error: "<< e.what();
+//            this->getSessionConfigItem("wJobname")->set_value("");
 //        }
 
-        this->data_.append( dc::newDataConnector( this->ui->wJobname      , "wJobname"      , "-N"           ) );
-        this->data_.append( dc::newDataConnector( this->ui->wProjectFolder, "wProjectFolder", ""             ) );
-        this->data_.append( dc::newDataConnector(                           "localFolder"   , "local_folder" ) );
-        this->data_.append( dc::newDataConnector(                           "remoteFolder"  , "remote_folder") );
 
-     // verify existence of local_file_location[/project_folder[/jobname]]
-        QString path;
-        try {
-            path = this->jobs_project_job_path(LOCAL);
-            this->getSessionConfigItem("localFolder" )->set_value_and_type( path );
-            this->getSessionConfigItem("remoteFolder")->set_value_and_type( this->jobs_project_job_path( REMOTE, false ) ); // no need to store resolved path
-        } catch (std::runtime_error &e ) {
-            Log() << "\n    Error: "<< e.what();
-        }
-        QString qs;
-        qs = this->getSessionConfigItem("wProjectFolder")->value().toString();
-        this->ui->wProjectFolder->setText(qs);
-
-        qs = this->getSessionConfigItem("wJobname")->value().toString();
-        this->ui->wJobname->setText(qs);
+        this->data_.append( dc::newDataConnector("wJobname"      , "-N"           ) );
+        this->data_.append( dc::newDataConnector("localFolder"   , "local_folder" ) );
+        this->data_.append( dc::newDataConnector("remoteFolder"  , "remote_folder") );
 
         this->getSessionConfigItem("wCheckCopyToDesktop", true );
         this->data_.append( dc::newDataConnector( this->ui->wCheckCopyToDesktop, "wCheckCopyToDesktop", "") );
@@ -524,17 +563,25 @@
 
         this->ui->wAutomaticRequests->setChecked( true );
 
-        if( !this->getSessionConfigItem("wJobname")->value().toString().isEmpty() ) {
-            this->lookForJobscript( path );
-        } else
-        {// no jobname - all values are either default, or come from the config file
-         // we consider this as NO unsaved changes (
+        bool empty_jobname = this->job_folder().isEmpty();
+        this->ui->wResourcesGroup    ->setVisible(!empty_jobname );
+        this->ui->wScriptPage        ->setEnabled(!empty_jobname );
+        this->ui->wNewJobscriptButton->setVisible( empty_jobname );
+        this->reloadJobscriptAction_ ->setEnabled(!empty_jobname );
+
+        if( empty_jobname )
+        {// no jobname - hide resources and script
             this->launcher_.script.set_has_unsaved_changes(false);
         }
-        this->check_script_unsaved_changes();
+        this->check_script_unsaved_changes(); // ?? nessecary ?? todo
+        this->update_StatusbarWidgets();
     }
 
-     void MainWindow::saveSessionAction_triggered()
+    bool MainWindow::isScriptOpen() const {
+        return !this->ui->wResourcesGroup->isHidden();
+    }
+
+    void MainWindow::saveSessionAction_triggered()
     {
         LOG_AND_CHECK_IGNORESIGNAL( NO_ARGUMENT );
 
@@ -555,6 +602,27 @@
         }
     }
 
+    void MainWindow::saveAsSessionAction_triggered()
+    {
+        LOG_AND_CHECK_IGNORESIGNAL( NO_ARGUMENT );
+
+//        QString path_to_session_data = this->launcher_.session_config.filename();
+//        if( path_to_session_data.isEmpty() ) {
+//            path_to_session_data = this->launcher_.homePath("session.data");
+//        }
+//        path_to_session_data = QFileDialog::getSaveFileName( this, "Save this Launcher session"
+//                                                  , path_to_session_data
+//                                                  ,"Launcher sessions (*.data)"
+//                                                  , nullptr
+//                                                  , QFileDialog::DontConfirmOverwrite
+//                                                  );
+//        if( !path_to_session_data.isEmpty() ) {
+//            this->save_session( path_to_session_data );
+//        } else {
+//            Log() << "\n    canceled.";
+//        }
+    }
+
     void MainWindow::save_session( QString const& path_to_session_data )
     {
         LOG_CALLER(0) << QString("\n      path: '%1'").arg( path_to_session_data ).C_STR();
@@ -564,70 +632,165 @@
         this->statusBar()->showMessage(msg);
     }
 
-    QString
-    MainWindow::
-    jobs_project_path( LocalOrRemote local_or_remote, bool resolve )
-    {
-        QString fileLocation = ( local_or_remote==LOCAL ? "localFileLocation" : "remoteFileLocation" );
-        QString path = QString( this->getSessionConfigItem( fileLocation   )->value().toString() ).append("/")
-                       .append( this->getSessionConfigItem("wProjectFolder")->value().toString() );
-        QDir qdir(path);
-        path = qdir.cleanPath(path);
-        if( local_or_remote==REMOTE ) {
-            if( resolve && path.startsWith('$') && this->sshSession_.isAuthenticated() ) {
-                QString envvar = path.split('/')[0];
-                QString cmd("echo %1");
-                try {
-                    this->sshSession_.execute_remote_command(cmd,envvar);
-                    QString resolved = this->sshSession_.qout().trimmed();
-                    path.replace(envvar,resolved);
-                } catch(std::runtime_error &e ) {
-                 // pass
-                }
-            }
-            return path;
-        } else {
-            if( qdir.exists() ) {
-                return path;
-            } else {
-                throw_<std::runtime_error>("Local project folder does not exist: '%1'", path );
-            }
+//    QString
+//    MainWindow::
+//    jobs_project_path( LocalOrRemote local_or_remote, bool resolve )
+//    {
+//        QString fileLocation = ( local_or_remote==LOCAL ? "localFileLocation" : "remoteFileLocation" );
+//        QString path = QString( this->getSessionConfigItem( fileLocation   )->value().toString() ).append("/")
+//                       .append( this->project_folder() );
+//        QDir qdir(path);
+//        path = qdir.cleanPath(path);
+//        if( local_or_remote==REMOTE ) {
+//            if( resolve && path.startsWith('$') && this->sshSession_.isAuthenticated() ) {
+//                QString envvar = path.split('/')[0];
+//                QString cmd("echo %1");
+//                try {
+//                    this->sshSession_.execute_remote_command(cmd,envvar);
+//                    QString resolved = this->sshSession_.qout().trimmed();
+//                    path.replace(envvar,resolved);
+//                } catch(std::runtime_error &e ) {
+//                 // pass
+//                }
+//            }
+//            return path;
+//        } else {
+//            if( !qdir.exists() ) {
+//                throw_<std::runtime_error>("Local project folder does not exist: '%1'", path );
+//            }
+//            return path;
+//        }
+//    }
+
+QString MainWindow::local_path_to( PathTo path_to, QString const& add_message )
+{
+    QDir dir( this->local_file_location() );
+    if( path_to >= RootFolder ) {
+        if( !verify_directory(&dir) ) {
+            this->error_message_missing_local_file_location(add_message);
+            return QString();
         }
-        return QString(); // keep compiler happy
+        if( path_to == RootFolder ){
+            return dir.absolutePath();
+        }
+    }
+    if( path_to >= ProjectFolder ) {
+        if( !verify_directory(&dir,this->project_folder(),false,true) ) {
+            this->error_message_missing_project_folder(add_message);
+            return QString();
+        }
+        if( path_to == ProjectFolder ) {
+            return dir.absolutePath();
+        }
+    }
+    if( path_to >= JobFolder ) {
+        if( !verify_directory(&dir,this->job_folder(),false,true) ) {
+            this->error_message_missing_job_folder(add_message);
+            return QString();
+        }
+        if( path_to == JobFolder ) {
+            return dir.absolutePath();
+        }
+    }
+    if( path_to >= Script ) {
+        if( verify_file(&dir,"pbs.sh") ) {
+            return dir.absoluteFilePath("pbs.sh");
+        } else {
+            this->error_message_missing_job_script(add_message);
+            return QString();
+        }
+    } else {
+        return QString();// keep compiler happy
     }
 
-    QString
-    MainWindow::
-    jobs_project_job_path( LocalOrRemote local_or_remote, bool resolve )
-    {
-        QString fileLocation = ( local_or_remote==LOCAL ? "localFileLocation" : "remoteFileLocation" );
-        QString path = QString( this->getSessionConfigItem( fileLocation   )->value().toString() ).append("/")
-                       .append( this->getSessionConfigItem("wProjectFolder")->value().toString() ).append("/")
-                       .append( this->getSessionConfigItem("wJobname"      )->value().toString() );
-        QDir qdir(path);
-        path = qdir.cleanPath(path);
-        if( local_or_remote==REMOTE ) {
-            if( resolve && path.startsWith('$') && this->sshSession_.isAuthenticated() ) {
-                QString envvar = path.split('/')[0];
-                QString cmd("echo %1");
-                try {
-                    this->sshSession_.execute_remote_command(cmd,envvar);
-                    QString resolved = this->sshSession_.qout().trimmed();
-                    path.replace(envvar,resolved);
-                } catch(std::runtime_error &e ) {
-                 // pass
-                }
-            }
-            return path;
-        } else {
-            if( qdir.exists() ) {
-                return path;
-            } else {
-                throw_<std::runtime_error>("Local job folder does not exist: '%1'", path );
-            }
-        }
-        return QString(); // keep compiler happy
+}
+
+bool
+MainWindow::
+resolve( QString & s )
+{
+    QString envvar = s.split('/')[0];
+    QString cmd("echo %1");
+    try {
+        this->sshSession_.execute_remote_command(cmd,envvar);
+        QString resolved = this->sshSession_.qout().trimmed();
+        s.replace(envvar,resolved);
+    } catch(std::runtime_error &e ) {
+        return false;
     }
+    return true;
+}
+
+QString
+MainWindow::
+remote_path_to( PathTo path_to, bool resolve )
+{
+    QString path( this->remote_file_location() );
+    if( path_to >= RootFolder ) {
+        if( resolve && path.startsWith('$') && this->sshSession_.isAuthenticated() ) {
+            this->resolve(path);
+        }
+        if( path_to == RootFolder ){
+            return QDir::cleanPath(path);
+        }
+    }
+    if( path_to >= ProjectFolder ) {
+        path.append('/').append( this->project_folder() );
+        if( path_to == ProjectFolder ) {
+            return QDir::cleanPath(path);
+        }
+    }
+    if( path_to >= JobFolder ) {
+        path.append('/').append( this->job_folder() );
+        if( path_to == JobFolder ) {
+            return QDir::cleanPath(path);
+        }
+    }
+    if( path_to >= Script ) {
+        path.append('/').append("pbs.sh");
+    }
+    return QDir::cleanPath(path);
+}
+
+
+//    QString
+//    MainWindow::
+//    jobs_project_job_path( LocalOrRemote local_or_remote, bool resolve )
+//    {
+//        QString fileLocation = ( local_or_remote==LOCAL ? "localFileLocation" : "remoteFileLocation" );
+//        QString path = QString( this->getSessionConfigItem( fileLocation   )->value().toString() ).append("/")
+//                       .append( this->project_folder() ).append("/")
+//                       .append( this->getSessionConfigItem("wJobname"      )->value().toString() );
+//        QDir qdir(path);
+//        path = qdir.cleanPath(path);
+//        if( local_or_remote==REMOTE ) {
+//            if( resolve && path.startsWith('$') && this->sshSession_.isAuthenticated() ) {
+//                QString envvar = path.split('/')[0];
+//                QString cmd("echo %1");
+//                try {
+//                    this->sshSession_.execute_remote_command(cmd,envvar);
+//                    QString resolved = this->sshSession_.qout().trimmed();
+//                    path.replace(envvar,resolved);
+//                } catch(std::runtime_error &e ) {
+//                 // pass
+//                }
+//            }
+//            return path;
+//        } else {
+//            if( !qdir.exists() ) {
+//                throw_<std::runtime_error>("Local job folder does not exist: '%1'", path );
+//            }
+//            return path;
+//        }
+//    }
+
+//    QString MainWindow::jobs_project_job_script_path( LocalOrRemote local_or_remote, bool resolve )
+//    {
+//        QString tmp = QString( this->jobs_project_job_path(local_or_remote,resolve) )
+//                      .append("/pbs.sh");
+//        return tmp;
+//    }
+
  //-----------------------------------------------------------------------------
     void MainWindow::storeResetValues()
     {
@@ -647,19 +810,12 @@
 
         for( QList<dc::DataConnectorBase*>::iterator iter = this->data_.begin(); iter!=this->data_.end(); ++iter ) {
             (*iter)->value_widget_to_config();
-            delete (*iter);
-        }
-
-        if( this->walltime_ ) {
-            delete this->walltime_;
-            this->walltime_ = nullptr;
         }
 
         QSize windowSize = this->size();
         this->getSessionConfigItem("windowWidth" )->set_value( windowSize.width () );
         this->getSessionConfigItem("windowHeight")->set_value( windowSize.height() );
 
-        this->save_session( this->launcher_.session_config.filename() );
 
         if ( this->launcher_.script.has_unsaved_changes() ) {
             QMessageBox::Button answer =
@@ -668,19 +824,29 @@
                                           "Do you want to save?"
                                          );
             if( answer==QMessageBox::Yes ) {
-                Log(1) << "\n    - Calling on_wSave_clicked()";
-                this->on_wSave_clicked();
+                Log(1) << "\n    - Calling save()";
+                this->saveJobscriptAction_triggered();
             } else {
                 Log(1) << "\n    - Discarding unsaved changes to script.";
             }
         }
 
+        this->save_session( this->launcher_.session_config.filename() );
+         // don't modify the session config after this line!
+
+     // Clean up
+        for( QList<dc::DataConnectorBase*>::iterator iter = this->data_.begin(); iter!=this->data_.end(); ++iter ) {
+            (*iter)->value_widget_to_config();
+        }
+        if( this->walltime_ ) {
+            delete this->walltime_;
+            this->walltime_ = nullptr;
+        }
         delete ui;
         ssh2::Session::cleanup();
 
         delete this->paletteRedForeground_;
         Log() << "\n    Launcher closed.";
-
     }
  //-----------------------------------------------------------------------------
     void MainWindow::setIgnoreSignals( bool ignore )
@@ -857,21 +1023,10 @@
     {
         QString msg;
         QTextStream ts(&msg);
-        ts << "\n    Checking unsaved changes : ";
-        bool has_unsaved_changes = this->launcher_.script.has_unsaved_changes();
-        if( has_unsaved_changes ) {
-            ts << "true";
-            this->ui->wSave ->setText("*** Save ***");
-            this->ui->wSave2->setText("*** Save ***");
-            this->ui->wSave ->setToolTip("Save the current script locally (there are unsaved changes).");
-            this->ui->wSave2->setToolTip("Save the current script locally (there are unsaved changes).");
-        } else {
-            ts << "false";
-            this->ui->wSave ->setText("Save");
-            this->ui->wSave2->setText("Save");
-            this->ui->wSave ->setToolTip("Save the current script locally.");
-            this->ui->wSave2->setToolTip("Save the current script locally.");
-        }
+        ts << "\n    Checking unsaved changes : "
+           << ( this->launcher_.script.has_unsaved_changes() ? "true" : "false");
+
+        this->update_StatusbarWidgets();
         if( this->verbosity_ ) {
             return msg;
         } else {
@@ -951,7 +1106,7 @@ void MainWindow::on_wNNodes_valueChanged(int arg1)
     LOG_AND_CHECK_IGNORESIGNAL( QString().setNum(arg1) );
 
     if( this->ui->wAutomaticRequests->isChecked() ) {
-        Log(1) <<"\n    q to on_wRequestNodes_clicked()";
+        Log(1) <<"\n    Forwarding to on_wRequestNodes_clicked()";
         on_wRequestNodes_clicked();
     } else {
         this->pendingRequest_ = NodesAndCoresPerNode;
@@ -1027,46 +1182,53 @@ bool MainWindow::can_authenticate()
     return ok;
 }
 
-void MainWindow::on_wPages_currentChanged(int index_current_page)
+void MainWindow::on_wPages_currentChanged(int index_new_page)
 {
-    LOG_AND_CHECK_IGNORESIGNAL( QString().setNum(index_current_page) );
+    LOG_AND_CHECK_IGNORESIGNAL( QString().setNum(index_new_page) );
 
     this->authenticate( /*silent=*/ this->can_authenticate() && this->sshSession_.isConnected() );
 
     this->selected_job_.clear();
 
-    Log(1) << QString("\n    changing tab %1->%2: ").arg(this->previousPage_).arg(index_current_page).C_STR();
-    switch (index_current_page) {
+    Log(1) << QString("\n    changing tab %1->%2: ").arg(this->current_page_).arg(index_new_page).C_STR();
+    switch (index_new_page) {
     case 0:
-        if( this->previousPage_==1 )
+        if( this->current_page_==1 )
         {// read the script from wScript
-            if( this->launcher_.script.has_unsaved_changes() ) {
-                QString text = this->ui->wScript->toPlainText();
-                this->launcher_.script.parse( text, false );
+            if( this->isScriptOpen()
+             && this->launcher_.script.has_unsaved_changes() )
+            {
+                this->script_text_to_config();
             }
         }
         break;
     case 1:        
         {
-            switch( this->pendingRequest_ ) {
-              case NodesAndCoresPerNode:
-                this->on_wRequestNodes_clicked();
-                break;
-              case( CoresAndGbPerCore ):
-                this->on_wRequestCores_clicked();
-                break;
-              default:
-                break;
-            }
-            for( QList<dc::DataConnectorBase*>::iterator iter=this->data_.begin(); iter!=this->data_.end(); ++iter )
-            {
-                if( (*iter)->value_widget_to_config() ) {
-                    (*iter)->value_config_to_script();
+            if( this->isScriptOpen() ) {
+                switch( this->pendingRequest_ ) {
+                  case NodesAndCoresPerNode:
+                    this->on_wRequestNodes_clicked();
+                    break;
+                  case( CoresAndGbPerCore ):
+                    this->on_wRequestCores_clicked();
+                    break;
+                  default:
+                    break;
                 }
+                for( QList<dc::DataConnectorBase*>::iterator iter=this->data_.begin(); iter!=this->data_.end(); ++iter )
+                {
+                    if( (*iter)->value_widget_to_config() ) {
+                        (*iter)->value_config_to_script();
+                    }
+                }
+                QString text = this->launcher_.script.text();
+                IGNORE_SIGNALS_UNTIL_END_OF_SCOPE;
+                this->ui->wScript->setText(text);
+            } else {
+                IGNORE_SIGNALS_UNTIL_END_OF_SCOPE;
+                this->ui->wScript->setText("Create a new job script : menu Job/New job script\n"
+                                           "or open an existing one : menu Job/Open job script...");
             }
-            QString text = this->launcher_.script.text();
-            IGNORE_SIGNALS_UNTIL_END_OF_SCOPE;
-            this->ui->wScript->setText(text);
         }
         break;
     case 2:
@@ -1085,7 +1247,7 @@ void MainWindow::on_wPages_currentChanged(int index_current_page)
     default:
         break;
     }
-    this->previousPage_ = index_current_page;
+    this->current_page_ = index_new_page;
 }
 
 void MainWindow::on_wEnforceNNodes_toggled(bool checked)
@@ -1103,27 +1265,6 @@ void MainWindow::on_wSingleJob_toggled(bool checked)
     bool hide = !checked;
     this->launcher_.script.find_key("naccesspolicy")->setHidden(hide);
 }
-
-//void MainWindow::on_wWalltimeUnit_currentTextChanged(const QString &arg1)
-//{
-//    LOG_AND_CHECK_IGNORESIGNAL( arg1 );
-
-//    this->getDataConnector("wWalltimeUnit")->value_widget_to_config();
-//    this->walltimeUnitDependencies(true);
-//}
-
-//void MainWindow::on_wWalltime_valueChanged(double arg1)
-//{
-//    LOG_AND_CHECK_IGNORESIGNAL( QString().setNum(arg1) );
-
-//    IGNORE_SIGNALS_UNTIL_END_OF_SCOPE;
-
-//    cfg::Item* walltimeSeconds = this->getSessionConfigItem("walltimeSeconds");
-//    double seconds = arg1*this->walltimeUnitSeconds_;
-//    walltimeSeconds->set_value( formatWalltimeSeconds( seconds ) );
-//    this->getDataConnector("walltimeSeconds")->value_config_to_script();
-//    Log(1) <<"    walltime set to: " << seconds << "s.";
-//}
 
 void MainWindow::on_wWalltime_editingFinished()
 {
@@ -1266,20 +1407,24 @@ Job ID                  Username    Queue    Jobname          SessID  NDS   TSK 
 bool MainWindow::retrieve( Job const& job, bool local, bool vsc_data )
 {
     if( job.status()==Job::Retrieved ) return true;
+    QString msg = QString("Retrieve job ").append( job.short_id() );
+    if( !this->requiresAuthentication(msg) ) return false;
 
     if( local )
     {
         QString target = job. local_job_folder();
         QString source = job.remote_job_folder();
+        this->resolve(source); // authentication already verified
         this->sshSession_.sftp_get_dir(target,source);
         job.status_ = Job::Retrieved;
     }
-    if( vsc_data && job.remote_location_!="$VSC_DATA")
+    if( vsc_data && !job.remote_location_.startsWith("$VSC_DATA") )
     {
         QString cmd = QString("mkdir -p %1");
-        QString vsc_data_destination = job.vsc_data_job_parent_folder(this->remote_env_vars_["$VSC_DATA"]);
+        QString vsc_data_destination
+                = job.vsc_data_job_parent_folder( this->vscdata_file_location() );
+        this->resolve( vsc_data_destination );
         int rc = this->sshSession_.execute_remote_command( cmd, vsc_data_destination );
-
         cmd = QString("cp -rv %1 %2"); // -r : recursive, -v : verbose
         rc = this->sshSession_.execute_remote_command( cmd, job.remote_job_folder(), vsc_data_destination );
         job.status_ = Job::Retrieved;
@@ -1289,113 +1434,29 @@ bool MainWindow::retrieve( Job const& job, bool local, bool vsc_data )
     return job.status()==Job::Retrieved;
 }
 
-void MainWindow::getRemoteFileLocations_()
-{
-    this->remote_env_vars_.clear();
-    if( !this->remote_file_locations_.isEmpty() ) {
-        this->remote_file_locations_ = this->getSessionConfigItem("wRemote")->choices_as_QStringList();
-    }
-    this->authenticate();
-    if( this->sshSession_.isAuthenticated() ) {
-        for ( QStringList::Iterator iter = this->remote_file_locations_.begin()
-            ; iter!=this->remote_file_locations_.end(); ++iter )
-        {
-            if( iter->startsWith('$') ) {
-                QString cmd("echo %1");
-                try {
-                    this->sshSession_.execute_remote_command( cmd, *iter );
-                    *iter = this->sshSession_.qout().trimmed();
-                } catch(std::runtime_error &e ) {
-                 // pass
-                }
-            }
-        }
-    }
-}
-
-//void MainWindow::on_wLocalFileLocationButton_clicked()
+//void MainWindow::getRemoteFileLocations_()
 //{
-//    LOG_AND_CHECK_IGNORESIGNAL(NO_ARGUMENT);
-
-//    QString directory = QFileDialog::getExistingDirectory( this, "Select local file location:", this->launcher_.homePath() );
-//    if( directory.isEmpty() ) return;
-
-//    this->getSessionConfigItem("localFileLocation")->set_value(directory);
-
-//    this->getDataConnector("localFileLocation")->value_config_to_widget();
-
-//    this->getSessionConfigItem   ("wProjectFolder")->set_value("");
-//    this->getDataConnector("wProjectFolder")->value_config_to_widget();
+//    this->remote_env_vars_.clear();
+//    if( !this->remote_file_locations_.isEmpty() ) {
+//        this->remote_file_locations_ = this->getSessionConfigItem("wRemote")->choices_as_QStringList();
+//    }
+//    this->authenticate();
+//    if( this->sshSession_.isAuthenticated() ) {
+//        for ( QStringList::Iterator iter = this->remote_file_locations_.begin()
+//            ; iter!=this->remote_file_locations_.end(); ++iter )
+//        {
+//            if( iter->startsWith('$') ) {
+//                QString cmd("echo %1");
+//                try {
+//                    this->sshSession_.execute_remote_command( cmd, *iter );
+//                    *iter = this->sshSession_.qout().trimmed();
+//                } catch(std::runtime_error &e ) {
+//                 // pass
+//                }
+//            }
+//        }
+//    }
 //}
-
-void MainWindow::on_wProjectFolderButton_clicked()
-{
-    LOG_AND_CHECK_IGNORESIGNAL(NO_ARGUMENT);
-
-    QString parent = this->local_file_location();
-    QString folder = QFileDialog::getExistingDirectory( this, "Select or create a project folder:", parent );
-    if( folder.isEmpty() ) {
-        this->statusBar()->showMessage("No project folder selected.");
-        return;
-    }
-    folder = QDir::cleanPath(folder);
-    if( !folder.startsWith(parent) ) {
-        QMessageBox::critical( this, TITLE, QString("The selected folder is not a subfolder of '%1'. "
-                                                    "You must change the local file location to a folder "
-                                                    "that is at least one level above this folder.").arg(parent) );
-        return;
-    }
-    this->statusBar()->clearMessage();
-    parent.append("/");
-    QString relative = folder;
-            relative.remove(parent);
-
-    this->getSessionConfigItem   ("wProjectFolder")->set_value( relative );
-    this->getDataConnector("wProjectFolder")->value_config_to_widget();
-}
-
-void MainWindow::on_wJobnameButton_clicked()
-{
-    LOG_AND_CHECK_IGNORESIGNAL(NO_ARGUMENT);
-
-//    if( this->ui->wLocal->text().isEmpty() ) {
-//        QMessageBox::warning( this, TITLE, "You must select a local file location first.");
-//        return;
-//    }
-//    if( this->ui->wProjectFolder->text().isEmpty() ) {
-//        QMessageBox::warning( this, TITLE, "You must select a subfolder first.");
-//        return;
-//    }
-
-    QString parent = this->jobs_project_path(LOCAL);
-    QString selected = QFileDialog::getExistingDirectory( this, "Select subfolder:", parent );
-    if( selected.isEmpty() ) {
-        QMessageBox::warning( this, TITLE, "No directory selected.");
-        return;
-    }
-    selected = QDir::cleanPath(selected);
-    if( !selected.startsWith(parent) ) {
-        QMessageBox::critical( this, TITLE, QString("The selected directory is not a subdirectory of '%1'. "
-                                                    "You must change the Subfolder to a folder that is at "
-                                                    "least one level above this folder.").arg(parent) );
-        return;
-    }
-    this->statusBar()->clearMessage();
-    parent.append("/");
-    QString selected_leaf = selected;
-    selected_leaf.remove(parent);
-    this->getSessionConfigItem   ("wJobname")->set_value(selected_leaf);
-    this->getDataConnector("wJobname")->value_config_to_widget(); // also triggers wJobname2
-
-    QString remote_folder = this->jobs_project_job_path(REMOTE);
-
-    this->getSessionConfigItem( "localFolder")->set_value(selected);
-    this->getSessionConfigItem("remoteFolder")->set_value(remote_folder);
-    this->getDataConnector    ( "localFolder")->value_config_to_script();
-    this->getDataConnector    ("remoteFolder")->value_config_to_script();
-
-    this->lookForJobscript( selected );
-}
 
 bool MainWindow::lookForJobscript(QString const& job_folder, bool ask_to_load , bool create_if_inexistent)
 {// return false if canceled
@@ -1459,6 +1520,8 @@ bool MainWindow::lookForJobscript(QString const& job_folder, bool ask_to_load , 
 
 bool MainWindow::loadJobscript( QString const& filepath )
 {
+    IGNORE_SIGNALS_UNTIL_END_OF_SCOPE;
+
     LOG_CALLER_INFO << QString("\n    loading job script '%1'.").arg(filepath).C_STR();
     try
     {
@@ -1511,18 +1574,12 @@ bool MainWindow::loadJobscript( QString const& filepath )
         }
      // a few special cases:
         QString abe = this->getSessionConfigItem("notifyWhen")->value().toString();
-        this->getSessionConfigItem   ("wNotifyAbort")->set_value( abe.contains('a') );
-        this->getSessionConfigItem   ("wNotifyBegin")->set_value( abe.contains('b') );
-        this->getSessionConfigItem   ("wNotifyEnd"  )->set_value( abe.contains('e') );
+        this->getSessionConfigItem("wNotifyAbort")->set_value( abe.contains('a') );
+        this->getSessionConfigItem("wNotifyBegin")->set_value( abe.contains('b') );
+        this->getSessionConfigItem("wNotifyEnd"  )->set_value( abe.contains('e') );
         this->getDataConnector("wNotifyAbort")->value_config_to_widget();
         this->getDataConnector("wNotifyBegin")->value_config_to_widget();
         this->getDataConnector("wNotifyEnd"  )->value_config_to_widget();
-
-//        if( !this->username().isEmpty() ) {
-//            //this->on_username_editingFinished();
-//            //this->on_username_returnPressed();
-//            this->on_username_textChanged( this->username() );
-//        }
     }
     catch( std::runtime_error& e )
     {
@@ -1534,6 +1591,8 @@ bool MainWindow::loadJobscript( QString const& filepath )
         QMessageBox::critical(this,TITLE,msg);
         return false;
     }
+    this->reloadJobscriptAction_->setEnabled(true);
+    this->update_StatusbarWidgets();
  // read from file, hence no unsaved changes sofar
     return true;
 }
@@ -1542,7 +1601,7 @@ bool MainWindow::saveJobscript( QString const& filepath )
 {
     Log() << QString ("\n    writing script '%1' ... ").arg(filepath).C_STR();
     try {
-        this->launcher_.script.write( filepath, false );
+        this->launcher_.script.write( filepath, /*warn_before_overwrite=*/false );
         Log() << "done.";
     } catch( pbs::WarnBeforeOverwrite &e ) {
         QMessageBox::StandardButton answer =
@@ -1552,9 +1611,11 @@ bool MainWindow::saveJobscript( QString const& filepath )
                                      );
         if( answer == QMessageBox::Yes )
         {// make a back up
-            QFile qFile(filepath);
-            QString backup = QString( this->jobs_project_job_path(LOCAL) ).append("/~pbs.sh.").append( QString().setNum( qrand() ) );
-            qFile.copy(backup);
+            QFile f(filepath);
+            QDir  d(filepath);
+            d.cdUp();
+            QString backup = d.absoluteFilePath( QString("~pbs.sh.").append( toolbox::now2() ) );
+            f.copy(backup);
          // and save
             this->launcher_.script.write( filepath, false );
             Log() << QString("done (overwritten, but made backup '%1').").arg(backup).C_STR();
@@ -1571,153 +1632,27 @@ bool MainWindow::saveJobscript( QString const& filepath )
     return true;
 }
 
-//void MainWindow::on_wProjectFolder_textChanged(const QString &arg1)
+
+
+//void MainWindow::reload()
 //{
-//    LOG_AND_CHECK_IGNORESIGNAL( arg1 );
+//    LOG_AND_CHECK_IGNORESIGNAL(NO_ARGUMENT);
 
-//    this->getSessionConfigItem("wJobname" )->set_value("");
-//    this->getDataConnector    ("wJobname" )->value_config_to_widget();
+//    QString script_file = QString( this->jobs_project_job_path(LOCAL) ).append("/pbs.sh");
+//    QFileInfo qFileInfo(script_file);
+//    if( !qFileInfo.exists() ) {
+//        this->statusBar()->showMessage("No job script found, hence not loaded.");
+//    } else {
+//        QMessageBox::StandardButton answer = QMessageBox::Yes;
+//        if( this->launcher_.script.has_unsaved_changes() ) {
+//            answer = QMessageBox::question( this, TITLE, "Unsaved changes to the current job script will be lost on reloading. Continue?");
+//        }
+//        if( answer==QMessageBox::Yes ) {
+//            this->loadJobscript(script_file);
+//            this->statusBar()->showMessage("job script reloaded.");
+//        }
+//    }
 //}
-
-//void MainWindow::on_wJobname_textChanged(const QString &arg1)
-//{
-//    LOG_AND_CHECK_IGNORESIGNAL( arg1 );
-//    this->getSessionConfigItem("wJobname" )->set_value( arg1 );
-//}
-
-void MainWindow::on_wSave_clicked()
-{
-    LOG_AND_CHECK_IGNORESIGNAL(NO_ARGUMENT);
-
-    QString filepath = QString( this->jobs_project_job_path(LOCAL) );
-    if( filepath.isEmpty() ) {
-        QMessageBox::critical(this,TITLE,"Local file location/subfolder/jobname not fully specified.\nSaving as ");
-    } else {
-        filepath.append("/pbs.sh");
-        this->saveJobscript( filepath );
-    }
-}
-
-void MainWindow::on_wReload_clicked()
-{
-    LOG_AND_CHECK_IGNORESIGNAL(NO_ARGUMENT);
-
-    QString script_file = QString( this->jobs_project_job_path(LOCAL) ).append("/pbs.sh");
-    QFileInfo qFileInfo(script_file);
-    if( !qFileInfo.exists() ) {
-        this->statusBar()->showMessage("No job script found, hence not loaded.");
-    } else {
-        QMessageBox::StandardButton answer = QMessageBox::Yes;
-        if( this->launcher_.script.has_unsaved_changes() ) {
-            answer = QMessageBox::question( this, TITLE, "Unsaved changes to the current job script will be lost on reloading. Continue?");
-        }
-        if( answer==QMessageBox::Yes ) {
-            this->loadJobscript(script_file);
-            this->statusBar()->showMessage("job script reloaded.");
-        }
-    }
-}
-
-void MainWindow::on_wSubmit_clicked()
-{
-    LOG_AND_CHECK_IGNORESIGNAL(NO_ARGUMENT);
-
-    if( !this->requiresAuthentication("Submit job") ) {
-        return;
-    }
-
-    if(  this->launcher_.script.has_unsaved_changes()
-     || !this->launcher_.script.touch_finished_found()
-      )
-    {
-        QMessageBox::Button answer = QMessageBox::question(this,TITLE,"The job script has unsaved changes.\nSave Job script?"
-                                                          , QMessageBox::Yes|QMessageBox::No|QMessageBox::Cancel
-                                                          , QMessageBox::Cancel
-                                                          );
-        if( answer==QMessageBox::Cancel ) {
-            this->statusBar()->showMessage( QString("Submit job '%1' CANCELED!").arg( this->ui->wJobname->text() ) );
-            return;
-        } else
-        if( answer==QMessageBox::No ) {
-            this->statusBar()->showMessage("Job script not saved.");
-        } else {// Yes
-            QString filepath = QString( this->jobs_project_job_path(LOCAL) ).append("/pbs.sh");
-            if( !this->saveJobscript(filepath) ) {
-                return;
-            }
-        }
-    }
- // test if the remote job folder is inexisting or empty
-    QString cmd("ls %1");
-    int rc = this->sshSession_.execute_remote_command( cmd, this->jobs_project_job_path(REMOTE,false) );
-    if( rc==0 && !this->sshSession_.qout().isEmpty() )
-    {// ask the user if he wants to empty the remote job folder first
-        int answer =
-                QMessageBox::question( this,TITLE
-                                     ,"The remote job folder is not empty."
-                                      "Do you want to erase the remote job folder first?\n"
-                                      "(If you answer No, new files will be added and "
-                                      "existing files will be overwritten)."
-                                     ,"Cancel"                          // button0
-                                     ,"Keep remote job folder contents" // button1
-                                     ,"Erase remote job folder contents"// button2
-                                     , 0                                // default button
-                                     );
-        switch(answer) {
-          case 1:
-            this->statusBar()->showMessage("Remote job folder not erased. Files are added or overwritten.");
-            break;
-          case 2:
-          { cmd = QString("rm -rf %1/*");
-            int rc = this->sshSession_.execute_remote_command( cmd, this->jobs_project_job_path(REMOTE,false) );
-            if( rc==0 ) {
-                this->statusBar()->showMessage("Erased remote job folder.");
-            } else {
-                while( rc != 0 )
-                {
-                    int answer = QMessageBox::question( this,TITLE,"An error occurred while erasing remote job folder contents"
-                                                      ,"Retry"          // button0
-                                                      ,"Ignore"         // button1
-                                                      ,"Cancel submit"  // button2
-                                                      , 0 );             // default button
-                    switch(answer) {
-                      case 0: // retry
-                        rc = this->sshSession_.execute_remote_command( cmd );
-                        break; // out of switch, but continue with while loop
-                      case 1: // ignore
-                        rc = 0; // break out of while loop
-                        break;  // break out of switch
-                      case 2:
-                      default:
-                        this->statusBar()->showMessage( QString("Submit job '%1' CANCELED!").arg( this->ui->wJobname->text() ) );
-                        return;
-                    }
-                }
-            }
-            break;
-          }
-          default:
-            this->statusBar()->showMessage( QString("Submit job '%1' CANCELED!").arg( this->ui->wJobname->text() ) );
-            return;
-        }
-    }
-    QString remote_job_folder = this->jobs_project_job_path(REMOTE);
-    this->sshSession_.sftp_put_dir( this->jobs_project_job_path(LOCAL), remote_job_folder, true );
-
-    cmd = QString("cd %1 && qsub pbs.sh");
-    this->sshSession_.execute_remote_command( cmd, remote_job_folder );
-    QString job_id = this->sshSession_.qout().trimmed();
-    this->statusBar()->showMessage(QString("Job submitted: %1").arg(job_id));
-    cfg::Item* ci_job_list = this->getSessionConfigItem("job_list");
-    if( ci_job_list->value().type()==QVariant::Invalid )
-        ci_job_list->set_value_and_type( QStringList() );
-    QStringList job_list = ci_job_list->value().toStringList();
-
-    Job job( job_id, this->local_file_location(), this->remote_file_location(), this->ui->wProjectFolder->text(), this->ui->wJobname->text(), Job::Submitted );
-    job_list.append( job.toString() );
-
-    ci_job_list->set_value( job_list );
-}
 
 void MainWindow::on_wScript_textChanged()
 {
@@ -1739,26 +1674,19 @@ void MainWindow::on_wRefresh_clicked()
 QString MainWindow::selectedJob( QTextEdit* qTextEdit )
 {
     QString selection;
-    while( true )
-    {
-        QTextCursor cursor = qTextEdit->textCursor();
-        cursor.select(QTextCursor::LineUnderCursor);
-        selection = cursor.selectedText();
-        if( selection.startsWith(">>> ") ) {
-            qTextEdit->setTextCursor(cursor);
-            break;
-        } else {
-            int bn = cursor.blockNumber(); // = line number, starts at line 0, which is empty
-            if( bn==0 ) {
-                this->statusBar()->showMessage("No job Selected");
-                return selection;
-            }
-            cursor.movePosition( QTextCursor::Up);
-            qTextEdit->setTextCursor(cursor);
-        }
+    QTextCursor cursor = qTextEdit->textCursor();
+    cursor.select(QTextCursor::LineUnderCursor);
+    selection = cursor.selectedText();
+
+    if( selection.isEmpty()
+     || selection.startsWith("*** ")
+      ) {
+        this->statusBar()->showMessage("No job Selected");
+        selection.clear();
+    } else {
+        qTextEdit->setTextCursor(cursor);
+        selection = selection.split(':')[0];
     }
-    selection = selection.mid(4);
-    //this->statusBar()->showMessage(selection);
     return selection;
 }
 
@@ -1799,7 +1727,7 @@ void MainWindow::on_wRetrieveSelectedJob_clicked()
     bool toDesktop = this->ui->wCheckCopyToDesktop->isChecked();
     bool toVscData = this->ui->wCheckCopyToVscData->isChecked();
     if( this->retrieve( *job, toDesktop, toVscData ) ) {
-        ci_joblist->set_value( joblist.toStringList( Job::Submitted | Job::Finished ) );
+        ci_joblist->set_value( joblist.toStringList( Job::Submitted|Job::Finished|Job::Retrieved ) );
         this->refreshJobs(joblist);
     }
     this->selected_job_.clear();
@@ -1827,31 +1755,36 @@ void MainWindow::on_wRetrieveAllJobs_clicked()
 }
 
 void MainWindow::refreshJobs( JobList const& joblist )
-{
+{ 
     for ( JobList::const_iterator iter=joblist.cbegin()
         ; iter!=joblist.cend(); ++iter )
     {
         this->isFinished(*iter);
     }
 
-    this->ui->wFinished->setText( joblist.toString(Job::Finished) );
+    QString text("*** JOBS READY FOR RETRIEVAL ***\n");
+    text.append( joblist.toString(Job::Finished) );
+    text.append("\n*** UNFINISHED JOBS ***\n");
+    text.append( joblist.toString(Job::Submitted) );
+    text.append("\n*** RETRIEVED JOBS ***\n");
+    text.append( joblist.toString(Job::Retrieved) );
+    this->ui->wFinished->setText( text );
 
-    QString text = joblist.toString(Job::Submitted);
-    QString username = this->username();
-    if( !username.isEmpty() ) {
-        QString cmd = QString("qstat -u %1");
-        this->sshSession_.execute_remote_command( cmd, username );
-        if( !this->sshSession_.qout().isEmpty() ) {
-            text.append("\n--- ").append( cmd ).append( this->sshSession_.qout() );
-             // using '---' rather than '>>>' avoids that the user can
-             // select the output of qstat as if it was a job entry.
-        }
-    }
-    this->ui->wNotFinished->setText( text);
+//    QString username = this->username();
+//    if( !username.isEmpty() ) {
+//        QString cmd = QString("qstat -u %1");
+//        this->sshSession_.execute_remote_command( cmd, username );
+//        if( !this->sshSession_.qout().isEmpty() ) {
+//            text.append("\n--- ").append( cmd ).append( this->sshSession_.qout() );
+//             // using '---' rather than '>>>' avoids that the user can
+//             // select the output of qstat as if it was a job entry.
+//        }
+//    }
+//    this->ui->wNotFinished->setText( text);
 
-    this->ui->wRetrieved->setText( joblist.toString(Job::Retrieved) );
+//    this->ui->wRetrieved->setText( joblist.toString(Job::Retrieved) );
 
-    this->getSessionConfigItem("job_list")->set_value( joblist.toStringList(Job::Submitted|Job::Finished) );
+    this->getSessionConfigItem("job_list")->set_value( joblist.toStringList(Job::Submitted|Job::Finished|Job::Retrieved) );
 
     this->selected_job_.clear();
 }
@@ -2054,61 +1987,17 @@ void MainWindow::on_wSelectModule_currentIndexChanged(const QString &arg1)
     }
 }
 
-void MainWindow::on_wReload2_clicked()
-{
-    LOG_AND_CHECK_IGNORESIGNAL(NO_ARGUMENT);
-    Log(1) <<"\n    Forwarding to on_wReload_clicked()";
-    this->on_wReload_clicked();
-    if( this->statusBar()->currentMessage().startsWith("No script found") ) {
-        this->statusBar()->showMessage("Script reloaded from resources page");
-    }
+//void MainWindow::on_wNotFinished_selectionChanged()
+//{
+//    LOG_AND_CHECK_IGNORESIGNAL(NO_ARGUMENT);
 
-    for( QList<dc::DataConnectorBase*>::iterator iter=this->data_.begin(); iter!=this->data_.end(); ++iter )
-    {
-        if( (*iter)->value_widget_to_config() ) {
-            (*iter)->value_config_to_script();
-        }
-    }
-    QString text = this->launcher_.script.text();
-    this->ui->wScript->setText(text);
- // no unsaved changes since read from file, but the above iteration over DataConnectors
- // requires that it is explicitly reset.
-    this->launcher_.script.set_has_unsaved_changes(false);
-    this->check_script_unsaved_changes();
-
-}
-
-void MainWindow::on_wSave2_clicked()
-{
-    LOG_AND_CHECK_IGNORESIGNAL(NO_ARGUMENT);
-    if( this->launcher_.script.has_unsaved_changes() ) {
-        Log(1) <<"\n    parsing script text";
-        QString text = this->ui->wScript->toPlainText();
-        this->launcher_.script.parse( text, false );
-        Log(1) <<"\n    Forwarding to on_wSave_clicked()";
-        this->on_wSave_clicked();
-    }
-}
-
-void MainWindow::on_wSubmit2_clicked()
-{
-    LOG_AND_CHECK_IGNORESIGNAL(NO_ARGUMENT);
-    Log(1) <<"\n    Forwarding to on_wSave2_clicked()";
-    this->on_wSave2_clicked();
-    Log(1) <<"\n    Forwarding to on_wSubmit_clicked()";
-    this->on_wSubmit_clicked();
-}
-
-void MainWindow::on_wNotFinished_selectionChanged()
-{
-    LOG_AND_CHECK_IGNORESIGNAL(NO_ARGUMENT);
-
-    IGNORE_SIGNALS_UNTIL_END_OF_SCOPE;
-    this->selected_job_ = this->selectedJob( this->ui->wNotFinished );
-    if( !this->selected_job_.isEmpty() ) {
-        this->statusBar()->showMessage( QString("Selected job:%1.").arg( this->selected_job_ ) );
-    }
-}
+//    IGNORE_SIGNALS_UNTIL_END_OF_SCOPE;
+//    this->selected_job_ = this->selectedJob( this->ui->wNotFinished );
+//    if( !this->selected_job_.isEmpty() ) {
+//        this->selected_job_ = this->selected_job_.split(':')[0];
+//        this->statusBar()->showMessage( QString("Selected job: %1.").arg( this->selected_job_ ) );
+//    }
+//}
 
 void MainWindow::on_wFinished_selectionChanged()
 {
@@ -2116,7 +2005,6 @@ void MainWindow::on_wFinished_selectionChanged()
 
     IGNORE_SIGNALS_UNTIL_END_OF_SCOPE;
     this->selected_job_ = this->selectedJob( this->ui->wFinished );
-//    this->statusBar()->showMessage( QString("Selected job ").append( this->selected_job_ ) );
     if( !this->selected_job_.isEmpty() ) {
         this->statusBar()->showMessage( QString("Selected job:%1.").arg( this->selected_job_ ) );
     }
@@ -2128,7 +2016,7 @@ void MainWindow::on_wClearSelection_clicked()
         this->statusBar()->showMessage("Nothing selected.");
     } else {
         this->clearSelection( this->ui->wFinished    );
-        this->clearSelection( this->ui->wNotFinished );
+//        this->clearSelection( this->ui->wNotFinished );
         this->selected_job_.clear();
         this->statusBar()->showMessage("Selection cleared.");
     }
@@ -2204,7 +2092,7 @@ bool isNonEmptyDir( QString const& dirpath ) {
 //#endif
     int answer = QMessageBox::question( this, TITLE, msg
                                       , "Cancel"    // button0
-                                      , "Continue ..."          // button1
+                                      , "Continue..."          // button1
                                       , QString()               // button2
                                       , 1                       // default button
                                       );
@@ -2257,7 +2145,7 @@ bool MainWindow::authenticate(bool silent)
 
     LOG_CALLER_INFO;
 
-    if( this->previousPage_==MainWindowUnderConstruction )
+    if( this->current_page_==MainWindowUnderConstruction )
     {// try to authenticate ONLY if no user interaction is required.
         QString uname = this->username();
         if( uname.isEmpty() ) {
@@ -2295,12 +2183,25 @@ bool MainWindow::authenticate(bool silent)
             result = success;
         }
         catch( ssh2::NoAddrInfo &e ) {
-            if( !silent ) {
-                QString msg= QString("Could not getaddrinfo for %1.").arg( this->sshSession_.loginNode() );
-                this->statusBar()->showMessage(msg);
-                QMessageBox::warning( this,TITLE,msg.append("\n  . Check your internet connection."
-                                                            "\n  . Check the availability of the cluster."
-                                                            ) );
+            QString msg= QString("Launcher could not reach %1. ").arg( this->sshSession_.loginNode() );
+            this->statusBar()->showMessage(msg);
+            Log(0) << msg.prepend("\n    ").C_STR();
+
+            if( this->proceed_offline_ || silent )
+            {// be silent
+            } else {
+                int answer = QMessageBox::question( this, TITLE
+                                                  , msg.append("Possible causes are"
+                                                               "\n  . you are offline (no internet connection)"
+                                                               "\n  . the cluster's login nodes are offline"
+                                                               "\nClick 'Proceed offline' if you are working "
+                                                               "offline and don't want to see this message again.")
+                                                  ,"Proceed offline" // button0
+                                                  ,"Ok"              // button1
+                                                  , QString()        // button2
+                                                  , 1                // default button
+                                                  );
+                this->proceed_offline_ = (answer==0);
             }
             no_connection=true;
             result = failed;
@@ -2319,12 +2220,12 @@ bool MainWindow::authenticate(bool silent)
         }
         catch( ssh2::MissingUsername& e ) {
             if( !silent )
-                this->warn("You must authenticate first (extra/authenticate...)");
+                this->warn("You must authenticate first (menu Session/Authenticate...)");
             result = failed;
         }
         catch( ssh2::MissingKey& e ) {
             if( !silent )
-                this->warn("You must authenticate first (extra/authenticate...)");
+                this->warn("You must authenticate first (menu Session/Authenticate...)");
             result = failed;
         }
         catch( ssh2::PassphraseNeeded& e ) {
@@ -2381,7 +2282,7 @@ bool MainWindow::authenticate(bool silent)
             if( this->is_uptodate_for_!=this->ui->wCluster->currentText() )
             {
                 Log()<< "automatic authentication succeeded.";
-                this->getRemoteFileLocations_();
+                //this->getRemoteFileLocations_();
              // get list of available cluster modules
                 QString cmd("__module_avail");
                 this->sshSession_.execute_remote_command(cmd);
@@ -2495,7 +2396,7 @@ void MainWindow::localFileLocationAction_triggered()
                 , QString("The current job script %1 has unsaved changes.\n"
                           "(Changes will be lost if you do not save).\n"
                           "Save Job script?")
-                 .arg( this->ui->wJobname->text() )
+                 .arg( this->job_folder() )
                 , QMessageBox::Yes|QMessageBox::No|QMessageBox::Cancel
                 , QMessageBox::Cancel
                 );
@@ -2505,7 +2406,7 @@ void MainWindow::localFileLocationAction_triggered()
         } else if( answer==QMessageBox::No ) {
             this->statusBar()->showMessage("Current job script %1 NOT saved.");
         } else {// answer==QMessageBox::Yes
-            QString filepath = QString( this->jobs_project_job_path(LOCAL) ).append("/pbs.sh");
+            QString filepath = this->local_path_to(JobFolder).append("/pbs.sh");
             if( !this->saveJobscript(filepath) ) {
                 return;
             }
@@ -2565,17 +2466,17 @@ void MainWindow::update_WindowTitle()
 
 void MainWindow::update_StatusbarWidgets()
 {
-    this->wAuthentIndicator_->setText( QString("[%1]")
-                                          .arg( this->sshSession_.isAuthenticated()
-                                              ? this->username()
-                                              : ( !this->sshSession_.isConnected()
-                                                ? QString("offline")
-                                                : QString("not authenticated")
-                                                )
-                                              )
-                                     );
-    QString s;
-    s = this->getSessionConfigItem("wJobname")->value().toString();
+    QString s = QString("[%1]")
+                   .arg( this->sshSession_.isAuthenticated()
+                       ? this->username()
+                       : ( !this->sshSession_.isConnected()
+                         ? QString("offline")
+                         : QString("not authenticated")
+                         )
+                       );
+    this->wAuthentIndicator_->setText(s);
+
+    s = this->job_folder();
     if( this->launcher_.script.has_unsaved_changes() ) {
         s.prepend('*').append('*');
      // pallette not honored on mac?
@@ -2586,8 +2487,8 @@ void MainWindow::update_StatusbarWidgets()
     }
     this->wJobnameIndicator_->setText(s);
 
-    s = this->getSessionConfigItem("wProjectFolder")->value().toString();
-    if( !s.endsWith('/') ) s.append('/');
+    s = this->project_folder();
+    if( !s.isEmpty() && !s.endsWith('/') ) s.append('/');
     this->wProjectIndicator_->setText(s);
 }
 
@@ -2595,15 +2496,15 @@ void MainWindow::update_StatusbarWidgets()
 {
     LOG_AND_CHECK_IGNORESIGNAL(NO_ARGUMENT);
 
-    if( this->ui->wJobname->text().isEmpty() ) {
+    if( this->job_folder().isEmpty() ) {
         this->statusBar()->showMessage("No job folder, cannot create template.");
         return;
     }
-    QString template_folder = QString("templates/").append( this->ui->wJobname->text() );
+    QString template_folder = QString("templates/").append( this->job_folder() );
     template_folder = this->launcher_.homePath( template_folder );
 
     QString msg = QString("Creating job template from job folder '%1' ...")
-                     .arg( this->ui->wJobname->text() );
+                     .arg( this->job_folder() );
 
     QDir qdir_template_folder(template_folder);
     if( qdir_template_folder.exists() )
@@ -2632,13 +2533,13 @@ void MainWindow::update_StatusbarWidgets()
         int answer =
         QMessageBox::question( this, TITLE, msg
                              ,"Cancel"
-                             , QString("Create templates/").append( this->ui->wJobname->text() )
+                             , QString("Create templates/").append( this->job_folder() )
                              ,"Select another template location"
                              );
         switch( answer ) {
           case 1:
             qdir_template_folder.mkpath( QString() );
-            msg = QString("Creating 'templates/%1' ... ").arg( this->ui->wJobname->text() );
+            msg = QString("Creating 'templates/%1' ... ").arg( this->job_folder() );
             this->statusBar()->showMessage(msg);
             break;
           case 2:
@@ -2653,17 +2554,19 @@ void MainWindow::update_StatusbarWidgets()
         }
     }
  // create the template by copying the entire folder
-    copy_folder_recursively( this->jobs_project_job_path(LOCAL), template_folder );
-    this->statusBar()->showMessage( msg.append( QString("'%1' created.").arg(template_folder) ) );
+    QString jobfolder = this->local_path_to(JobFolder);
+    if( !jobfolder.isEmpty() ) {
+        copy_folder_recursively( jobfolder, template_folder );
+        this->statusBar()->showMessage( msg.append( QString("'%1' created.").arg(template_folder) ) );
+    }
 }
-
 
 void MainWindow::selectTemplateAction_triggered()
 {
     LOG_AND_CHECK_IGNORESIGNAL(NO_ARGUMENT);
 
     QString msg;
-    if( this->ui->wJobname->text().isEmpty() ) {
+    if( this->job_folder().isEmpty() ) {
         msg = "You must select a job folder first!";
         QMessageBox::warning(this,TITLE,msg);
         this->statusBar()->showMessage(msg);
@@ -2692,12 +2595,15 @@ void MainWindow::selectTemplateAction_triggered()
             return;
         }
     }
-    copy_folder_recursively( template_folder, this->jobs_project_job_path(LOCAL) );
-    if( template_folder_contains_pbs_sh ) {
-        this->loadJobscript( QString( this->jobs_project_job_path(LOCAL) ).append("/pbs.sh") );
+    QString jobfolder = this->local_path_to(JobFolder);
+    if( !jobfolder.isEmpty() ) {
+        copy_folder_recursively( template_folder, jobfolder );
+        if( template_folder_contains_pbs_sh ) {
+            this->loadJobscript( QString( jobfolder ).append("/pbs.sh") );
+        }
+        this->statusBar()->showMessage(msg);
+        return;
     }
-    this->statusBar()->showMessage(msg);
-    return;
 }
 
 QString MainWindow::select_template_location()
@@ -2754,91 +2660,397 @@ QString MainWindow::select_template_location()
 QString MainWindow::local_file_location() {
     return this->getSessionConfigItem("localFileLocation")->value().toString();
 }
+QString MainWindow::project_folder() {
+    return this->getSessionConfigItem("wProjectFolder")->value().toString();
+}
+
+QString MainWindow::job_folder() {
+    return this->getSessionConfigItem("wJobname")->value().toString();
+}
 
 QString MainWindow::remote_file_location() {
     return this->getSessionConfigItem("remoteFileLocation")->value().toString();
 }
 
-void MainWindow::on_wShowFilelocations_clicked()
-{
-    LOG_AND_CHECK_IGNORESIGNAL(NO_ARGUMENT);
-
-    QString job = this->ui->wJobname->text();
-    if( job.isEmpty() ) {
-        job = "<None>";
-    }
-    QString msg = QString("File locations for job name '%1':").arg(job)
-                  .append("\n\nlocal: \n  ").append( this->jobs_project_job_path(LOCAL) )
-                  .append("\n\nremote;\n  ").append( this->jobs_project_job_path(REMOTE,false) );
-    QMessageBox::information(this, TITLE, msg, QMessageBox::Close, QMessageBox::Close );
+QString MainWindow::vscdata_file_location() {
+     QString vscdata( this->getSessionConfigItem("remoteFileLocation")->value().toString() );
+     vscdata.replace("$VSC_SCRATCH","$VSC_DATA");
+     return vscdata;
 }
 
-void MainWindow::on_wShowLocalJobFolder_clicked()
-{
-    if( this->ui->wJobname->text().isEmpty() ) {
-        this->statusBar()->showMessage("No job folder is selected, there is nothing to show.");
-    } else {
-        QFileDialog::getOpenFileName( this, TITLE, this->jobs_project_job_path(LOCAL) );
-    }
-}
+//void MainWindow::on_wShowLocalJobFolder_clicked()
+//{
+//    if( this->job_folder().isEmpty() ) {
+//        this->statusBar()->showMessage("No job folder is selected, there is nothing to show.");
+//    } else {
+//        QFileDialog::getOpenFileName( this, TITLE, this->jobs_project_job_path(LOCAL) );
+//    }
+//}
 
-void MainWindow::on_wShowRemoteJobFolder_clicked()
-{
-    this->statusBar()->showMessage("This feature is not yet available.");
-}
+//void MainWindow::on_wShowRemoteJobFolder_clicked()
+//{
+//    this->statusBar()->showMessage("This feature is not yet available.");
+//}
 
 void MainWindow::newJobscriptAction_triggered()
 {
-    QString example("[path/to/project_folder/]job_folder");
-    bool ok;
-    QString result =
-            QInputDialog::getText( this,TITLE
-                                 ,"Enter a file path for to the new job folder"
-                                 , QLineEdit::Normal, example, &ok );
-    QString absolute;
-    if( ok && !result.isEmpty() && result!=example )
-    {
-#ifdef STAY_IN_LOCAL_FILE_LOCATION
-        if( !this->is_in_local_file_location( result, &absolute ) ) {
-            QString msg( this->statusBar()->currentMessage() );
-            msg.append(" No new jobscript created.");
-            return;
-        }
-#endif
-        if( this->lookForJobscript( absolute,/*ask_to_load=*/true,/*create_if_inexisting=*/true ) )
-        {// not canceled
-         // decompose relative path in project folder and job folder:
-            QStringList folders = result.split('/');
-            QString job_folder = folders.last();
-            folders.pop_back();
-            QString project_folder = folders.join('/');
-         // store in session config
-            this->getSessionConfigItem("wJobname"      )->set_value(job_folder);
-            this->getDataConnector    ("wJobname"      )->value_config_to_widget();
-            this->getSessionConfigItem("wProjectFolder")->set_value(project_folder);
-            this->getDataConnector    ("wProjectFolder")->value_config_to_widget();
-        }
+    this->getSessionConfigItem("wJobname")->set_value(NEWJOB);
+    this->getDataConnector("wJobname")->value_config_to_script();
+    if( !this->isScriptOpen() ) {
+        this->ui->wNewJobscriptButton->setVisible(false);
+        this->ui->wResourcesGroup    ->setVisible(true );
+        this->ui->wScriptPage        ->setEnabled(true );
     }
+    this->reloadJobscriptAction_->setEnabled(false);
+}
+void MainWindow::script_text_to_config()
+{
+    QString text = this->ui->wScript->toPlainText();
+    this->launcher_.script.parse( text, false );
+
+    IGNORE_SIGNALS_UNTIL_END_OF_SCOPE;
+    for( QList<dc::DataConnectorBase*>::iterator iter=this->data_.begin(); iter!=this->data_.end(); ++iter ) {
+        if( (*iter)->value_script_to_config() )
+            (*iter)->value_config_to_widget();
+    }
+ // we must honour signals during on_wRequestNodes_clicked(), otherwise it does nothing.
+    this->ignoreSignals_ = false;
+    this->on_wRequestNodes_clicked();
+    this->ignoreSignals_ = true;
+
+    for( QList<dc::DataConnectorBase*>::iterator iter=this->data_.begin(); iter!=this->data_.end(); ++iter ) {
+        if( (*iter)->value_widget_to_config() )
+            (*iter)->value_config_to_script();
+    }
+ // revert to pre-IGNORE_SIGNALS_UNTIL_END_OF_SCOPE state.
 }
 
 void MainWindow::saveJobscriptAction_triggered()
 {
+    LOG_AND_CHECK_IGNORESIGNAL(NO_ARGUMENT);
+    switch( this->current_page_) {
+    case 0:
+    case MainWindowConstructedButNoPreviousPage:
+    {// make sure that the widgets' values are transferred to the script
+        for( QList<dc::DataConnectorBase*>::iterator iter=this->data_.begin(); iter!=this->data_.end(); ++iter )
+        {
+            if( (*iter)->value_widget_to_config() ) {
+                (*iter)->value_config_to_script();
+            }
+        }
+    }   break;
 
+    case 1:
+    {// make sure that changes to the script text are parsed and saved
+        Log(1) <<"\n    parsing script text";
+        QString text = this->ui->wScript->toPlainText();
+        this->script_text_to_config();
+    }   break;
+
+    default:
+        break;
+    }
+
+    if( this->job_folder() == NEWJOB )
+    {// forward to saveAs
+        this->saveAsJobscriptAction_triggered();
+    } else {
+        QStringList folders;
+        int verify_error;
+        QDir dir( this->local_file_location() );
+        if( !verify_directory(&dir) ) {
+            this->error_message_missing_local_file_location("'save job script' was canceled.");
+            return;
+        }
+        if( !verify_directory(&dir,this->project_folder(),false,true,&folders,&verify_error) ) {
+            this->error_message_missing_project_folder("'save job script' was canceled.");
+        }
+        if( !verify_directory(&dir,this->job_folder(),false,true,&folders,&verify_error) ) {
+            this->error_message_missing_job_folder("'save job script' was canceled.");
+        }
+//        if( !verify_file(&dir,"pbs.sh") ) {
+//            this->error_message_missing_job_script("'save job script' was canceled.");
+//        }
+        QString filepath = this->local_path_to(Script);
+        if( !filepath.isEmpty() ) {
+            this->saveJobscript( dir.absoluteFilePath("pbs.sh") );
+        } else {
+            return;
+        }
+    }
+    this->reloadJobscriptAction_->setEnabled(true);
+}
+
+void MainWindow::saveAsJobscriptAction_triggered()
+{
+    QStringList folders;
+    int verify_error;
+    QDir dir( this->local_file_location() );
+    if( !verify_directory(&dir) ) {
+        this->error_message_missing_local_file_location();
+        return;
+    }
+    QString example = this->job_folder();
+    if( example == NEWJOB ) {
+        example = "[path/to/project_folder/]job_folder";
+    }
+    bool ok;
+    QString projectpath_jobfolder =
+            QInputDialog::getText( this,TITLE
+                                 ,"Enter a (relative) file path for the new job folder"
+                                 , QLineEdit::Normal, example, &ok );
+    if( ok && !projectpath_jobfolder.isEmpty() && projectpath_jobfolder!=example )
+    {
+        if( verify_directory( &dir, projectpath_jobfolder, /*create_path=*/false, /*stay_inside=*/true, &folders, &verify_error ) )
+        {
+            if( verify_file ( &dir,"pbs.sh") )
+            {// ask permission to overwrite
+                QString msg = QString("The folder '%1' already contains a jobscript.\n"
+                                      "Do you want to overwrite it?")
+                                 .arg(dir.path());
+                QMessageBox::StandardButton answer
+                        = QMessageBox::question( this, TITLE, msg
+                                               , QMessageBox::Yes|QMessageBox::Cancel
+                                               , QMessageBox::Cancel
+                                               );
+                if( answer != QMessageBox::Yes ) {
+                    this->statusBar()->showMessage("Canceled: job script is NOT saved.");
+                    return;
+                }
+            }
+        } else {
+            if( !verify_directory( &dir, projectpath_jobfolder, /*create_path=*/true, /*stay_inside=*/true, &folders, &verify_error ) ) {
+                QString msg = QString("Could not create directory '%1/%2'.\n"
+                                      "Do you have sufficient permissions?")
+                                 .arg( this->local_file_location() )
+                                 .arg( projectpath_jobfolder )
+                                 ;
+                this->message(msg,QMessageBox::critical);
+                return;
+            }
+        }
+    }
+ // do the save
+    this->getSessionConfigItem("wProjectFolder")->set_value(folders.at(1));
+    this->getSessionConfigItem("wJobname"      )->set_value(folders.at(2));
+    this->saveJobscript( dir.absoluteFilePath("pbs.sh") );
 }
 
 void MainWindow::openJobscriptAction_triggered()
 {
+    QStringList folders;
+    int verify_error;
+    QDir dir( this->local_file_location() );
+    if( !verify_directory(&dir) ) {
+        this->error_message_missing_local_file_location();
+        return;
+    }
 
+    QString jobfolder =
+        QFileDialog::getExistingDirectory( this, "Select a job folder file"
+                                         , this->getSessionConfigItem("localFileLocation")->value().toString()
+                                         );
+    if( !verify_directory(&dir,jobfolder,/*create_path=*/false,/*stay_inside=*/true,&folders,&verify_error) ) {
+        QString msg;
+        switch(verify_error) {
+        case Outside:
+            msg = "You must select a directory inside the local file location.";
+            break;
+        case Inexisting:
+            msg = "You must select an existing directory or create a new one, inside the local file location.";
+            break;
+        default:
+            break;
+        }
+        this->error_message_missing_job_folder(msg);
+        return;
+    }
+    if( verify_file(&dir,"pbs.sh") ) {
+        this->getSessionConfigItem("wProjectFolder")->set_value(folders.at(1));
+        this->getSessionConfigItem("wJobname"      )->set_value(folders.at(2));
+        this->loadJobscript( dir.filePath("pbs.sh") );
+    } else {
+        QString msg = QString("No job script found in Folder '%1'. \n"
+                              "Create a new one?")
+                         .arg( dir.absolutePath() );
+        QMessageBox::StandardButton answer = QMessageBox::question
+                ( this,TITLE,msg
+                , QMessageBox::Yes|QMessageBox::Cancel, QMessageBox::Cancel
+                );
+        if( answer==QMessageBox::Yes ) {
+            this->newJobscriptAction_triggered();
+            this->getSessionConfigItem("wProjectFolder")->set_value(folders.at(1));
+            this->getSessionConfigItem("wJobname"      )->set_value(folders.at(2)); // overwrite __NEW_JOB__ with wJobname
+            this->update_StatusbarWidgets();
+            this->statusBar()->showMessage("Click menu Job/Save to create the job script.");
+        } else {
+            this->statusBar()->showMessage("'Open job script...' Canceled.");
+        }
+    }
+}
+
+void MainWindow::reloadJobscriptAction_triggered()
+{// check that the path to the jobfolder and the job script exist
+    QStringList folders;
+    int verify_error;
+    QDir dir( this->local_file_location() );
+    if( !verify_directory(&dir) ) {
+        this->error_message_missing_local_file_location("'reload job script' was canceled.");
+        return;
+    }
+    if( !verify_directory(&dir,this->project_folder(),false,true,&folders,&verify_error) ) {
+        this->error_message_missing_project_folder("'reload job script' was canceled.");
+    }
+    if( !verify_directory(&dir,this->job_folder(),false,true,&folders,&verify_error) ) {
+        this->error_message_missing_job_folder("'reload job script' was canceled.");
+    }
+    if( !verify_file(&dir,"pbs.sh") ) {
+        this->error_message_missing_job_script("'reload job script' was canceled.");
+    }
+ // check for unsaved changes
+    QMessageBox::StandardButton answer = QMessageBox::Yes;
+    if( this->launcher_.script.has_unsaved_changes() ) {
+        answer = QMessageBox::question( this, TITLE, "Unsaved changes to the current job script will be lost on reloading. Continue?");
+    }
+    if( answer==QMessageBox::Yes ) {
+        this->loadJobscript(dir.absoluteFilePath("pbs.sh"));
+        for( QList<dc::DataConnectorBase*>::iterator iter=this->data_.begin(); iter!=this->data_.end(); ++iter )
+        {
+            if( (*iter)->value_widget_to_config() ) {
+                (*iter)->value_config_to_script();
+            }
+        }
+        QString text = this->launcher_.script.text();
+        this->ui->wScript->setText(text);
+     // no unsaved changes since read from file, but the above iteration over DataConnectors
+     // requires that it is explicitly reset.
+        this->launcher_.script.set_has_unsaved_changes(false);
+        this->check_script_unsaved_changes();
+        this->statusBar()->showMessage("job script reloaded.");
+    } else {
+        this->statusBar()->showMessage("reload job script canceled by user.");
+    }
 }
 
 void MainWindow::submitJobscriptAction_triggered()
 {
+    LOG_AND_CHECK_IGNORESIGNAL(NO_ARGUMENT);
 
+    if( !this->requiresAuthentication("Submit job") ) {
+        return;
+    }
+
+    QString canceled = QString("Submit job '%1' CANCELED!").arg( this->job_folder() );
+    QString remote_job_folder = this->remote_path_to(JobFolder);
+    QString  local_job_folder = this-> local_path_to(JobFolder,canceled);
+
+    if(  this->launcher_.script.has_unsaved_changes()
+     || !this->launcher_.script.touch_finished_found()
+      )
+    {
+        QMessageBox::Button answer = QMessageBox::question(this,TITLE,"The job script has unsaved changes.\nSave Job script?"
+                                                          , QMessageBox::Yes|QMessageBox::No|QMessageBox::Cancel
+                                                          , QMessageBox::Cancel
+                                                          );
+        if( answer==QMessageBox::Cancel ) {
+            this->statusBar()->showMessage(canceled);
+            return;
+        } else
+        if( answer==QMessageBox::No ) {
+            this->statusBar()->showMessage("Job script not saved.");
+        } else {// Yes
+            QString filepath = this->local_path_to(Script);
+            if( !this->saveJobscript(filepath) ) {
+                return;
+            }
+        }
+    }
+ // test if the remote job folder is inexisting or empty
+    QString cmd("ls %1");
+    int rc = this->sshSession_.execute_remote_command( cmd, remote_job_folder );
+    if( rc==0 && !this->sshSession_.qout().isEmpty() )
+    {// ask the user if he wants to empty the remote job folder first
+        int answer =
+                QMessageBox::question( this,TITLE
+                                     ,"The remote job folder is not empty."
+                                      "Do you want to erase the remote job folder first?\n"
+                                      "(If you answer No, new files will be added and "
+                                      "existing files will be overwritten)."
+                                     ,"Cancel"                          // button0
+                                     ,"Keep remote job folder contents" // button1
+                                     ,"Erase remote job folder contents"// button2
+                                     , 0                                // default button
+                                     );
+        switch(answer) {
+          case 1:
+            this->statusBar()->showMessage("Remote job folder not erased. Files are added or overwritten.");
+            break;
+          case 2:
+          { cmd = QString("rm -rf %1/*");
+            int rc = this->sshSession_.execute_remote_command( cmd, remote_job_folder );
+            if( rc==0 ) {
+                this->statusBar()->showMessage("Erased remote job folder.");
+            } else {
+                while( rc != 0 )
+                {
+                    int answer = QMessageBox::question( this,TITLE,"An error occurred while erasing remote job folder contents"
+                                                      ,"Retry"          // button0
+                                                      ,"Ignore"         // button1
+                                                      ,"Cancel submit"  // button2
+                                                      , 0 );             // default button
+                    switch(answer) {
+                      case 0: // retry
+                        rc = this->sshSession_.execute_remote_command( cmd );
+                        break; // out of switch, but continue with while loop
+                      case 1: // ignore
+                        rc = 0; // break out of while loop
+                        break;  // break out of switch
+                      case 2:
+                      default:
+                        this->statusBar()->showMessage(canceled);
+                        return;
+                    }
+                }
+            }
+            break;
+          }
+          default:
+            this->statusBar()->showMessage(canceled);
+            return;
+        }
+    }
+    this->sshSession_.sftp_put_dir( local_job_folder, remote_job_folder, true );
+
+    cmd = QString("cd %1 && qsub pbs.sh");
+    this->sshSession_.execute_remote_command( cmd, remote_job_folder );
+    QString job_id = this->sshSession_.qout().trimmed();
+    this->statusBar()->showMessage(QString("Job submitted: %1").arg(job_id));
+    cfg::Item* ci_job_list = this->getSessionConfigItem("job_list");
+    if( ci_job_list->value().type()==QVariant::Invalid )
+        ci_job_list->set_value_and_type( QStringList() );
+    QStringList job_list = ci_job_list->value().toStringList();
+
+    Job job( job_id, this->local_file_location(), this->remote_file_location()
+           , this->project_folder()
+           , this->getSessionConfigItem("wJobname"      )->value().toString()
+           , Job::Submitted );
+    job_list.append( job.toString() );
+
+    ci_job_list->set_value( job_list );
 }
 
 void MainWindow::showFileLocationsAction_triggered()
 {
+    LOG_AND_CHECK_IGNORESIGNAL(NO_ARGUMENT);
 
+    QString job = this->job_folder();
+    if( job.isEmpty() ) {
+        job = "<None>";
+    }
+    QString msg = QString("File locations for job name '%1':").arg(job)
+                  .append("\n\nlocal: \n  ").append( this-> local_path_to(JobFolder) )
+                  .append("\n\nremote;\n  ").append( this->remote_path_to(JobFolder,false) );
+    QMessageBox::information(this, TITLE, msg, QMessageBox::Close, QMessageBox::Close );
 }
 
 void MainWindow::showLocalJobFolderAction_triggered()
@@ -2851,40 +3063,130 @@ void MainWindow::showRemoteJobFolderAction_triggered()
 
 }
 
-bool is_absolute_path( QString const& folder )
+
+//bool MainWindow::is_in_local_file_location( QString const& folder, QString *absolute_folder )
+//{/* verify that job_folder is in the local_file_location.
+//  * If not, a message is sent to the the statusBar.
+//  * if absolute_folder is not null it contains the absolute file path without
+//  * redundant '/', './' or '../'
+//  */
+//    QString absolute_folder_;
+//    if( is_absolute_path(folder) ) {
+//        absolute_folder_ = QDir::cleanPath(folder);
+//    } else
+//    {// relative path, make absolute
+//        QDir parent( this->local_file_location() );
+//        absolute_folder_ = QDir::cleanPath( parent.absoluteFilePath(folder) );
+//    }
+//    if( absolute_folder ) {
+//        *absolute_folder = absolute_folder_;
+//    }
+//    if( absolute_folder->startsWith( this->local_file_location() ) ) {
+//        return true;
+//    } else {
+//        QString msg = QString("Folder '%1' is located outside the local file location '%2'.")
+//                         .arg(absolute_folder_)
+//                         .arg(this->local_file_location());
+//        this->statusBar()->showMessage(msg);
+//        return false;
+//    }
+//}
+
+
+void MainWindow::on_wNewJobscriptButton_clicked()
 {
-    bool is_absolute = (folder.at(0)=='/');
-#ifdef Q_OS_WIN
-         is_absolute|= (folder.at(1)==':');
-#endif
-    return is_absolute;
+    LOG_AND_CHECK_IGNORESIGNAL(NO_ARGUMENT);
+
+    this->newJobscriptAction_triggered();
 }
 
-bool MainWindow::is_in_local_file_location( QString const& folder, QString *absolute_folder )
-{/* verify that job_folder is in the local_file_location.
-  * If not, a message is sent to the the statusBar.
-  * if absolute_folder is not null it contains the absolute file path without
-  * redundant '/', './' or '../'
-  */
-    QString absolute_folder_;
-    if( is_absolute_path(folder) ) {
-        absolute_folder_ = QDir::cleanPath(folder);
-    } else
-    {// relative path, make absolute
-        QDir parent( this->local_file_location() );
-        absolute_folder_ = QDir::cleanPath( parent.absoluteFilePath(folder) );
-    }
-    if( absolute_folder ) {
-        *absolute_folder = absolute_folder_;
-    }
-    if( absolute_folder->startsWith( this->local_file_location() ) ) {
-        return true;
+QMessageBox::StandardButton
+MainWindow::
+message( QString msg, message_box_t message_box ) {
+   QMessageBox::StandardButton answer = (*message_box)(this,TITLE,msg,QMessageBox::Ok,QMessageBox::Ok);
+   return answer;
+}
+
+void
+MainWindow::
+error_message_missing_local_file_location
+  ( QString const& msg1
+  , message_box_t message_box )
+{
+    QString tmp = this->local_file_location();
+    QString msg;
+    if( tmp.isEmpty() ) {
+        msg = "Local file location is empty string.";
     } else {
-        QString msg = QString("Folder '%1' is located outside the local file location '%2'.")
-                         .arg(absolute_folder_)
-                         .arg(this->local_file_location());
-        this->statusBar()->showMessage(msg);
-        return false;
+        msg = QString("Inexisting local file location: '%1'")
+                 .arg( tmp );
     }
+    if( !msg1.isEmpty() ) {
+        msg.append("\n\n").append(msg1);
+    }
+    message(msg,message_box);
 }
 
+void
+MainWindow::
+error_message_missing_project_folder
+  ( QString const& msg1
+  , message_box_t message_box )
+{
+    QString tmp = this->project_folder();
+    QString msg = QString("Inexisting project folder: '%1'"
+                          "(Local file location:\n    '%2'")
+                     .arg( tmp )
+                     .arg( this->local_file_location() )
+                     ;
+    if( !msg1.isEmpty() ) {
+        msg.append("\n\n").append(msg1);
+    }
+    message(msg,message_box);
+}
+
+void
+MainWindow::
+error_message_missing_job_folder
+  ( QString const& msg1
+  , message_box_t message_box )
+{
+    QString tmp = this->job_folder();
+    QString msg;
+    if( tmp.isEmpty() ) {
+        msg = "Jobname is empty string.";
+    } else {
+        msg = QString("Inexisting job folder:\n    '%1'"
+                      "(Project folder:\n    '%2'"
+                      "Local file location:\n    '%3')")
+                 .arg( tmp )
+                 .arg( this->project_folder() )
+                 .arg( this->local_file_location() )
+                 ;
+    }
+    if( !msg1.isEmpty() ) {
+        msg.append("\n\n").append(msg1);
+    }
+    message(msg,message_box);
+}
+
+void
+MainWindow::
+error_message_missing_job_script
+  ( QString const& msg1
+  , message_box_t message_box )
+{
+    QString msg;
+    msg = QString("Inexisting job script:\n    'pbs.sh'"
+                  "(Job folder:\n    '%1'"
+                  "Project folder:\n    '%2'"
+                  "Local file location:\n    '%3')")
+             .arg( this->job_folder() )
+             .arg( this->project_folder() )
+             .arg( this->local_file_location() )
+             ;
+    if( !msg1.isEmpty() ) {
+        msg.append("\n\n").append(msg1);
+    }
+    message(msg,message_box);
+}

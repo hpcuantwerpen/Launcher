@@ -330,6 +330,17 @@ namespace ssh2
         if( !this->isConnected() ) {
             throw_<NotConnected>("Attempt to authenticate without ssh2 connection.");
         }
+        if( this->username().isEmpty() ) {
+            throw_<MissingUsername>("Cannot authenticate without username.");
+        }
+        if( this->private_key_.empty() ) {
+            throw_<MissingKey>("Cannot authenticate without private key.");
+        }
+#ifndef NO_PUBLIC_KEY_NEEDED
+        if( this->public_key_.empty() ) {
+            throw_<MissingKey>("Cannot authenticate without public key.");
+        }
+#endif
         int rv;
         while( ( rv = libssh2_userauth_publickey_fromfile
                         ( this->session_

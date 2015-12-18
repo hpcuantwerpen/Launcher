@@ -156,20 +156,22 @@ namespace pbs
         QString new_filepath( filepath.isEmpty() ? this->filepath_ : filepath );
         if( new_filepath.isEmpty() )
             throw_<std::runtime_error>("Script::write() : no filepath provided.");
-        QFileInfo fileinfo( new_filepath );
-        fileinfo.makeAbsolute();
-        QDir dir( fileinfo.absolutePath() );
-        if( !dir.exists() ) {
-            throw_<std::runtime_error>("Script::write() : inexisting folder: '%1'",fileinfo.filePath() );
+
+        QFileInfo info( new_filepath );
+        new_filepath = info.absoluteFilePath();
+
+        QString parent_folder = info.absolutePath();
+        if( !QDir().mkpath(parent_folder) ) {
+            throw_<std::runtime_error>("Script::write() : could not create folder: '%1'",info.filePath() );
         }
-        if( fileinfo.exists() && warn_before_overwrite ) {
-            throw_<WarnBeforeOverwrite>("Warn before overwrite: '%1'",fileinfo.filePath() );
+        if( info.exists() && warn_before_overwrite ) {
+            throw_<WarnBeforeOverwrite>("Warn before overwrite: '%1'",info.filePath() );
         }
         Script* non_const_this = const_cast<Script*>(this);
         (*non_const_this)["generated_on"] = toolbox::now();
-        QFile f(fileinfo.filePath());
-        f.open(QIODevice::Truncate/*|QIODevice::Text*/|QIODevice::WriteOnly);
-        QTextStream out(&f);
+        QFile file(info.filePath());
+        file.open(QIODevice::Truncate/*|QIODevice::Text*/|QIODevice::WriteOnly);
+        QTextStream out(&file);
 
         QString const& txt = this->text();
         out << txt

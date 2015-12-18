@@ -23,6 +23,7 @@
 
 #include "messagebox.h"
 #include "version.h"
+#include "verify.h"
 
 namespace Ui {
     class MainWindow;
@@ -40,7 +41,6 @@ namespace Ui {
       , int level=1
       );
  //-----------------------------------------------------------------------------
-    bool is_absolute_path( QString const& folder );
 
 
 class MainWindow : public QMainWindow
@@ -98,15 +98,10 @@ private slots:
 
 //    void on_wJobname_textChanged(const QString &arg1);
 
-    void on_wProjectFolderButton_clicked();
+//    void on_wProjectFolderButton_clicked();
 
-    void on_wJobnameButton_clicked();
 
-    void on_wSave_clicked();
 
-    void on_wReload_clicked();
-
-    void on_wSubmit_clicked();
 
     void on_wScript_textChanged();
 
@@ -128,15 +123,13 @@ private slots:
 
     void on_wSelectModule_currentIndexChanged(const QString &arg1);
 
-    void on_wReload2_clicked();
-
-    void on_wSave2_clicked();
-
-    void on_wSubmit2_clicked();
+//    void on_wReload2_clicked();
+//    void on_wSave2_clicked();
+//    void on_wSubmit2_clicked();
 
     void on_wSingleJob_toggled(bool checked);
 
-    void on_wNotFinished_selectionChanged();
+//    void on_wNotFinished_selectionChanged();
 
     void on_wFinished_selectionChanged();
 
@@ -146,6 +139,7 @@ private slots:
     void openSessionAction_triggered();
     void newSessionAction_triggered();
     void saveSessionAction_triggered();
+    void saveAsSessionAction_triggered();
     void authenticateAction_triggered();
     void localFileLocationAction_triggered();
     void remoteFileLocationAction_triggered();
@@ -154,19 +148,27 @@ private slots:
     void createTemplateAction_triggered();
     void newJobscriptAction_triggered();
     void saveJobscriptAction_triggered();
+    void saveAsJobscriptAction_triggered();
     void openJobscriptAction_triggered();
+    void reloadJobscriptAction_triggered();
     void submitJobscriptAction_triggered();
     void showFileLocationsAction_triggered();
     void showLocalJobFolderAction_triggered();
     void showRemoteJobFolderAction_triggered();
 
-    void on_wShowFilelocations_clicked();
+//    void save();
+//    void submit();
+//    void reload();
 
-    void on_wShowLocalJobFolder_clicked();
+//    void on_wShowFilelocations_clicked();
 
-    void on_wShowRemoteJobFolder_clicked();
+//    void on_wShowLocalJobFolder_clicked();
+
+//    void on_wShowRemoteJobFolder_clicked();
 
     void on_wWalltime_editingFinished();
+
+    void on_wNewJobscriptButton_clicked();
 
 public:
     void setupHome();
@@ -178,6 +180,7 @@ public:
 
     void storeResetValues();
     QString check_script_unsaved_changes();
+    void script_text_to_config();
     void refreshJobs( JobList const& joblist );
 
     bool isFinished( Job const& job ) const;
@@ -199,6 +202,7 @@ public:
     bool loadJobscript( QString const& filepath );
     bool saveJobscript( QString const& filepath );
     bool remoteCopyJob();
+    bool isScriptOpen() const;
 
     cfg::Item* getSessionConfigItem( QString const& name );
      // get config item by name and create it (empty) if it does not exist
@@ -207,19 +211,24 @@ public:
      // as above but sets a default value (and type) if the item did not exist before.
 
     QString local_file_location();
+    QString project_folder();
+    QString job_folder();
     QString remote_file_location();
-    bool is_in_local_file_location(QString const& folder, QString *absolute_folder);
+    QString vscdata_file_location();
+//    bool is_in_local_file_location(QString const& folder, QString *absolute_folder);
 
+//    enum LocalOrRemote {LOCAL,REMOTE};
+//    QString jobs_project_path           ( LocalOrRemote local_or_remote, bool resolve=true );
+//    QString jobs_project_job_path       ( LocalOrRemote local_or_remote, bool resolve=true );
+//    QString jobs_project_job_script_path( LocalOrRemote local_or_remote, bool resolve=true );
+//    void getRemoteFileLocations_();
 
-//    QString local_subfolder();
-//    QString local_subfolder_jobname();
-//    QString remote_subfolder();
-//    QString remote_subfolder_jobname();
-    enum LocalOrRemote {LOCAL,REMOTE};
-    QString jobs_project_path( LocalOrRemote local_or_remote, bool resolve=true );
-    QString jobs_project_job_path( LocalOrRemote local_or_remote, bool resolve=true );
-
-    void getRemoteFileLocations_();
+    enum PathTo {
+        RootFolder, ProjectFolder, JobFolder, Script
+    };
+    QString  local_path_to( PathTo path_to, QString const& add_message=QString() );
+    QString remote_path_to( PathTo path_to, bool resolve=true );
+    bool resolve( QString & s );
 
     QString get_path_to_clusters();
 
@@ -235,24 +244,30 @@ public:
     QString select_template_location();
 
     void warn( QString const& msg1, QString const& msg2=QString() );
-    // msg1 -> status bar
-    // msg1+msg2 -> QMessageBox::warning
 
     QString username();
     bool can_authenticate();
     void update_WindowTitle();
     void update_StatusbarWidgets();
+
+    typedef QMessageBox::StandardButton (*message_box_t)( QWidget*, QString const&, QString const&, QMessageBox::StandardButtons, QMessageBox::StandardButton );
+    QMessageBox::StandardButton message( QString msg, message_box_t message_box=&QMessageBox::warning );
+    void error_message_missing_local_file_location( QString const& msg1=QString(), message_box_t message_box=QMessageBox::critical );
+    void error_message_missing_project_folder     ( QString const& msg1=QString(), message_box_t message_box=QMessageBox::critical );
+    void error_message_missing_job_folder         ( QString const& msg1=QString(), message_box_t message_box=QMessageBox::critical );
+    void error_message_missing_job_script         ( QString const& msg1=QString(), message_box_t message_box=QMessageBox::critical );
+
 private:
     Ui::MainWindow *ui;
     Launcher launcher_;
     bool ignoreSignals_;
-    int previousPage_;
+    int current_page_;
     QList<dc::DataConnectorBase*> data_;
     dc::DataConnectorBase* getDataConnector( QString const& name );
     QPalette* paletteRedForeground_;
 
     ssh2::Session sshSession_;
-    QMap<QString,QString> remote_env_vars_;
+//    QMap<QString,QString> remote_env_vars_;
     int verbosity_;
 
     QMenu* helpMenu_;
@@ -261,18 +276,23 @@ private:
     QMenu* jobMenu_;
     QAction* newJobscriptAction_;
     QAction* saveJobscriptAction_;
+    QAction* saveAsJobscriptAction_;
     QAction* openJobscriptAction_;
+    QAction* reloadJobscriptAction_;
     QAction* submitJobscriptAction_;
     QAction* showFileLocationsAction_;
     QAction* showLocalJobFolderAction_;
     QAction* showRemoteJobFolderAction_;
+
+    QMenu* templatesMenu_;
     QAction* selectTemplateAction_;
     QAction* createTemplateAction_;
 
     QMenu* sessionMenu_;
-    QAction* openSessionAction_;
     QAction* newSessionAction_;
+    QAction* openSessionAction_;
     QAction* saveSessionAction_;
+    QAction* saveAsSessionAction_;
 
     QMenu* extraMenu_;
     QAction* authenticateAction_;
@@ -294,8 +314,8 @@ private:
     QString selected_job_;
     MessageBox messages_;
     QString is_uptodate_for_;
-    QStringList remote_file_locations_;
+//    QStringList remote_file_locations_;
+    bool proceed_offline_;
 };
-
 
 #endif // MAINWINDOW_H
