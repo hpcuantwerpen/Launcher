@@ -139,7 +139,7 @@
       , verbosity_(INITIAL_VERBOSITY)
       , walltime_(nullptr)
       , pendingRequest_(NoPendingRequest)
-      , messages_(TITLE)
+//      , messages_(TITLE)
       , proceed_offline_(false)
     {
         LOG_CALLER_INFO << "\n    Running Launcher version = "<<VERSION;
@@ -189,8 +189,8 @@
         QFont font("Courier New",7);
 
         this->ui->wFinished   ->setFont(font);
-        this->ui->wNotFinished->setFont(font);
-        this->ui->wRetrieved  ->setFont(font);
+//        this->ui->wNotFinished->setFont(font);
+//        this->ui->wRetrieved  ->setFont(font);
 #endif
      // keep this the last line
         current_page_ = MainWindowConstructedButNoPreviousPage;

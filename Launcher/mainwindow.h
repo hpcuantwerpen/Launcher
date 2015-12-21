@@ -312,7 +312,7 @@ private:
     } pendingRequest_;
 
     QString selected_job_;
-    MessageBox messages_;
+//    MessageBox messages_;
     QString is_uptodate_for_;
 //    QStringList remote_file_locations_;
     bool proceed_offline_;
