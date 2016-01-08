@@ -52,13 +52,22 @@ namespace ssh2
         RemoteCommands_t const* remote_commands_;
     };
 
+// //=============================================================================
+//    class SshBase
+// //=============================================================================
+//    {
+//    public:
+//        SshBase();
+//        virtual ~SshBase();
+//    };
+
  //=============================================================================
     class Session
  //=============================================================================
     {
     public:
         Session();
-        ~Session();
+        virtual ~Session();
 
         QString loginNode() const & { return this->login_node_.c_str(); }
         void setLoginNode( QString const& loginNode );

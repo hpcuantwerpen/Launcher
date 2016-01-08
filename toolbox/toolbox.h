@@ -9,6 +9,7 @@
 #include "datetime_now.h"
 #include "log.h"
 #include "verify.h"
+#include "external.h"
 
 #endif // TOOLBOX_H
 

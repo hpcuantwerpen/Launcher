@@ -20,11 +20,13 @@ HEADERS += orderedmap.h     \
            toolbox.h \
     datetime_now.h \
     log.h \
+    external.h \
     verify.h
 
 SOURCES += orderedmap.cpp   \
            warn_.cpp \
     datetime_now.cpp \
     log.cpp \
+    external.cpp \
     verify.cpp
 

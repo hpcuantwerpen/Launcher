@@ -1,6 +1,72 @@
 TODO LIST
 - add file location views
-- dont show joblist, qstat -u output is sufficient and appears on single line -> simple selection...
+- submit and retrieve copy the entire map  without checking if a file has changed. For small files that isn't a
+  problem, but for big files this is problematic. a practical solution could be the use of git. THis also can remove
+  the dependency on libssh2 from the code and potentially removes a lot of code from the code base
+  only partially true: still need to be able to execute remote commands, but at least all the file transfer code can
+  removed
+  apparently the git bash for windows contains a ssh.exe file (in "C:\Program Files\Git\usr\bin") with which i could
+  successfully login on hopper.
+  Here is a way to tell git which key to use: http://superuser.com/questions/232373/how-to-tell-git-which-private-key-to-use
+  If we content with executing system commands for ssh with QProcess (http://stackoverflow.com/questions/3227767/how-to-run-a-system-command-in-qt)
+  then the dependency on libssh2 can be completely removed. Git commands can be executed as a system command to,
+  or by using libgit2 (https://libgit2.github.com)
+  if this approach works well, the remote file location view may be removed.
+
+  workflow:
+  1) create local empty repo (only once)
+     execute local commands
+        cd /path/to/local/job/folder
+        git init
+     or
+        git init /path/to/local/job/folder
+
+  2) save locally (possibly many times)
+     execute local commands (in the local folder)
+        git add .
+        git commit -a -m "..."
+
+  3) create remote empty repo (only once)
+     execute remote commands (in the remote directory)
+        git init
+        git config receive.denyCurrentBranch ignore
+        (The last command is to avoid the error below)
+     or
+         git init /path/to/remote/job/folder
+         git config receive.denyCurrentBranch ignore --file /path/to/remote/job/folder/.git/config
+     and execute local command (in local directory)
+        git remote add origin /path/to/remote/job/folder
+
+  4) synchronize:
+     execute local command (in local directory)
+         git push master origin
+     execute remote command (in remote directory) (see error below)
+         git reset --hard
+
+  etijskens@etijskens [525] ~/qws/git-testje$ git push origin master
+  Counting objects: 3, done.
+  Delta compression using up to 8 threads.
+  Compressing objects: 100% (2/2), done.
+  Writing objects: 100% (3/3), 217 bytes | 0 bytes/s, done.
+  Total 3 (delta 0), reused 0 (delta 0)
+  remote: error: refusing to update checked out branch: refs/heads/master
+  remote: error: By default, updating the current branch in a non-bare repository
+  remote: error: is denied, because it will make the index and work tree inconsistent
+  remote: error: with what you pushed, and will require 'git reset --hard' to match
+  remote: error: the work tree to HEAD.
+  remote: error:
+  remote: error: You can set 'receive.denyCurrentBranch' configuration variable to
+  remote: error: 'ignore' or 'warn' in the remote repository to allow pushing into
+  remote: error: its current branch; however, this is not recommended unless you
+  remote: error: arranged to update its work tree to match what you pushed in some
+  remote: error: other way.
+  remote: error:
+  remote: error: To squelch this message and still keep the default behaviour, set
+  remote: error: 'receive.denyCurrentBranch' configuration variable to 'refuse'.
+  To ssh://vsc20170@login.hpc.uantwerpen.be:/scratch/antwerpen/201/vsc20170/git-testje/.git
+   ! [remote rejected] master -> master (branch is currently checked out)
+  error: failed to push some refs to 'ssh://vsc20170@login.hpc.uantwerpen.be:/scratch/antwerpen/201/vsc20170/git-testje/.git'
+
 - test template
 - test session new/open/save/save as
 - bug fix: templates folder is missing.
@@ -40,6 +106,8 @@ DONE (reverse chronological order)
 2015-12-18
 - new gui with menu and new/open/save/save as menu items
 - removed the job management items
+- dont show joblist, qstat -u output is sufficient and appears on single line -> simple selection...
+  not exactly true, because finished jobs do not disappear from the qstat -u output after only a short period.
 2015-11-24
 - bug fix: save button shows unsaved changes at startup
 - remove automatic save on submit

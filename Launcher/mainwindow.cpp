@@ -8,6 +8,7 @@
 #include <QInputDialog>
 #include <QTextStream>
 #include <QMessageBox>
+#include <QProcess>
 
 #include <warn_.h>
 #include <ssh2tools.h>
@@ -147,6 +148,7 @@
 
         createActions();
         createMenus();
+        this->useGitSynchronizationAction_triggered();
 
         ssh2::Session::autoOpen = true;
 
@@ -202,6 +204,7 @@
         connect( aboutAction_, SIGNAL(triggered()), this, SLOT( aboutAction_triggered() ) );
 
         verboseAction_ = new QAction("Verbose logging", this);
+        verboseAction_->setCheckable(true);
         connect( verboseAction_, SIGNAL(triggered()), this, SLOT( verboseAction_triggered() ) );
 
         openSessionAction_ = new QAction("&Open...", this);
@@ -213,7 +216,7 @@
         connect( newSessionAction_, SIGNAL(triggered()), this, SLOT( newSessionAction_triggered() ) );
 
         saveSessionAction_ = new QAction("Save", this);
-           saveSessionAction_ ->setShortcut(QKeySequence("SHIFT+CTRL+S"));
+        saveSessionAction_ ->setShortcut(QKeySequence("SHIFT+CTRL+S"));
         connect( saveSessionAction_, SIGNAL(triggered()), this, SLOT( saveSessionAction_triggered() ) );
 
         saveAsSessionAction_ = new QAction("Save As...", this);
@@ -265,6 +268,12 @@
 
         showRemoteJobFolderAction_ = new QAction("Show remote job folder contents...", this);
         connect( showRemoteJobFolderAction_, SIGNAL(triggered()), this, SLOT( showRemoteJobFolderAction_triggered() ) );
+
+        useGitSynchronizationAction_ = new QAction("Use git synchronization",this);
+        useGitSynchronizationAction_->setCheckable(true);
+        useGitSynchronizationAction_->setChecked  (true);
+        connect( useGitSynchronizationAction_, SIGNAL(triggered()), this, SLOT( useGitSynchronizationAction_triggered() ) );
+
     }
 
     void MainWindow::createMenus()
@@ -299,6 +308,7 @@
 
         extraMenu_ = menuBar()->addMenu("&Extra");
         extraMenu_ ->addAction(verboseAction_);
+        extraMenu_ ->addAction(useGitSynchronizationAction_);
     }
 
     void MainWindow::aboutAction_triggered()
@@ -317,6 +327,23 @@
     {
         LOG_AND_CHECK_IGNORESIGNAL(NO_ARGUMENT);
         this->verbosity_ = ( this->verboseAction_->isChecked() ? 2 : 0 );
+    }
+
+    void MainWindow::useGitSynchronizationAction_triggered()
+    {
+//        LOG_AND_CHECK_IGNORESIGNAL(NO_ARGUMENT);
+        this->use_git_sync_ = false;
+        if( this->useGitSynchronizationAction_->isChecked() ) {
+            QProcess qProcess(this);
+            qProcess.start("git",QStringList()<<"--version");
+            int rc = -1;
+            if( qProcess.waitForFinished() ) {
+                rc = qProcess.exitCode();
+                qProcess.close();
+            }
+            if( rc==0 )
+                this->use_git_sync_ = true;
+        }
     }
 
     void MainWindow::newSessionAction_triggered()
@@ -532,16 +559,6 @@
                 this->statusBar()->showMessage(msg);
             }
         }
-//        QString path;
-//        try {
-//            path = this->jobs_project_job_path(LOCAL);
-//            this->getSessionConfigItem("localFolder" )->set_value_and_type( path );
-//            this->getSessionConfigItem("remoteFolder")->set_value_and_type( this->jobs_project_job_path( REMOTE, false ) ); // no need to store resolved path
-//        } catch (std::runtime_error &e ) {
-//            Log() << "\n    Error: "<< e.what();
-//            this->getSessionConfigItem("wJobname")->set_value("");
-//        }
-
 
         this->data_.append( dc::newDataConnector("wJobname"      , "-N"           ) );
         this->data_.append( dc::newDataConnector("localFolder"   , "local_folder" ) );
@@ -575,6 +592,20 @@
         }
         this->check_script_unsaved_changes(); // ?? nessecary ?? todo
         this->update_StatusbarWidgets();
+
+        this->file_system_model = new QFileSystemModel(this);
+        QString s = this->local_file_location();
+        this->file_system_model->setRootPath(s);
+        QTreeView& tree = *(this->ui->wViewLocal);
+        tree.setModel(this->file_system_model);
+        if( !s.isEmpty()) {
+            const QModelIndex rootIndex = this->file_system_model->index(QDir::cleanPath(s));
+            if( rootIndex.isValid() )
+                tree.setRootIndex(rootIndex);
+        }
+//        tree.setIndentation(20);
+        tree.setSortingEnabled(true);
+        this->statusBar()->showMessage("tree");
     }
 
     bool MainWindow::isScriptOpen() const {
@@ -2702,6 +2733,7 @@ void MainWindow::newJobscriptAction_triggered()
         this->ui->wScriptPage        ->setEnabled(true );
     }
     this->reloadJobscriptAction_->setEnabled(false);
+    this->update_StatusbarWidgets();
 }
 void MainWindow::script_text_to_config()
 {
@@ -2774,11 +2806,15 @@ void MainWindow::saveJobscriptAction_triggered()
         QString filepath = this->local_path_to(Script);
         if( !filepath.isEmpty() ) {
             this->saveJobscript( dir.absoluteFilePath("pbs.sh") );
+            if( this->use_git_sync_ ) {
+//                this->sshSession_.git_local_save( this->local_path_to(JobFolder) );
+            }
         } else {
             return;
         }
     }
     this->reloadJobscriptAction_->setEnabled(true);
+
 }
 
 void MainWindow::saveAsJobscriptAction_triggered()
@@ -2834,6 +2870,9 @@ void MainWindow::saveAsJobscriptAction_triggered()
     this->getSessionConfigItem("wProjectFolder")->set_value(folders.at(1));
     this->getSessionConfigItem("wJobname"      )->set_value(folders.at(2));
     this->saveJobscript( dir.absoluteFilePath("pbs.sh") );
+    if( this->use_git_sync_ ) {
+//        this->sshSession_.git_local_save( this->local_path_to(JobFolder) );
+    }
 }
 
 void MainWindow::openJobscriptAction_triggered()

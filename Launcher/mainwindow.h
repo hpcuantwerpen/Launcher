@@ -12,6 +12,7 @@
 #include <QStringList>
 #include <QtDebug>
 #include <QTime>
+#include <QFileSystemModel>
 
 #include <launcher.h>
 #include <ssh2tools.h>
@@ -82,10 +83,6 @@ private slots:
 
     void on_wEnforceNNodes_toggled(bool checked);
 
-//    void on_wWalltimeUnit_currentTextChanged(const QString &arg1);
-
-//    void on_wWalltime_valueChanged(double arg1);
-
     void on_wNotifyAddress_editingFinished();
 
     void on_wNotifyAbort_toggled(bool checked);
@@ -93,15 +90,6 @@ private slots:
     void on_wNotifyBegin_toggled(bool checked);
 
     void on_wNotifyEnd_toggled(bool checked);
-
-//    void on_wProjectFolder_textChanged(const QString &arg1);
-
-//    void on_wJobname_textChanged(const QString &arg1);
-
-//    void on_wProjectFolderButton_clicked();
-
-
-
 
     void on_wScript_textChanged();
 
@@ -123,13 +111,7 @@ private slots:
 
     void on_wSelectModule_currentIndexChanged(const QString &arg1);
 
-//    void on_wReload2_clicked();
-//    void on_wSave2_clicked();
-//    void on_wSubmit2_clicked();
-
     void on_wSingleJob_toggled(bool checked);
-
-//    void on_wNotFinished_selectionChanged();
 
     void on_wFinished_selectionChanged();
 
@@ -155,16 +137,7 @@ private slots:
     void showFileLocationsAction_triggered();
     void showLocalJobFolderAction_triggered();
     void showRemoteJobFolderAction_triggered();
-
-//    void save();
-//    void submit();
-//    void reload();
-
-//    void on_wShowFilelocations_clicked();
-
-//    void on_wShowLocalJobFolder_clicked();
-
-//    void on_wShowRemoteJobFolder_clicked();
+    void useGitSynchronizationAction_triggered();
 
     void on_wWalltime_editingFinished();
 
@@ -215,13 +188,6 @@ public:
     QString job_folder();
     QString remote_file_location();
     QString vscdata_file_location();
-//    bool is_in_local_file_location(QString const& folder, QString *absolute_folder);
-
-//    enum LocalOrRemote {LOCAL,REMOTE};
-//    QString jobs_project_path           ( LocalOrRemote local_or_remote, bool resolve=true );
-//    QString jobs_project_job_path       ( LocalOrRemote local_or_remote, bool resolve=true );
-//    QString jobs_project_job_script_path( LocalOrRemote local_or_remote, bool resolve=true );
-//    void getRemoteFileLocations_();
 
     enum PathTo {
         RootFolder, ProjectFolder, JobFolder, Script
@@ -234,8 +200,6 @@ public:
 
     void createActions();
     void createMenus();
-
-//    void activateAuthenticateButton( bool activate, QString const& inactive_button_text="authenticate..." );
 
     QString selectedJob( QTextEdit* qTextEdit );
     void clearSelection( QTextEdit* qTextEdit );
@@ -267,8 +231,7 @@ private:
     QPalette* paletteRedForeground_;
 
     ssh2::Session sshSession_;
-//    QMap<QString,QString> remote_env_vars_;
-    int verbosity_;
+   int verbosity_;
 
     QMenu* helpMenu_;
     QAction* aboutAction_;
@@ -299,11 +262,14 @@ private:
     QAction* localFileLocationAction_;
     QAction* remoteFileLocationAction_;
     QAction* verboseAction_;
+    QAction* useGitSynchronizationAction_;
 
     QLabel *wAuthentIndicator_
          , *wJobnameIndicator_
          , *wProjectIndicator_;
     Walltime *walltime_;
+
+    QFileSystemModel* file_system_model;
 
     enum PendingRequest {
         NoPendingRequest=0
@@ -314,8 +280,8 @@ private:
     QString selected_job_;
     MessageBox messages_;
     QString is_uptodate_for_;
-//    QStringList remote_file_locations_;
     bool proceed_offline_;
+    bool use_git_sync_;
 };
 
 #endif // MAINWINDOW_H
