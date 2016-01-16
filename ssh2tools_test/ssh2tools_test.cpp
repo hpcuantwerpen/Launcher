@@ -22,7 +22,7 @@ Ssh2_test::Ssh2_test()
 
 void Ssh2_test::testCase1()
 {
-    ssh2::Session s;
+    ssh::Libssh2Impl s;
     s.setLoginNode("login.hpc.uantwerpen.be");
     s.setUsername("vsc20170");
     s.setPrivatePublicKeyPair("/Users/etijskens/.ssh/id_rsa_npw");
@@ -41,13 +41,13 @@ void Ssh2_test::testCase1()
 
 void Ssh2_test::testCase2()
 {
-    ssh2::Session s;
+    ssh::Libssh2Impl s;
     s.setLoginNode("login.hpc.uantwerpen.be");
     s.setUsername("vsc20170");
     s.setPrivatePublicKeyPair("/Users/etijskens/.ssh/id_rsa");
     try {
         s.open();
-    } catch( ssh2::PassphraseNeeded& e ) {
+    } catch( ssh::PassphraseNeeded& e ) {
         std::cout << "\n(Intentional) Error: " << e.what() << std::endl;
         s.setPassphrase("Thezoo12");
         s.open();
@@ -56,7 +56,7 @@ void Ssh2_test::testCase2()
     try {
         s.setPassphrase("wrong passphrase");
         s.open();
-    } catch( ssh2::WrongPassphrase& e ) {
+    } catch( ssh::WrongPassphrase& e ) {
         std::cout << "\n(Intentional) Error: " << e.what() << std::endl;
     }
 
@@ -65,13 +65,13 @@ void Ssh2_test::testCase2()
 
 void Ssh2_test::testCase3()
 {
-    ssh2::Session s;
+    ssh::Libssh2Impl s;
     s.setLoginNode("login.hpc.uantwerpen.be");
     s.setUsername("vsc20170");
     s.setPrivatePublicKeyPair("/Users/etijskens/.ssh/id_rsa_npw");
     //s.open();
-    ssh2::Session::autoOpen=true;
-    ssh2::Session::autoClose=true;
+    ssh::Libssh2Impl::autoOpen=true;
+    ssh::Libssh2Impl::autoClose=true;
     QString cmd("echo $VSC_SCRATCH");
     s.execute(cmd);
     //s.execute("/bin/touch /scratch/antwerpen/201/vsc20170/franky");
@@ -94,11 +94,11 @@ void Ssh2_test::testCase3()
 
 void Ssh2_test::testCase4()
 {
-    ssh2::Session s;
+    ssh::Libssh2Impl s;
     s.setLoginNode("login.hpc.uantwerpen.be");
     s.setUsername("vsc20170");
     s.setPrivatePublicKeyPair("/Users/etijskens/.ssh/id_rsa_npw");
-    ssh2::Session::autoOpen=true;
+    ssh::Libssh2Impl::autoOpen=true;
 
     QDir("/Users/etijskens/Launcher_pp/jobs/subfolder/test2").removeRecursively();
     s.execute("rm -rf /scratch/antwerpen/201/vsc20170/test");

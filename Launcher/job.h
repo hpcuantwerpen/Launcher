@@ -4,7 +4,7 @@
 #include <QString>
 #include <QStringList>
 
-#include <ssh2tools.h>
+//#include <ssh2tools.h>
 #include <job.h>
 
 class MainWindow;

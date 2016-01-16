@@ -13,12 +13,16 @@ template <class T> std::ostream& operator<<( Log const& log, T const& t );
   * which is more practical then
   *    Log log(2);
   *
-
   */
 
 class Log
-{/* For implementation details see
+{/*
+  * send output to a file, by appending it.
+  *
+  * For implementation details see
   * http://stackoverflow.com/questions/6240950/platform-independent-dev-null-in-c
+  *   if a null pointer is provided to the constructor of ostream, it automatically
+  *   sets the badbit and silently ignores any writes
   */
 
     template <class T> friend std::ostream& ::operator<<( Log const& log, T const& t );
@@ -40,10 +44,12 @@ public:
      /* -1 = no logging (silent)
       */
     static std::string filename;
+    /* if filename is "std::cout" output is sent to std::cout rather than to a file.
+     */
 
 private:
-    mutable std::ofstream* f_;
-    mutable std::ostream * null_;
+    mutable std::ostream* f_;
+    mutable std::ostream* null_;
 };
 
 template <class T>
@@ -56,13 +62,13 @@ std::ostream& operator<<( Log const& log, T const& t )
     }
 }
 
-#define INFO     "\nInfo"
-#define DEBUG    "\nDebug"
-#define WARNING  "\nWARNING"
-#define CRITICAL "\nCRITICAL"
-#define FATAL    "\n!!! FATAL !!!"
+#define INFO     "\nInfo "
+#define DEBUG    "\nDebug "
+#define WARNING  "\nWARNING "
+#define CRITICAL "\nCRITICAL "
+#define FATAL    "\n!!! FATAL !!! "
 
-#define C_STR toUtf8().data
+#define C_STR toUtf8().constData
  // allows for Log() << some_QString.C_STR();
 
 #endif // LOG_H

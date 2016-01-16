@@ -77,18 +77,18 @@ static int waitsocket(int socket_fd, LIBSSH2_SESSION *session)
     return rc;
 }
 
-namespace ssh2
+namespace ssh
 {//-----------------------------------------------------------------------------
-    Session::Session()
+    Libssh2Impl::Libssh2Impl()
       : sock_(-1)
       , session_(nullptr)
       , isAuthenticated_(false)
       , execute_remote_command(this)
     {}
  //-----------------------------------------------------------------------------
-    bool Session::isInitializedLibssh_ = false;
+    bool Libssh2Impl::isInitializedLibssh_ = false;
  //-----------------------------------------------------------------------------
-    void Session::setLoginNode( QString const& login )
+    void Libssh2Impl::setLoginNode( QString const& login )
     {
         this->login_node_ = login.toStdString();
      // make sure that we re-connect and re-authenticate when the cluster is changed!
@@ -96,7 +96,7 @@ namespace ssh2
         this->isAuthenticated_ = false;
     }
  //-----------------------------------------------------------------------------
-    bool Session::setUsername( QString const& user )
+    bool Libssh2Impl::setUsername( QString const& user )
     {
         this->reset();
         this->username_ = user.toStdString();
@@ -104,7 +104,7 @@ namespace ssh2
     }
  //-----------------------------------------------------------------------------
     bool
-    Session::
+    Libssh2Impl::
     setPrivatePublicKeyPair
       ( QString const& private_key
 #   ifndef NO_PUBLIC_KEY_NEEDED
@@ -150,7 +150,7 @@ namespace ssh2
         return true;
     }
  //-----------------------------------------------------------------------------
-    bool Session::setPassphrase( QString const & passphrase, bool must_throw )
+    bool Libssh2Impl::setPassphrase( QString const & passphrase, bool must_throw )
     {
         this->isAuthenticated_ = false;
         if( this->username_.empty() ) {
@@ -174,7 +174,7 @@ namespace ssh2
     }
 
  //-----------------------------------------------------------------------------
-    void Session::open()
+    void Libssh2Impl::open()
     {
         if( this->isOpen() ) {
             return;
@@ -184,7 +184,7 @@ namespace ssh2
         this->authenticate();
     }
  //-----------------------------------------------------------------------------
-    void Session::connect()
+    void Libssh2Impl::connect()
     {
      // precondition
         if( this->login_node_.empty() ) {
@@ -247,12 +247,12 @@ namespace ssh2
             throw_<ConnectTimedOut>("Failed to connect.");
         }
      // libssh2 stuff...
-        if( !Session::isInitializedLibssh_ )
+        if( !Libssh2Impl::isInitializedLibssh_ )
         {
             if( (rv=libssh2_init(0)) != 0 ) {
                 throw_<Libssh2Error>("Failed at initializing libssh2, exitcode = %1.", rv );
             }
-            Session::isInitializedLibssh_ = true;
+            Libssh2Impl::isInitializedLibssh_ = true;
         }
         this->session_ = libssh2_session_init();
         if( !this->session_ ) {
@@ -324,7 +324,7 @@ namespace ssh2
 */
     }
  //-----------------------------------------------------------------------------
-    void Session::authenticate()
+    void Libssh2Impl::authenticate()
     {
         this->isAuthenticated_ = false;
         if( !this->isConnected() ) {
@@ -381,23 +381,23 @@ namespace ssh2
 //      }
     }
  //-----------------------------------------------------------------------------
-    bool Session::isOpen() const {
+    bool Libssh2Impl::isOpen() const {
         return this->session_;
     }
  //-----------------------------------------------------------------------------
-    bool Session::autoOpen = false;
-    bool Session::autoClose= false;
-    int  Session::verbose =
+    bool Libssh2Impl::autoOpen = false;
+    bool Libssh2Impl::autoClose= false;
+    int  Libssh2Impl::verbose =
 #ifdef QT_DEBUG
                             1;
 #else
                             1;
 #endif
  //-----------------------------------------------------------------------------
-    void Session::exec_( QString const & command_line, QString* qout, QString* qerr )
+    void Libssh2Impl::exec_( QString const & command_line, QString* qout, QString* qerr )
     {
         if( !this->isOpen() ) {
-            if( Session::autoOpen ) {
+            if( Libssh2Impl::autoOpen ) {
                 this->open();
             } else {
                 throw_<SshOpenError>("SshOpenError");
@@ -447,7 +447,7 @@ namespace ssh2
                     if( rv > 0 )
                     {
                         this->bytecount_[iq] += rv;
-                        if( Session::verbose > 1 ) {
+                        if( Libssh2Impl::verbose > 1 ) {
                             std::cerr << '\n' << name[iq] << " buffer<<<";
                             for( int i=0; i < rv; ++i ) fputc( buffer[i], stderr);
                             std::cerr << ">>>";
@@ -486,20 +486,20 @@ namespace ssh2
         libssh2_channel_free(channel);
         channel = nullptr;
 
-        if( Session::autoClose ) {
+        if( Libssh2Impl::autoClose ) {
             this->close();
         }
      }
  //-----------------------------------------------------------------------------
-    int Session::execute( QString const& cmd )
+    int Libssh2Impl::execute( QString const& cmd )
     {
         try {
-            if( Session::verbose ) {
+            if( Libssh2Impl::verbose ) {
                 LOG(1) << "\nRemote execution of \n    command    : '" << cmd.C_STR() << "'";
             }
             this->exec_( cmd, &this->qout_, &this->qerr_ );
 
-            if( Session::verbose || this->cmd_exit_code_ )
+            if( Libssh2Impl::verbose || this->cmd_exit_code_ )
             {
                 Log(1) << "\n    exit code  : " << this->cmd_exit_code_;
                 if( this->cmd_exit_signal_ )
@@ -629,14 +629,14 @@ namespace ssh2
 #endif//#ifdef SCP
  //-----------------------------------------------------------------------------
     size_t
-    Session::
+    Libssh2Impl::
     sftp_put_file
       ( QString const&  q_local_filepath
       , QString const& q_remote_filepath )
     {
         std::string  local_filepath =  q_local_filepath.toStdString();
         std::string remote_filepath = q_remote_filepath.toStdString();
-        if( Session::verbose ) {
+        if( Libssh2Impl::verbose ) {
             Log(1) << "\nFile transfer : local >> remote"
                     << "\n    local : '" <<  q_local_filepath.C_STR() << "'"
                     << "\n    remote: '" << q_remote_filepath.C_STR() << "'"
@@ -644,7 +644,7 @@ namespace ssh2
         }
 
         if( !this->isOpen() ) {
-            if( Session::autoOpen ) {
+            if( Libssh2Impl::autoOpen ) {
                 this->open();
             } else {
                 throw_<SshOpenError>("SshOpenError");
@@ -716,26 +716,26 @@ namespace ssh2
             total += nread;
         } while (rc > 0);
 
-        if( Session::verbose > 1 )
+        if( Libssh2Impl::verbose > 1 )
             fprintf(stderr, "SFTP upload done!\n");
 
         libssh2_sftp_shutdown(sftp_session);
 
-        if(Session::autoClose) {
+        if(Libssh2Impl::autoClose) {
             this->close();
         }
         return total;
     }
  //-----------------------------------------------------------------------------
     size_t
-    Session::
+    Libssh2Impl::
     sftp_get_file
       ( QString const&  q_local_filepath
       , QString const& q_remote_filepath )
     {
         std::string  local_filepath =  q_local_filepath.toStdString();
         std::string remote_filepath = q_remote_filepath.toStdString();
-        if( Session::verbose ) {
+        if( Libssh2Impl::verbose ) {
             Log(1) << "\nFile transfer : remote >> local"
                       << "\n    remote: '" << q_remote_filepath.C_STR() << "'"
                       << "\n    local : '" <<  q_local_filepath.C_STR() << "'"
@@ -743,7 +743,7 @@ namespace ssh2
         }
 
         if( !this->isOpen() ) {
-            if( Session::autoOpen ) {
+            if( Libssh2Impl::autoOpen ) {
                 this->open();
             } else {
                 throw_<SshOpenError>("SshOpenError");
@@ -787,7 +787,7 @@ namespace ssh2
             }
         } while( !sftp_handle);
 
-        if( Session::verbose > 1 ) {
+        if( Libssh2Impl::verbose > 1 ) {
             fprintf(stderr, "libssh2_sftp_open() is done, now receive data!\n");
         }
         size_t total = 0;
@@ -828,7 +828,7 @@ namespace ssh2
     }
  //-----------------------------------------------------------------------------
     bool
-    Session::
+    Libssh2Impl::
     sftp_put_dir
       ( QString const&  local_dirpath
       , QString const& remote_dirpath
@@ -879,7 +879,7 @@ namespace ssh2
     }
  //-----------------------------------------------------------------------------
     bool
-    Session::
+    Libssh2Impl::
     sftp_get_dir
       ( QString const&  local_dirpath // = target
       , QString const& remote_dirpath // = source
@@ -935,7 +935,7 @@ namespace ssh2
         return true;
     }
  //-----------------------------------------------------------------------------
-    void Session::
+    void Libssh2Impl::
     close( bool keep_libssh_init )
     {
         if( this->session_ ) {
@@ -947,13 +947,13 @@ namespace ssh2
             ::close(this->sock_);
             this->sock_ = -1;
         }
-        if( !keep_libssh_init && Session::isInitializedLibssh_ ) {
+        if( !keep_libssh_init && Libssh2Impl::isInitializedLibssh_ ) {
             libssh2_exit();
-            Session::isInitializedLibssh_ = false;
+            Libssh2Impl::isInitializedLibssh_ = false;
         }
     }
  //-----------------------------------------------------------------------------
-    void Session::
+    void Libssh2Impl::
     reset()
     {
         this->close();
@@ -970,17 +970,17 @@ namespace ssh2
 #endif
     }
  //-----------------------------------------------------------------------------
-    Session::
-    ~Session()
+    Libssh2Impl::
+    ~Libssh2Impl()
     {
         this->close();
     }
  //-----------------------------------------------------------------------------
-    void Session::cleanup()
+    void Libssh2Impl::cleanup()
     {
-        if( Session::isInitializedLibssh_ ) {
+        if( Libssh2Impl::isInitializedLibssh_ ) {
             libssh2_exit();
-            Session::isInitializedLibssh_ = false;
+            Libssh2Impl::isInitializedLibssh_ = false;
         }
     }
  //-----------------------------------------------------------------------------
@@ -992,7 +992,7 @@ namespace ssh2
         return out.toStdString();
     }
  //-----------------------------------------------------------------------------
-    QString Session::toString() const
+    QString Libssh2Impl::toString() const
     {
         QString s;
         QTextStream ts(&s);
@@ -1008,7 +1008,7 @@ namespace ssh2
         return s;
     }
  //-----------------------------------------------------------------------------
-    QString Session::get_env( QString const& env)
+    QString Libssh2Impl::get_env( QString const& env)
     {
         QString cmd("echo ");
         if( !env.startsWith('$') ) cmd.append('$');

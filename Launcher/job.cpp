@@ -1,5 +1,8 @@
 #include "job.h"
+
 #include <QStringList>
+#include <QDir>
+
 #include <iostream>
 
  //-----------------------------------------------------------------------------

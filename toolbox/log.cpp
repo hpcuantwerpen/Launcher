@@ -1,11 +1,16 @@
 #include "log.h"
+#include <iostream>
 
  //-----------------------------------------------------------------------------
     Log::Log( int level )
       : f_(nullptr), null_(nullptr)
     {
         if( level>=0 && level<=Log::verbosity ) {
-            this->f_ = new std::ofstream( Log::filename, std::ios::out|std::ios_base::app );
+            if( Log::filename=="std::cout") {
+                this->f_ = &std::cout;
+            } else {
+                this->f_ = new std::ofstream( Log::filename, std::ios::out|std::ios_base::app );
+            }
         } else {
             this->null_ = new std::ostream(nullptr);
         }
@@ -13,8 +18,10 @@
     //-----------------------------------------------------------------------------
     Log::~Log()
     {
-        if( this->f_   ) delete this->f_;
-        if( this->null_) delete this->null_;
+        if( this->f_ && Log::filename!="std::cout")
+            delete this->f_;
+        if( this->null_ )
+            delete this->null_;
     }
  //-----------------------------------------------------------------------------
     int Log::verbosity = 1;

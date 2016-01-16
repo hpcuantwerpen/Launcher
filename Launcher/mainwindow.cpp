@@ -11,7 +11,7 @@
 #include <QProcess>
 
 #include <warn_.h>
-#include <ssh2tools.h>
+//#include <ssh2tools.h>
 #include <cmath>
 #include <time.h>
 
@@ -137,6 +137,11 @@
       , ui(new Ui::MainWindow)
       , ignoreSignals_(false)
       , current_page_(MainWindowUnderConstruction)
+#ifdef QT_DEBUG
+      , ssh( &std::cout )
+#else
+      , ssh( &std::cout ) // todo, log to file
+#endif
       , verbosity_(INITIAL_VERBOSITY)
       , walltime_(nullptr)
       , pendingRequest_(NoPendingRequest)
@@ -146,11 +151,14 @@
         LOG_CALLER_INFO << "\n    Running Launcher version = "<<VERSION;
         ui->setupUi(this);
 
+
         createActions();
         createMenus();
-        this->useGitSynchronizationAction_triggered();
+//        this->useGitSynchronizationAction_triggered();
+     // so far there is only one implementation, so we don't need the line above.
+        this->ssh.set_impl(true);
 
-        ssh2::Session::autoOpen = true;
+//        ssh::Libssh2Impl::autoOpen = true;
 
         this->paletteRedForeground_ = new QPalette();
         this->paletteRedForeground_->setColor(QPalette::Text,Qt::red);
@@ -162,13 +170,13 @@
         this->update_WindowTitle();
 
      // permanent widgets on statusbar
-        this->wAuthentIndicator_ = new QLabel();
+        this->wAuthenticationStatus_ = new QLabel();
         this->wJobnameIndicator_ = new QLabel();
         this->wProjectIndicator_ = new QLabel();
         this->statusBar()->addPermanentWidget(this->wProjectIndicator_);
         this->statusBar()->addPermanentWidget(this->wJobnameIndicator_);
-        this->statusBar()->addPermanentWidget(this->wAuthentIndicator_);
-        this->wAuthentIndicator_->setToolTip("Authentication indicator");
+        this->statusBar()->addPermanentWidget(this->wAuthenticationStatus_);
+        this->wAuthenticationStatus_->setToolTip("Authentication status");
         this->wJobnameIndicator_->setToolTip("Job folder and job name, surrounded by asterisks in case of unsaved changes");
         this->wProjectIndicator_->setToolTip("Project folder");
 
@@ -332,18 +340,9 @@
     void MainWindow::useGitSynchronizationAction_triggered()
     {
 //        LOG_AND_CHECK_IGNORESIGNAL(NO_ARGUMENT);
-        this->use_git_sync_ = false;
-        if( this->useGitSynchronizationAction_->isChecked() ) {
-            QProcess qProcess(this);
-            qProcess.start("git",QStringList()<<"--version");
-            int rc = -1;
-            if( qProcess.waitForFinished() ) {
-                rc = qProcess.exitCode();
-                qProcess.close();
-            }
-            if( rc==0 )
-                this->use_git_sync_ = true;
-        }
+//        if( this->useGitSynchronizationAction_->isChecked() ) {
+//            this->ssh.set_impl(true);
+//        }
     }
 
     void MainWindow::newSessionAction_triggered()
@@ -456,9 +455,6 @@
      // username and keys
         this->getSessionConfigItem("username"  , QString() );
         this->getSessionConfigItem("privateKey", QString() );
-#ifndef NO_PUBLIC_KEY_NEEDED
-        this->getSessionConfigItem("publicKey" , QString() );
-#endif
         this->getSessionConfigItem("passphraseNeeded", true );
 
         ci = this->getSessionConfigItem("wWalltime","1:00:00");
@@ -484,7 +480,13 @@
      // this->ui->wCluster
         QString path_to_clusters = this->get_path_to_clusters();
         if( path_to_clusters.isEmpty() ) {
-            QString msg("No clusters found (.info files).\n   ABORTING!");
+            QString msg("No "
+                        ""
+                        ""
+                        ""
+                        ""
+                        ""
+                        "s found (.info files).\n   ABORTING!");
             QMessageBox::critical( this, TITLE, msg );
             throw_<NoClustersFound>( msg.toStdString().c_str() );
         } else {
@@ -673,7 +675,7 @@
 //        QDir qdir(path);
 //        path = qdir.cleanPath(path);
 //        if( local_or_remote==REMOTE ) {
-//            if( resolve && path.startsWith('$') && this->sshSession_.isAuthenticated() ) {
+//            if( resolve && path.startsWith('$') && this->sshSession_.can_authenticate() ) {
 //                QString envvar = path.split('/')[0];
 //                QString cmd("echo %1");
 //                try {
@@ -741,10 +743,10 @@ MainWindow::
 resolve( QString & s )
 {
     QString envvar = s.split('/')[0];
-    QString cmd("echo %1");
+    QString cmd = QString("echo ").append(envvar);
     try {
-        this->sshSession_.execute_remote_command(cmd,envvar);
-        QString resolved = this->sshSession_.qout().trimmed();
+        this->ssh.execute(cmd,300);
+        QString resolved = this->ssh.standardOutput().trimmed();
         s.replace(envvar,resolved);
     } catch(std::runtime_error &e ) {
         return false;
@@ -758,7 +760,7 @@ remote_path_to( PathTo path_to, bool resolve )
 {
     QString path( this->remote_file_location() );
     if( path_to >= RootFolder ) {
-        if( resolve && path.startsWith('$') && this->sshSession_.isAuthenticated() ) {
+        if( resolve && path.startsWith('$') && this->ssh.authenticated() ) {
             this->resolve(path);
         }
         if( path_to == RootFolder ){
@@ -795,7 +797,7 @@ remote_path_to( PathTo path_to, bool resolve )
 //        QDir qdir(path);
 //        path = qdir.cleanPath(path);
 //        if( local_or_remote==REMOTE ) {
-//            if( resolve && path.startsWith('$') && this->sshSession_.isAuthenticated() ) {
+//            if( resolve && path.startsWith('$') && this->sshSession_.can_authenticate() ) {
 //                QString envvar = path.split('/')[0];
 //                QString cmd("echo %1");
 //                try {
@@ -874,7 +876,7 @@ remote_path_to( PathTo path_to, bool resolve )
             this->walltime_ = nullptr;
         }
         delete ui;
-        ssh2::Session::cleanup();
+//        ssh::Libssh2Impl::cleanup();
 
         delete this->paletteRedForeground_;
         Log() << "\n    Launcher closed.";
@@ -944,6 +946,7 @@ remote_path_to( PathTo path_to, bool resolve )
     void MainWindow::clusterDependencies( bool updateWidgets )
     {
         LOG_CALLER_INFO;
+        bool ok = true;
         {// act on config items only...
             IGNORE_SIGNALS_UNTIL_END_OF_SCOPE;
             QString cluster = this->getSessionConfigItem("wCluster")->value().toString();
@@ -962,18 +965,19 @@ remote_path_to( PathTo path_to, bool resolve )
             this->nodesetDependencies     (updateWidgets);
             this->walltimeUnitDependencies(updateWidgets);
 
-            this->sshSession_.setLoginNode( clusterInfo.loginNodes()[0] );
-            this->sshSession_.execute_remote_command.set_remote_commands( clusterInfo.remote_commands() );
-        }       
-     // try to authenticate to refresh the list of available modules and the
-     // remote file locations $VSC_DATA and $VSC_SCRATCH
-        this->sshSession_.setUsername( this->username() );
-        this->sshSession_.setPrivatePublicKeyPair( this->getSessionConfigItem("privateKey")->value().toString()
-#ifndef NO_PUBLIC_KEY_NEEDED
-                                                 , this->getSessionConfigItem("publicKey")->value().toString()
-#endif
-                                                 , /*must_throw=*/ false );
-        this->authenticate();
+            ok = this->ssh.set_login_node( clusterInfo.loginNodes()[0] );
+            this->ssh.set_RemoteCommandMap( *clusterInfo.remote_commands() );
+        }
+        if( ok ) // login node is ok
+        {// try to authenticate to refresh the list of available modules and the
+         // remote file locations $VSC_DATA and $VSC_SCRATCH
+            if( this->ssh.set_username( this->username() ) ) {
+                if( this->ssh.set_private_key( this->getSessionConfigItem("privateKey")->value().toString() ) )
+                {// attempt silent authentication
+                    this->authenticate();
+                }
+            }
+        }
    }
  //-----------------------------------------------------------------------------
     double round( double x, int decimals )
@@ -1202,22 +1206,19 @@ void MainWindow::on_wRequestCores_clicked()
     this->pendingRequest_ = NoPendingRequest;
 }
 
-bool MainWindow::can_authenticate()
-{
-    bool ok = !this->getSessionConfigItem("username"  )->value().toString().isEmpty()
-            &&!this->getSessionConfigItem("privateKey")->value().toString().isEmpty()
-#ifndef NO_PUBLIC_KEY_NEEDED
-            &&!this->getSessionConfigItem("publicKey" )->value().toString().isEmpty()
-#endif
-            ;
-    return ok;
-}
+//bool MainWindow::can_authenticate()
+//{
+//    bool ok = !this->getSessionConfigItem("username"  )->value().toString().isEmpty()
+//            &&!this->getSessionConfigItem("privateKey")->value().toString().isEmpty()
+//            ;
+//    return ok;
+//}
 
 void MainWindow::on_wPages_currentChanged(int index_new_page)
 {
     LOG_AND_CHECK_IGNORESIGNAL( QString().setNum(index_new_page) );
 
-    this->authenticate( /*silent=*/ this->can_authenticate() && this->sshSession_.isConnected() );
+//    this->authenticate( /*silent=*/ this->can_authenticate() && this->sshSession_.isConnected() );
 
     this->selected_job_.clear();
 
@@ -1264,7 +1265,7 @@ void MainWindow::on_wPages_currentChanged(int index_new_page)
         break;
     case 2:
         {
-            bool ok = this->sshSession_.isAuthenticated();
+            bool ok = this->ssh.authenticated();
             if( !ok ) {
                 QMessageBox::warning(this,TITLE,"Since you are not authenticated, you have no access to the remote host. Remote functionality on this tab is disabled.");
             }
@@ -1394,14 +1395,14 @@ Job ID                  Username    Queue    Jobname          SessID  NDS   TSK 
 128279.mn.hopper.antwe  vsc20170    q1h      a_simple_job        --      1     20    --   01:00:00 Q       --
       */
         try
-        {// Test for the existence fo finished.<jobid>
+        {// Test for the existence of finished.<jobid>
          // The job cannot be finished if finished.<jobid> does not exist.
             QString cmd = QString("ls ")
                 .append( job.remote_location_ )
                 .append('/' ).append(job.subfolder_)
                 .append('/' ).append(job.jobname_)
                 .append("/finished.").append( job.long_id() );
-            int rv = this->sshSession_.execute_remote_command(cmd);
+            int rv = this->ssh.execute( cmd, 300, "Test the existence of finished.<jobid>");
             bool is_finished = ( rv==0 );
             if( !is_finished ) {
                 return false;
@@ -1409,9 +1410,9 @@ Job ID                  Username    Queue    Jobname          SessID  NDS   TSK 
          // It is possible but rare that finished.<jobid> exists, but the
          // epilogue is still running. To make sure:
          // Check the output of qstat -u username
-            cmd = QString("qstat -u %1");
-            rv = this->sshSession_.execute_remote_command( cmd, this->sshSession_.username() );
-            QStringList qstat_lines = this->sshSession_.qout().split('\n',QString::SkipEmptyParts);
+            cmd = QString("qstat -u %1").arg( this->ssh.username() ) ;
+            rv = this->ssh.execute( cmd, 300, "Make sure that the job's epilogue is finished too.");
+            QStringList qstat_lines = this->ssh.standardOutput().split('\n',QString::SkipEmptyParts);
             for ( QStringList::const_iterator iter=qstat_lines.cbegin()
                 ; iter!=qstat_lines.cend(); ++iter ) {
                 if( iter->startsWith(job.job_id_)) {
@@ -1435,33 +1436,36 @@ Job ID                  Username    Queue    Jobname          SessID  NDS   TSK 
     }
 }
 
-bool MainWindow::retrieve( Job const& job, bool local, bool vsc_data )
+bool MainWindow::retrieve( Job const& job, bool local, bool /*vsc_data*/ )
 {
     if( job.status()==Job::Retrieved ) return true;
     QString msg = QString("Retrieve job ").append( job.short_id() );
-    if( !this->requiresAuthentication(msg) ) return false;
+
+    if( !this->actionRequiringAuthentication(msg) ) return false;
 
     if( local )
     {
-        QString target = job. local_job_folder();
-        QString source = job.remote_job_folder();
-        this->resolve(source); // authentication already verified
-        this->sshSession_.sftp_get_dir(target,source);
-        job.status_ = Job::Retrieved;
+        QString  local_jobfolder = job. local_job_folder();
+        QString remote_jobfolder = job.remote_job_folder();
+        this->resolve(remote_jobfolder); // authentication already verified
+        int rc = this->ssh.remote_sync_to_local(local_jobfolder, remote_jobfolder ) ;
+        if( rc==0 ) {
+            job.status_ = Job::Retrieved;
+        }
     }
+/* not trivial with git
     if( vsc_data && !job.remote_location_.startsWith("$VSC_DATA") )
     {
         QString cmd = QString("mkdir -p %1");
         QString vsc_data_destination
                 = job.vsc_data_job_parent_folder( this->vscdata_file_location() );
         this->resolve( vsc_data_destination );
-        int rc = this->sshSession_.execute_remote_command( cmd, vsc_data_destination );
+        int rc = this->ssh.execute_remote_command( cmd, vsc_data_destination );
         cmd = QString("cp -rv %1 %2"); // -r : recursive, -v : verbose
-        rc = this->sshSession_.execute_remote_command( cmd, job.remote_job_folder(), vsc_data_destination );
+        rc = this->ssh.execute_remote_command( cmd, job.remote_job_folder(), vsc_data_destination );
         job.status_ = Job::Retrieved;
-
-        if( rc ) {/*keep compiler happy (rc unused variable)*/}
     }
+*/
     return job.status()==Job::Retrieved;
 }
 
@@ -1472,7 +1476,7 @@ bool MainWindow::retrieve( Job const& job, bool local, bool vsc_data )
 //        this->remote_file_locations_ = this->getSessionConfigItem("wRemote")->choices_as_QStringList();
 //    }
 //    this->authenticate();
-//    if( this->sshSession_.isAuthenticated() ) {
+//    if( this->sshSession_.can_authenticate() ) {
 //        for ( QStringList::Iterator iter = this->remote_file_locations_.begin()
 //            ; iter!=this->remote_file_locations_.end(); ++iter )
 //        {
@@ -1656,14 +1660,20 @@ bool MainWindow::saveJobscript( QString const& filepath )
             return false;
         }
     }
-    this->statusBar()->showMessage( QString("Job script saved: '%1'").arg(filepath) );
+
+    QDir  d(filepath);
+    d.cdUp();
+    int rc = this->ssh.local_save( d.absolutePath() );
+    if( rc ) {
+        this->statusBar()->showMessage( QString("Job script saved: '%1', but local repository could not be updated!!").arg(filepath) );
+    } else {
+        this->statusBar()->showMessage( QString("Job script saved: '%1'").arg(filepath) );
+    }
  // just saved, hence no unsaved changes yet.
     this->launcher_.script.set_has_unsaved_changes(false);
     this->check_script_unsaved_changes();
     return true;
 }
-
-
 
 //void MainWindow::reload()
 //{
@@ -1836,7 +1846,7 @@ void MainWindow::deleteJob( QString const& jobid )
                 QString msg = QString("killing job %1 ... ").arg( job.long_id() );
                 this->statusBar()->showMessage(msg);
                 QString cmd = QString("qdel %1").arg( job.short_id() );
-                this->sshSession_.execute_remote_command(cmd);
+                this->ssh.execute(cmd,300,"deleteJob : deleting running jobs necessitates killing it.");
                 this->statusBar()->showMessage( msg.append("done") );
             }
          // remove local job folder
@@ -1852,7 +1862,7 @@ void MainWindow::deleteJob( QString const& jobid )
                 QString msg = QString("Removing: ").append( job.remote_job_folder() ).append(" ... ");
                 this->statusBar()->showMessage(msg);
                 QString cmd = QString("rm -rf %1");
-                this->sshSession_.execute_remote_command( cmd, job.remote_job_folder() );
+                this->ssh.execute( cmd, 300,job.remote_job_folder() );
                 this->statusBar()->showMessage( msg.append("done") );
             }
          // remove from job list
@@ -2062,7 +2072,7 @@ bool isNonEmptyDir( QString const& dirpath ) {
 }
 
 
- void MainWindow::authenticateAction_triggered()
+void MainWindow::authenticateAction_triggered()
 {/* ask for a username
   * if it is a valid username, store it in the sshSession_
   * otherwise cancel the authentication
@@ -2073,13 +2083,13 @@ bool isNonEmptyDir( QString const& dirpath ) {
   */
     LOG_AND_CHECK_IGNORESIGNAL(NO_ARGUMENT)
 
-    if( this->sshSession_.isAuthenticated() ) {
+    if( this->ssh.authenticated() ) {
         QString msg = QString("This session is already authenticated:"
                               "\n  user: %1"
                               "\n  key : %2"
                               "\n\nDo you want to re-authenticate?")
-                         .arg( this->sshSession_.username() )
-                         .arg( this->sshSession_.privateKey() );
+                         .arg( this->ssh.username() )
+                         .arg( this->ssh.private_key() );
         QMessageBox::StandardButton answer = QMessageBox::question(this,TITLE,msg);
         if( answer!=QMessageBox::Yes ) return;
     }
@@ -2095,7 +2105,7 @@ bool isNonEmptyDir( QString const& dirpath ) {
             username = validateUsername(username);
             if( !username.isEmpty() )
             {// username is ok
-                this->sshSession_.setUsername(username);
+                this->ssh.set_username(username);
                 break;
             }
         } else {
@@ -2131,281 +2141,149 @@ bool isNonEmptyDir( QString const& dirpath ) {
     switch( answer ) {
       case 1:
         private_key = QFileDialog::getOpenFileName( this, QString("Select your (%1) PRIVATE key file :").arg(username), start_in );
-        if( !QFileInfo( private_key ).exists() ) {
+        if( this->ssh.set_private_key(private_key) ) {
+            if( this->authenticate( /*silent=*/false ) ) {
+                this->update_StatusbarWidgets();
+                this->getSessionConfigItem("username"  )->set_value( this->ssh.username   () );
+                this->getSessionConfigItem("privateKey")->set_value( this->ssh.private_key() );
+            }
+        } else {
             this->statusBar()->showMessage( QString( "Authentication canceled : private key '%1' not found.").arg(private_key) );
-            return;
         }
         break;
       default:
         this->statusBar()->showMessage("Authentication canceled by user.");
-        return;
     }
-
-#ifdef NO_PUBLIC_KEY_NEEDED
-    this->sshSession_.setPrivatePublicKeyPair(private_key);
-#else
- // private key is provided, now public key
-    QString public_key = private_key;
-    public_key.append(".pub"); // make an educated guess...
-    if( !QFileInfo( public_key ).exists() )
-    {
-        answer = QMessageBox::question(this,TITLE,"You must also provide the corresponding PUBLIC key file.\n Continue?", QMessageBox::Ok|QMessageBox::No,QMessageBox::Ok);
-        if( answer==QMessageBox::Ok ) {
-            public_key = QFileDialog::getOpenFileName( this, "Select PUBLIC key file:", start_in );
-            if( public_key.isEmpty() || !QFileInfo(public_key).exists() )
-            {// not provided or inexisting
-                this->statusBar()->showMessage(QString("Public key '%1' not found or not provided.").arg(public_key) );
-                return false;
-            }
-        }
-    }
-    this->statusBar()->showMessage("Private/public key pair found.");
-    this->sshSession_.setPrivatePublicKeyPair( private_key, public_key );
-#endif
-    this->authenticate( /*silent=*/false );
 }
 
 bool MainWindow::authenticate(bool silent)
-{
-//    LOG_AND_CHECK_IGNORESIGNAL(silent)
-
-    if( this->sshSession_.isAuthenticated() ) {
+{/*
+  * Wrapper around this->ssh.authenticate() providing feedback to the user.
+  */
+    if( this->ssh.authenticated() ) {
         LOG_CALLER_INFO << "\n    already authenticated.";
         return true;
     }
 
     LOG_CALLER_INFO;
 
-    if( this->current_page_==MainWindowUnderConstruction )
-    {// try to authenticate ONLY if no user interaction is required.
-        QString uname = this->username();
-        if( uname.isEmpty() ) {
-            Log() << "\n    Automatic authentication canceled: missing user name.";
-            return false;
-        }
-        if( this->getSessionConfigItem("privateKey")->value().toString().isEmpty() ) {
-            Log() << QString("\n    Automatic authentication canceled for '%1': missing private key.").arg(uname).C_STR();
-            return false;
-        } // do we have a private key
-#ifndef NO_PUBLIC_KEY_NEEDED
-        if( this->getSessionConfigItem("publicKey" )->value().toString().isEmpty() ) {
-            Log() << QStrng("\n    Automatic authentication canceled for '%1': missing public key.").arg(uname).C_STR();
-            return false;
-        }
-#endif
-        if( this->getSessionConfigItem("passphraseNeeded")->value().toBool() ) {
-            Log() << QString("\n    Automatic authentication canceled  for '%1': passphrase needed.").arg(uname).C_STR();
-            return false;
-        }
-    }
-
-    IGNORE_SIGNALS_UNTIL_END_OF_SCOPE;
-
-    int max_attempts = 3;
-    bool no_connection = false;
-    int attempts = max_attempts;
-    enum {
-        success, retry, failed
-    } result;
-    while( attempts )
-    {
-        try {
-            this->sshSession_.open();
-            result = success;
-        }
-        catch( ssh2::NoAddrInfo &e ) {
-            QString msg= QString("Launcher could not reach %1. ").arg( this->sshSession_.loginNode() );
-            this->statusBar()->showMessage(msg);
-            Log(0) << msg.prepend("\n    ").C_STR();
-
-            if( this->proceed_offline_ || silent )
-            {// be silent
-            } else {
-                int answer = QMessageBox::question( this, TITLE
-                                                  , msg.append("Possible causes are"
-                                                               "\n  . you are offline (no internet connection)"
-                                                               "\n  . the cluster's login nodes are offline"
-                                                               "\nClick 'Proceed offline' if you are working "
-                                                               "offline and don't want to see this message again.")
-                                                  ,"Proceed offline" // button0
-                                                  ,"Ok"              // button1
-                                                  , QString()        // button2
-                                                  , 1                // default button
-                                                  );
-                this->proceed_offline_ = (answer==0);
-            }
-            no_connection=true;
-            result = failed;
-        }
-        catch( ssh2::ConnectTimedOut &e ) {
-            if( !silent ) {
-                QString msg= QString("Could not reach  %1.").arg( this->ui->wCluster->currentText() );
-                this->statusBar()->showMessage(msg);
-                QMessageBox::warning( this,TITLE,msg.append("\n  . Check your internet connection."
-                                                            "\n  . Check your VPN connection if you are outside the university."
-                                                            "\n  . Check the availability of the cluster."
-                                                            ) );
-            }
-            result = failed;
-            no_connection=true;
-        }
-        catch( ssh2::MissingUsername& e ) {
-            if( !silent )
-                this->warn("You must authenticate first (menu Session/Authenticate...)");
-            result = failed;
-        }
-        catch( ssh2::MissingKey& e ) {
-            if( !silent )
-                this->warn("You must authenticate first (menu Session/Authenticate...)");
-            result = failed;
-        }
-        catch( ssh2::PassphraseNeeded& e ) {
-            QString msg = QString("Enter passphrase for unlocking %1 key '%2':")
-                             .arg( this->sshSession_.username() )
-                             .arg( this->sshSession_.privateKey() );
-            QString passphrase = QInputDialog::getText( 0, TITLE, msg, QLineEdit::Password );
-            this->sshSession_.setPassphrase( passphrase );
-            result = retry;
-        }
-        catch( ssh2::WrongPassphrase& e ) {
-            if( attempts ) {
-                QString msg = QString("Could not unlock %1 key.\n"
-                                      "%2 attempts left.\n"
-                                      "Enter passphrase for unlocking key '%3':")
-                                 .arg( this->sshSession_.username() )
-                                 .arg( attempts )
-                                 .arg( this->sshSession_.privateKey() );
-                QString passphrase = QInputDialog::getText( 0, "Passphrase needed", msg );
-                this->sshSession_.setPassphrase( passphrase );
-                --attempts;
-                result = retry;
-            } else {
-                if( !silent )
-                    this->warn( QString("Cannot authenticate: failed to provide passphrase after %n attempts.")
-                                   .arg(max_attempts)
-                              );
-                result = failed;
-            }
-        }
-        catch( std::runtime_error& e ) {
-            QString msg = QString("Error attempting to authenticate on %1: ").append( e.what() )
-                             .arg( this->ui->wCluster->currentText() );
-            if( !silent ) {
-                this->warn(msg);
-            }
-            Log(0) << msg.prepend("\n    ").C_STR();
-         // remove keys from ssh session (but keep the username)
-            this->sshSession_.setUsername( this->getSessionConfigItem("username")->value().toString() );
-            result = failed;
-        }
-        if( result==success )
-        {
-            this->statusBar()->showMessage( QString("User %1 is authenticated.").arg( this->sshSession_.username() ) );
-            this->getSessionConfigItem("username"  )->set_value( this->sshSession_.username  () );
-            this->getSessionConfigItem("privateKey")->set_value( this->sshSession_.privateKey() );
-#ifndef NO_PUBLIC_KEY_NEEDED
-            this->getSessionConfigItem("publicKey" )->set_value( this->sshSession_. publicKey() );
-#endif
-            this->getSessionConfigItem("passphraseNeeded")->set_value( this->sshSession_.hasPassphrase() );
-
-            this->update_StatusbarWidgets();
-
-            if( this->is_uptodate_for_!=this->ui->wCluster->currentText() )
-            {
-                Log()<< "automatic authentication succeeded.";
-                //this->getRemoteFileLocations_();
-             // get list of available cluster modules
-                QString cmd("__module_avail");
-                this->sshSession_.execute_remote_command(cmd);
-                QStringList modules = this->sshSession_.qout().split("\n");
-                modules.prepend("--- select a module below ---");
-                this->ui->wSelectModule->clear();
-                this->ui->wSelectModule->addItems(modules);
-
-                QString modules_cluster = QString("modules_").append(this->getSessionConfigItem("wCluster")->value().toString() );
-                this->getSessionConfigItem(modules_cluster)->set_choices(modules);
-
-                this->is_uptodate_for_ = this->ui->wCluster->currentText();
-            }
-            break; //out of while loop
-        }
-        if( result==retry ) {
-            continue; // = retry
-        }
-        if( result==failed )
-        {
-            this->update_StatusbarWidgets();
-
-            QString msg;
-            if( attempts==0 )
-            {// after 3 unsuccesfull attempts to authenticate, we remove the keys from the session as they are probably wrong
-             // (but we keep the username)
-                this->sshSession_.setUsername( this->getSessionConfigItem("username")->value().toString() );
-
-                msg = QString("Authentication failed: %1 failed attempts to provide passphrase.").arg(max_attempts);
-            } else {
-                QString msg = "Authentication failed.";
-            }
-            this->statusBar()->showMessage(msg);
-            Log(0) << msg.prepend("\n    ").C_STR();
-
-            break; //out of while loop
-        }
-    }
-    if( no_connection )
-    {
-        this->update_StatusbarWidgets();
-
+    int rc = this->ssh.authenticate();
+    QString msg;
+    switch (rc) {
+    case 0:
+        msg = "Authentication successfull.";
+        break;
+    case toolbox::Ssh::MISSING_USERNAME:
+        msg = "Authentication failed: missing username.";
+        break;
+    case toolbox::Ssh::MISSING_LOGINNODE:
+        msg = "Authentication failed: missing login node.";
+        break;
+    case toolbox::Ssh::MISSING_PRIVATEKEY:
+        msg = "Authentication failed: missing private key.";
+        break;
+    case toolbox::Ssh::NO_INTERNET:
+        msg = "Authentication failed: no internet connection.";
         this->is_uptodate_for_.clear();
-
-        this->statusBar()->showMessage("Launcher was unable to make a connection. Proceeding offline.");
-        {// attempt to obtain cluster modules from config file, to enable the user to work offline.
-            QString modules_cluster = QString("modules_").append(this->getSessionConfigItem("wCluster")->value().toString() );
-            QStringList modules = this->getSessionConfigItem(modules_cluster)->choices_as_QStringList();
-            if( modules.isEmpty() ) {
-                this->statusBar()->showMessage("List of modules not available for current cluster ");
-            } else {
-                this->ui->wSelectModule->clear();
-                this->ui->wSelectModule->addItems({"--- select a module below ---"});
-                this->ui->wSelectModule->addItems(modules);
-                this->statusBar()->showMessage("Using List of modules from a previous session. Authenticate to update it.");
+        break;
+    case toolbox::Ssh::LOGINNODE_NOT_ALIVE:
+        msg = "Authentication failed: login node not alive.";
+        this->is_uptodate_for_.clear();
+        break;
+    default:
+        msg = "Authentication failed: cause unknown.";
+        break;
+    }
+    this->statusBar()->showMessage(msg);
+    this->update_StatusbarWidgets();
+    if( rc==0 )
+    {
+        QString cluster = this->getSessionConfigItem("wCluster")->value().toString();
+        if( this->is_uptodate_for_ != cluster )
+        {// get list of available cluster modules
+            if( this->ssh.execute("__module_avail",600,"Collect available modules.") == toolbox::Ssh::REMOTE_COMMAND_NOT_DEFINED_BY_CLUSTER ) {
+                QString msg = QString("Failed to find __module_avail command for cluster %1.\n"
+                                      "This is an error in the cluster's .info file: '%2'.\n"
+                                      "Contact support team.")
+                                 .arg( this->clusterInfo().name() )
+                                 .arg( this->clusterInfo().filename() )
+                            ;
+                QMessageBox::critical(this,TITLE,msg);
             }
+            QStringList modules = this->ssh.standardOutput().split("\n");
+            modules.prepend("--- select a module below ---");
+            this->ui->wSelectModule->clear();
+            this->ui->wSelectModule->addItems(modules);
+
+            QString modules_cluster = QString("modules_").append(this->getSessionConfigItem("wCluster")->value().toString() );
+            this->getSessionConfigItem(modules_cluster)->set_choices(modules);
+
+            this->is_uptodate_for_ = cluster;
+        }
+
+        return true;
+    }
+    if( silent || this->proceed_offline_ )
+    {// be silent
+    } else
+    {// make some noise
+        switch (rc) {
+        case toolbox::Ssh::NO_INTERNET:
+        {   int answer = QMessageBox::question( this, TITLE
+                                              , msg.append("\nClick 'Proceed offline' if you are working "
+                                                           "offline and don't want to see this message again.")
+                                              ,"Proceed offline" // button0
+                                              ,"Ok"              // button1
+                                              , QString()        // button2
+                                              , 1                // default button
+                                              );
+            this->proceed_offline_ = (answer==0);
+        }   break;
+
+        case toolbox::Ssh::LOGINNODE_NOT_ALIVE:
+        {   int answer = QMessageBox::question( this, TITLE
+                                              , msg.append("\n(If your are working off-campus, you might need VPN to reach the cluster.)"
+                                                           "\n\nClick 'Proceed offline' if you are working "
+                                                           "offline and don't want to see this message again.")
+                                              ,"Proceed offline" // button0
+                                              ,"Ok"              // button1
+                                              , QString()        // button2
+                                              , 1                // default button
+                                              );
+            this->proceed_offline_ = (answer==0);
+        }   break;
+        case toolbox::Ssh::MISSING_USERNAME:
+        case toolbox::Ssh::MISSING_PRIVATEKEY:
+            QMessageBox::warning( this, TITLE, "You must authenticate first (menu Session/Authenticate...)");
+        default:
+            msg = "Authentication failed: wrong login node/username/private key?";
+            QMessageBox::warning( this, TITLE, msg.append("You re-authenticate  (menu Session/Authenticate...)") );
+            break;
         }
     }
-
-    return result==success;
+    return false;
 }
 
-bool MainWindow::requiresAuthentication(QString const& action )
-{
-    if( !this->sshSession_.isAuthenticated() ) {
+bool MainWindow::actionRequiringAuthentication(QString const& action )
+{/*
+  * verify that authentication is possible, with feedback to the user if automatic authentication fails.
+  */
+    if( !this->ssh.authenticated() )
+    {// attempt automatic authentication (silent)
         if( !this->authenticate() )
         {// automatic authentication fails
-            if( this->sshSession_.isConnected() ) {
-                int answer = QMessageBox::question( this, TITLE, "This action requires that you authenticate."
-                                                  , QString("Cancel '%1'").arg(action)  // button0
-                                                  ,"Authenticate now..."                // button1
-                                                  , 0                                   // default button
-                                                  );
-                switch( answer ) {
-                  case 1: {
-                    this->authenticateAction_triggered();
-                    return this->sshSession_.isAuthenticated();
-                  }
-                  default:
-                    this->statusBar()->showMessage("Not authenticated, but authentication required to complete.");
-                    break;
-                }
-
-            } else {
-                QString msg = QString("Authentication is required to complete, but\n"
-                                      "Cluster %1 cannot be reached. Possible causes are:\n"
-                                      "  - you have no internet connection\n"
-                                      "  - you are outside the university and VPN is not connected\n"
-                                      "  - the cluster is down\n"
-                                      "Actions requiring identification are not available.")
-                                 ,arg( this->ui->wCluster->currentText() );
-                QMessageBox::critical( this, TITLE, msg );
+            int answer = QMessageBox::question( this, TITLE, "This action requires that you authenticate."
+                                              , QString("Cancel '%1'").arg(action)  // button0
+                                              ,"Authenticate now..."                // button1
+                                              , 0                                   // default button
+                                              );
+            switch( answer ) {
+              case 1: {
+                this->authenticateAction_triggered();
+                return this->ssh.authenticated();
+              }
+              default:
+                this->statusBar()->showMessage( QString(action).append(" aborted: authentication failed.") );
                 return false;
             }
         }
@@ -2498,14 +2376,14 @@ void MainWindow::update_WindowTitle()
 void MainWindow::update_StatusbarWidgets()
 {
     QString s = QString("[%1]")
-                   .arg( this->sshSession_.isAuthenticated()
-                       ? this->username()
-                       : ( !this->sshSession_.isConnected()
+                   .arg( this->ssh.authenticated()
+                       ? ( this->username().append('@').append( this->ssh.login_node() ) )
+                       : ( !this->ssh.connected_to_internet() || !this->ssh.login_node_alive()
                          ? QString("offline")
                          : QString("not authenticated")
                          )
                        );
-    this->wAuthentIndicator_->setText(s);
+    this->wAuthenticationStatus_->setText(s);
 
     s = this->job_folder();
     if( this->launcher_.script.has_unsaved_changes() ) {
@@ -2806,15 +2684,11 @@ void MainWindow::saveJobscriptAction_triggered()
         QString filepath = this->local_path_to(Script);
         if( !filepath.isEmpty() ) {
             this->saveJobscript( dir.absoluteFilePath("pbs.sh") );
-            if( this->use_git_sync_ ) {
-//                this->sshSession_.git_local_save( this->local_path_to(JobFolder) );
-            }
-        } else {
+      } else {
             return;
         }
     }
     this->reloadJobscriptAction_->setEnabled(true);
-
 }
 
 void MainWindow::saveAsJobscriptAction_triggered()
@@ -2877,6 +2751,28 @@ void MainWindow::saveAsJobscriptAction_triggered()
 
 void MainWindow::openJobscriptAction_triggered()
 {
+ // first check for unsaved changes to the current jobscript
+    if( this->isScriptOpen() && this->launcher_.script.has_unsaved_changes() )
+    {
+        int answer = QMessageBox::question(this,TITLE
+                                          ,"The current job script has unsaved changes.\nDo you want to:"
+                                          ,"Save changes and continue"
+                                          ,"Continue without saving"
+                                          ,"Cancel"
+                                          , 2
+                                          );
+        switch( answer ) {
+        case 0:
+            this->statusBar()->showMessage("'Job script Open...' canceled, current job script still has unsaved changes!");
+            return;
+        case 1:
+            this->statusBar()->showMessage("Continuing, previous job script was not saved!");
+            break;
+        default:
+            this->saveJobscriptAction_triggered();
+            break;
+        }
+    }
     QStringList folders;
     int verify_error;
     QDir dir( this->local_file_location() );
@@ -2889,6 +2785,10 @@ void MainWindow::openJobscriptAction_triggered()
         QFileDialog::getExistingDirectory( this, "Select a job folder file"
                                          , this->getSessionConfigItem("localFileLocation")->value().toString()
                                          );
+    if( jobfolder.isEmpty() ) {
+        this->statusBar()->showMessage("'Job script Open...' canceled.");
+        return;
+    }
     if( !verify_directory(&dir,jobfolder,/*create_path=*/false,/*stay_inside=*/true,&folders,&verify_error) ) {
         QString msg;
         switch(verify_error) {
@@ -2975,7 +2875,7 @@ void MainWindow::submitJobscriptAction_triggered()
 {
     LOG_AND_CHECK_IGNORESIGNAL(NO_ARGUMENT);
 
-    if( !this->requiresAuthentication("Submit job") ) {
+    if( !this->actionRequiringAuthentication("Submit job") ) {
         return;
     }
 
@@ -3004,10 +2904,18 @@ void MainWindow::submitJobscriptAction_triggered()
             }
         }
     }
+
+    int rc = this->ssh.local_sync_to_remote( local_job_folder, remote_job_folder );
+    if( rc ) {
+        this->statusBar()->showMessage("Local to remote synchronization failed. Job NOT submitted.");
+        return;
+    }
+
+/*
  // test if the remote job folder is inexisting or empty
     QString cmd("ls %1");
-    int rc = this->sshSession_.execute_remote_command( cmd, remote_job_folder );
-    if( rc==0 && !this->sshSession_.qout().isEmpty() )
+    int rc = this->ssh.execute( cmd, remote_job_folder );
+    if( rc==0 && !this->ssh.qout().isEmpty() )
     {// ask the user if he wants to empty the remote job folder first
         int answer =
                 QMessageBox::question( this,TITLE
@@ -3026,7 +2934,7 @@ void MainWindow::submitJobscriptAction_triggered()
             break;
           case 2:
           { cmd = QString("rm -rf %1/*");
-            int rc = this->sshSession_.execute_remote_command( cmd, remote_job_folder );
+            int rc = this->ssh.execute_remote_command( cmd, remote_job_folder );
             if( rc==0 ) {
                 this->statusBar()->showMessage("Erased remote job folder.");
             } else {
@@ -3039,7 +2947,7 @@ void MainWindow::submitJobscriptAction_triggered()
                                                       , 0 );             // default button
                     switch(answer) {
                       case 0: // retry
-                        rc = this->sshSession_.execute_remote_command( cmd );
+                        rc = this->ssh.execute_remote_command( cmd );
                         break; // out of switch, but continue with while loop
                       case 1: // ignore
                         rc = 0; // break out of while loop
@@ -3058,11 +2966,16 @@ void MainWindow::submitJobscriptAction_triggered()
             return;
         }
     }
-    this->sshSession_.sftp_put_dir( local_job_folder, remote_job_folder, true );
+    this->ssh.sftp_put_dir( local_job_folder, remote_job_folder, true );
+*/
 
-    cmd = QString("cd %1 && qsub pbs.sh");
-    this->sshSession_.execute_remote_command( cmd, remote_job_folder );
-    QString job_id = this->sshSession_.qout().trimmed();
+    QString cmd = QString("cd %1 && qsub pbs.sh").arg( remote_job_folder );
+    rc = this->ssh.execute( cmd, 300, QString("Submitting job: ").append( local_job_folder ) );
+    if( rc ) {
+        this->statusBar()->showMessage("Submit failed.");
+        return;
+    }
+    QString job_id = this->ssh.standardOutput().trimmed();
     this->statusBar()->showMessage(QString("Job submitted: %1").arg(job_id));
     cfg::Item* ci_job_list = this->getSessionConfigItem("job_list");
     if( ci_job_list->value().type()==QVariant::Invalid )

@@ -15,7 +15,7 @@
 #include <QFileSystemModel>
 
 #include <launcher.h>
-#include <ssh2tools.h>
+//#include <ssh2tools.h>
 #include <job.h>
 #include <dataconnector.h>
 #include <walltime.h>
@@ -167,8 +167,8 @@ public:
     void walltimeUnitDependencies( bool updateWidgets );
 
     void update_abe( QChar c, bool checked );
-    bool authenticate(bool silent = true);
-    bool requiresAuthentication(const QString &action = QString() );
+    bool authenticate( bool silent=true );
+    bool actionRequiringAuthentication(const QString &action = QString() );
 
     void updateResourceItems();
     bool lookForJobscript(QString const& job_folder, bool ask_to_load=false, bool create_if_inexistent=false );
@@ -210,7 +210,7 @@ public:
     void warn( QString const& msg1, QString const& msg2=QString() );
 
     QString username();
-    bool can_authenticate();
+//    bool can_authenticate();
     void update_WindowTitle();
     void update_StatusbarWidgets();
 
@@ -230,8 +230,9 @@ private:
     dc::DataConnectorBase* getDataConnector( QString const& name );
     QPalette* paletteRedForeground_;
 
-    ssh2::Session sshSession_;
-   int verbosity_;
+//    ssh::Libssh2Impl sshSession_;
+    toolbox::Ssh ssh;
+    int verbosity_;
 
     QMenu* helpMenu_;
     QAction* aboutAction_;
@@ -264,7 +265,7 @@ private:
     QAction* verboseAction_;
     QAction* useGitSynchronizationAction_;
 
-    QLabel *wAuthentIndicator_
+    QLabel *wAuthenticationStatus_
          , *wJobnameIndicator_
          , *wProjectIndicator_;
     Walltime *walltime_;

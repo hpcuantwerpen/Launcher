@@ -367,6 +367,7 @@
         this->set_default_remote_commands();
         ClusterInfoReader rdr;
         rdr.read(filename,this);
+        this->filename_ = filename;
     }
  //-----------------------------------------------------------------------------
     void ClusterInfo::set_default_remote_commands()
@@ -382,7 +383,7 @@
       , defaultNodeset_(rhs.defaultNodeset_)
       , remote_commands_(rhs.remote_commands_)
     {}
-//-----------------------------------------------------------------------------
+ //-----------------------------------------------------------------------------
     ClusterInfo& ClusterInfo::operator=( ClusterInfo const& rhs )
     {
         name_ = rhs.name_;
@@ -393,4 +394,14 @@
         remote_commands_ = rhs.remote_commands_;
         return *this;
     }
-
+ //-----------------------------------------------------------------------------
+//    std::map<std::string,std::string> ClusterInfo::std_remote_commands() const
+//    {
+//        std::map<std::string,std::string> std_map;
+//        RemoteCommands_t::const_iterator iter = this->remote_commands_.constBegin();
+//        while( iter != this->remote_commands_.constEnd()) {
+//            std_map[iter.key().toStdString()] = iter.value();
+//            ++iter;
+//        }
+//        return std_map;
+//    }

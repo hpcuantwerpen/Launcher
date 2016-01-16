@@ -20,7 +20,9 @@ HEADERS += orderedmap.h     \
            toolbox.h \
     datetime_now.h \
     log.h \
+    property.h \
     external.h \
+    ssh.h \
     verify.h
 
 SOURCES += orderedmap.cpp   \
@@ -28,5 +30,6 @@ SOURCES += orderedmap.cpp   \
     datetime_now.cpp \
     log.cpp \
     external.cpp \
+    ssh.cpp \
     verify.cpp
 

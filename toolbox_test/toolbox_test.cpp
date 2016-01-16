@@ -14,6 +14,7 @@ public:
 private Q_SLOTS:
     void testCase1();
     void testCase2();
+    void testCase2b();
     void testCase3();
 };
 
@@ -31,6 +32,16 @@ void ToolboxTest::testCase1()
 
 void ToolboxTest::testCase2()
 {
+    Log::filename = "log.log";
+    Log l1(1);
+    l1 << "blabla" << std::endl;
+    Log(2) << std::string("silence")<< std::endl;
+    Log(0) <<INFO<< std::string("really?")<< std::endl;
+}
+
+void ToolboxTest::testCase2b()
+{
+    Log::filename = "std::cout";
     Log l1(1);
     l1 << "blabla" << std::endl;
     Log(2) << std::string("silence")<< std::endl;

@@ -7,6 +7,7 @@
 #include <QRegularExpression>
 
 #include <throw_.h>
+#include <property.h>
 
  //=============================================================================
     class ClusterInfoReader;
@@ -88,6 +89,7 @@
         bool isDefault() const {
             return isDefault_;
         }
+
     private:
         QString name_;
         int     nNodes_;
@@ -131,9 +133,12 @@
         QMap<QString,QString> const* remote_commands() const {
             return &remote_commands_;
         }
+//        std::map<std::string,std::string> std_remote_commands() const;
 
         typedef QMap<QString,NodesetInfo> Nodesets_t;
         typedef QMap<QString,QString> RemoteCommands_t;
+
+        PROPERTY_RO( QString, filename )
 
     private:
         QString name_;

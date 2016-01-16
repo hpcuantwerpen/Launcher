@@ -9,23 +9,23 @@ SUBDIRS +=          \
     toolbox         \
     cfg             \
     Launcher        \
-    ssh2tools       \
+#   ssh2tools       \
     jobscript
 
-      cfg.depends = toolbox
-ssh2tools.depends = toolbox
- Launcher.depends = jobscript toolbox cfg ssh2tools
+       cfg.depends = toolbox
+#ssh2tools.depends = toolbox
+  Launcher.depends = jobscript toolbox cfg #ssh2tools
 
 BUILD_TESTS = 1
 equals(BUILD_TESTS,1) {
     SUBDIRS +=  toolbox_test    \
                 cfg_test        \
-                ssh2tools_test  \
+#               ssh2tools_test  \
                 jobscript_test
 
       toolbox_test.depends = toolbox
           cfg_test.depends = cfg
-    ssh2tools_test.depends = ssh2tools toolbox
+#   ssh2tools_test.depends = ssh2tools toolbox
     jobscript_test.depends = jobscript toolbox cfg
 }
 

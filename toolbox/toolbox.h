@@ -10,6 +10,7 @@
 #include "log.h"
 #include "verify.h"
 #include "external.h"
+#include "ssh.h"
 
 #endif // TOOLBOX_H
 
