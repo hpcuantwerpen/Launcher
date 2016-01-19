@@ -7,10 +7,14 @@
 #include <qmessagebox.h>
 
 
+#ifdef QT_DEBUG
+# define LOG_TO_STDOUT
+#endif
 int main(int argc, char *argv[])
 {
-    QApplication a(argc, argv);
+    toolbox::Log log;
  // make sure we can create the Launcher home directory so that we can log to ${HOME}/Launcher/Launcher.log
+    QApplication a(argc, argv); // must be created first before we can execute the code below.
     {
         QDir home(Launcher::homePath());
         home.cdUp();
@@ -18,15 +22,17 @@ int main(int argc, char *argv[])
             throw_<std::runtime_error>("aiaiaiaiaiaaaaai");
         }
 
-
-        Log::filename = Launcher::homePath("Launcher.log").toStdString();
-#ifdef QT_DEBUG
-     // always clear the log file
-        Log::clear();
-        Log() << "Log file cleared (debug version running).";
+#if defined(QT_DEBUG) && defined(LOG_TO_STDOUT)
+        log.set_log("std::cout");
 #else
+        log.set_log( Launcher::homePath("Launcher.log").toStdString() );
+#   ifdef QT_DEBUG
+     // always clear the log file
+        log.clear();
+        log<<"Log file cleared (debug version running).";
+#   else
         qint64 const max_size_kB = 512;
-        qint64 log_size_kB = Log::log_size()/1024;
+        qint64 log_size_kB = QFileInfo( log.filename().c_str() ).size()/1024;
         if( log_size_kB > max_size_kB )
         {
             QString msg = QString("The size of the log file exceeds %1 kB (%2 kB). "
@@ -37,19 +43,25 @@ int main(int argc, char *argv[])
                              .arg(log_size_kB);
             QMessageBox::Button answer = QMessageBox::question(nullptr,"Launcher",msg);
             if( answer==QMessageBox::Yes ) {
-                Log::clear();
-                Log() << "Log file cleared.";
+                log.clear();
+                log("Log file cleared on demand.");
             }
         }
+#   endif
 #endif
-        Log()
-            << "\n================================================================================"
-            << "\nLauncher started " << toolbox::now().toStdString().c_str()
-            << "\n================================================================================"
-            ;
+
+#ifdef QT_DEBUG
+        log.set_verbosity(10);
+#else
+        log.set_verbosity(1);
+#endif
+        std::string s = std::string("\n================================================================================")
+                            .append("\nLauncher started ").append( toolbox::now().toStdString() )
+                            .append("\n================================================================================");
+        log << s;
     }
 
-    MainWindow w;
+    MainWindow w( log );
     w.show();
 
     return a.exec();

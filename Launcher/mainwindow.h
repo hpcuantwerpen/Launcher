@@ -25,6 +25,7 @@
 #include "messagebox.h"
 #include "version.h"
 #include "verify.h"
+#include "log.h"
 
 namespace Ui {
     class MainWindow;
@@ -49,10 +50,15 @@ class MainWindow : public QMainWindow
     Q_OBJECT
 
 public:
-    explicit MainWindow(QWidget *parent = 0);
+    explicit MainWindow
+      ( toolbox::Log& log
+      , QWidget *parent=0
+      );
     ~MainWindow();
 
 private:
+    void log_call( int verbosity_level, QString const& callee, QString const& msg=QString() );
+
     void new_session( QString const& path );
     void save_session_path( QString const& path );
     QString load_session_path();
@@ -138,6 +144,7 @@ private slots:
     void showLocalJobFolderAction_triggered();
     void showRemoteJobFolderAction_triggered();
     void useGitSynchronizationAction_triggered();
+    void removeRepoAction_triggered();
 
     void on_wWalltime_editingFinished();
 
@@ -222,6 +229,7 @@ public:
     void error_message_missing_job_script         ( QString const& msg1=QString(), message_box_t message_box=QMessageBox::critical );
 
 private:
+    toolbox::Log& log_;
     Ui::MainWindow *ui;
     Launcher launcher_;
     bool ignoreSignals_;
@@ -247,6 +255,8 @@ private:
     QAction* showFileLocationsAction_;
     QAction* showLocalJobFolderAction_;
     QAction* showRemoteJobFolderAction_;
+    QAction* removeRepoAction_;
+
 
     QMenu* templatesMenu_;
     QAction* selectTemplateAction_;

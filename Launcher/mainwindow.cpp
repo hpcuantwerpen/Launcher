@@ -20,33 +20,49 @@
 #define OFFLINE "Offline"
 #define INITIAL_VERBOSITY 2
 #define NO_ARGUMENT QString()
-#define LOG_AND_CHECK_IGNORESIGNAL( ARGUMENT ) \
-  {\
-    QString msg("\n[ MainWindow::%1, %2, %3 ]");\
-    msg = msg.arg(__func__).arg(__FILE__).arg(__LINE__);\
-    if( this->verbosity_ && !QString((ARGUMENT)).isEmpty() ) \
-        msg.append("\n    Function was called with argument : ").append(ARGUMENT);\
-    if( !this->ignoreSignals_ ) {\
-        msg.append( this->check_script_unsaved_changes() ) ;\
-    }\
-    if( this->verbosity_ > 1 ) {\
-        if( this->ignoreSignals_ ) msg.append("\n    Ignoring signal");\
-        else                       msg.append("\n    Executing signal");\
-    }\
-    Log() << INFO << msg.toStdString();\
-    if( this->ignoreSignals_ ) return;\
-  }
+
+//#define     OPEN_LOG_ITEM  "\n[[[ "
+//#define    CLOSE_LOG_ITEM "\n]]]\n"
+//#define NO_CLOSE_LOG_ITEM ""
+//#define ARG(A) QString("\n      path; '%1'").arg(A).toStdString()
+
+//#define LOG_AND_CHECK_IGNORESIGNAL( ARGUMENT, CLOSE ) \
+//  {\
+//    QString msg("\n[[[ [ MainWindow::%1, %2, %3 ]");\
+//    msg = msg.arg(__func__).arg(__FILE__).arg(__LINE__);\
+//    if( this->verbosity_ && !QString((ARGUMENT)).isEmpty() ) \
+//        msg.append("\n    Function was called with argument : ").append(ARGUMENT);\
+//    if( !this->ignoreSignals_ ) {\
+//        msg.append( this->check_script_unsaved_changes() ) ;\
+//    }\
+//    if( this->verbosity_ > 1 ) {\
+//        if( this->ignoreSignals_ ) msg.append("\n    Ignoring signal");\
+//        else                       msg.append("\n    Executing signal");\
+//    }\
+//    msg.append( CLOSE );\
+//    this->log( msg.toStdString() );\
+//    if( this->ignoreSignals_ ) return;\
+//  }
+
+#define CHECK_IGNORESIGNAL                      \
+    if( this->ignoreSignals_ ) {                \
+        this->log_ << "\n    Ignoring signal";  \
+        return;                                 \
+    } else {                                    \
+        this->log_ << "\n    Executing signal"; \
+    }
 
  //-----------------------------------------------------------------------------
-#define LOG_CALLER_INFO \
-    QString caller = QString("\n[ MainWindow::%1, %2, %3 ]") \
-                     .arg(__func__).arg(__FILE__).arg(__LINE__);\
-    Log() << INFO << caller.C_STR()
+#define CALLEE( ARGUMENT ) \
+    QString("MainWindow::%1, argument=%2, %3, %4").arg(__func__).arg(ARGUMENT).arg(__FILE__).arg(__LINE__)
+#define CALLEE0 \
+    QString("MainWindow::%1, %2, %3").arg(__func__).arg(__FILE__).arg(__LINE__)
+#define BOOL2STRING(b) (b?"true":"false")
 
-#define LOG_CALLER(VERBOSITY) \
-    QString caller = QString("\n    [ MainWindow::%1, %2, %3 ]") \
-                     .arg(__func__).arg(__FILE__).arg(__LINE__);\
-    Log(VERBOSITY) << caller.C_STR()
+//#define LOG_CALLER(VERBOSITY) \
+//    QString caller = QString("\n    [ MainWindow::%1, %2, %3 ]") \
+//                     .arg(__func__).arg(__FILE__).arg(__LINE__);\
+//    this->this->log( std::ostringstream() << INFO << caller.C_STR(), VERBOSITY);
 
 // LOG_CALLER_INFO has no terminating ';' so we can do
 //     LOG_CALLER_INFO << whatever << and << even << more;
@@ -132,25 +148,26 @@
  //-----------------------------------------------------------------------------
  // MainWindow::
  //-----------------------------------------------------------------------------
-    MainWindow::MainWindow(QWidget *parent)
+    MainWindow::MainWindow
+      (toolbox::Log & log
+      , QWidget     * parent
+      )
       : QMainWindow(parent)
+      , log_(log)
       , ui(new Ui::MainWindow)
       , ignoreSignals_(false)
       , current_page_(MainWindowUnderConstruction)
-#ifdef QT_DEBUG
-      , ssh( &std::cout )
-#else
-      , ssh( &std::cout ) // todo, log to file
-#endif
+      , ssh( &log )
       , verbosity_(INITIAL_VERBOSITY)
       , walltime_(nullptr)
       , pendingRequest_(NoPendingRequest)
       , messages_(TITLE)
       , proceed_offline_(false)
     {
-        LOG_CALLER_INFO << "\n    Running Launcher version = "<<VERSION;
-        ui->setupUi(this);
+        this->log_call( 0, CALLEE0, QString("\n    Running Launcher version = ").append(VERSION) ) ;
 
+
+        ui->setupUi(this);
 
         createActions();
         createMenus();
@@ -206,8 +223,29 @@
         current_page_ = MainWindowConstructedButNoPreviousPage;
     }
 
+    void MainWindow::log_call
+      ( int            verbosity_level
+      , QString const& callee
+      , QString const& msg
+      )
+    {
+        QString s = QString("\n\n*** [ %1 ]").arg(callee).append(msg);
+        if( this->current_page_!=MainWindowUnderConstruction
+         && !this->ignoreSignals_
+         && this->log_.verbosity()>1
+          )
+        {
+            s.append( this->check_script_unsaved_changes() ) ;
+        }
+        std::ostream* po = this->log_.ostream(verbosity_level);
+        *po << s.toStdString();
+        this->log_.cleanup();
+    }
+
     void MainWindow::createActions()
     {
+        this->log_call( 1, CALLEE0 );
+
         aboutAction_ = new QAction("&About", this);
         connect( aboutAction_, SIGNAL(triggered()), this, SLOT( aboutAction_triggered() ) );
 
@@ -282,10 +320,14 @@
         useGitSynchronizationAction_->setChecked  (true);
         connect( useGitSynchronizationAction_, SIGNAL(triggered()), this, SLOT( useGitSynchronizationAction_triggered() ) );
 
+        removeRepoAction_ = new QAction("remove jobfolder repository ...", this );
+        connect( removeRepoAction_, SIGNAL(triggered()), this, SLOT( removeRepoAction_triggered() ) );
     }
 
     void MainWindow::createMenus()
     {
+        this->log_call( 1, CALLEE0 );
+
         helpMenu_ = menuBar()->addMenu("&Help");
         helpMenu_->addAction(aboutAction_);
 
@@ -321,7 +363,7 @@
 
     void MainWindow::aboutAction_triggered()
     {
-        LOG_AND_CHECK_IGNORESIGNAL(NO_ARGUMENT);
+        this->log_call( 1,CALLEE0);
 
         QString msg;
         msg.append( QString("program : %1\n").arg(TITLE  ) )
@@ -333,7 +375,7 @@
 
     void MainWindow::verboseAction_triggered()
     {
-        LOG_AND_CHECK_IGNORESIGNAL(NO_ARGUMENT);
+        this->log_call( 1,CALLEE0);
         this->verbosity_ = ( this->verboseAction_->isChecked() ? 2 : 0 );
     }
 
@@ -347,7 +389,7 @@
 
     void MainWindow::newSessionAction_triggered()
     {
-        LOG_AND_CHECK_IGNORESIGNAL( NO_ARGUMENT );
+        this->log_call( 1,CALLEE0);
 
         QString session_data = this->launcher_.homePath("");
         session_data = QFileDialog::getSaveFileName( this, "Enter a new filename or select a .data file for the new session"
@@ -361,15 +403,17 @@
             if( !session_data.endsWith(".data") ) {
                 session_data.append(".data");
             }
+            this->log_ << ( QString("\n    Ready to open new session: ").append(session_data).toStdString() );
             this->new_session(session_data);
         } else {
-            Log()<<"\n    Canceled.";
+            this->log_ << ("\n    Session/New... canceled.");
         }
     }
 
     void MainWindow::new_session( QString const& path )
     {
-        LOG_CALLER(0) << QString("\n      path; '%1'").arg(path).C_STR();
+        this->log_call( 1, CALLEE(path) );
+
         this->launcher_.session_config.clear();
         this->setup_session();
         this->launcher_.session_config.save(path);
@@ -378,7 +422,8 @@
 
     void MainWindow::save_session_path( QString const& path )
     {
-        LOG_CALLER(0) << QString("\n      path; '%1'").arg(path).C_STR();
+        this->log_call( 1, CALLEE(path) );
+
         cfg::Config launcher_config;
         QString launcher_cfg( this->launcher_.homePath("launcher.cfg") );
         if( QFileInfo(launcher_cfg).exists() ) {
@@ -393,6 +438,8 @@
 
     QString MainWindow::load_session_path()
     {
+        this->log_call( 1, CALLEE0 );
+
         cfg::Config launcher_config;
         QString path_to_launcher_config( Launcher::homePath("Launcher.cfg") );
         if( QFileInfo(path_to_launcher_config).exists() ) {
@@ -405,7 +452,8 @@
 
     void MainWindow::openSessionAction_triggered()
     {
-        LOG_AND_CHECK_IGNORESIGNAL( NO_ARGUMENT );
+        this->log_call( 1, CALLEE0 );
+        CHECK_IGNORESIGNAL;
 
         QString path_to_session_data =
                 QFileDialog::getOpenFileName( this, "Select a .data file"
@@ -413,15 +461,16 @@
                                             ,"Launcher sessions (*.data)"
                                             );
         if( !path_to_session_data.isEmpty() ) {
+            this->log_ << ( QString("\n    Ready to open session: ").append(path_to_session_data).toStdString() );
             this->open_session(path_to_session_data);
         } else {
-            Log()<<"\n    Canceled.";
+            this->log_ << ("\n    Session/open... Canceled.");
         }
     }
 
     void MainWindow::open_session( QString const& path_to_session_data )
     {
-        LOG_CALLER(0) << QString("\n      path; '%1'").arg(path_to_session_data).C_STR();
+        this->log_call( 1, CALLEE0, QString("\n      path to session.data; '%1'").arg(path_to_session_data) );
 
         this->launcher_.session_config.load(path_to_session_data);
         this->setup_session();
@@ -430,8 +479,9 @@
         this->statusBar()->showMessage(msg);
     }
 
-    void MainWindow::setup_session( )
+    void MainWindow::setup_session()
     {
+        this->log_call( 1, CALLEE0 );
         this->data_.clear();
 
         if( this->launcher_.session_config.contains("windowHeight") ) {
@@ -616,7 +666,8 @@
 
     void MainWindow::saveSessionAction_triggered()
     {
-        LOG_AND_CHECK_IGNORESIGNAL( NO_ARGUMENT );
+        this->log_call( 1, CALLEE0 );
+        CHECK_IGNORESIGNAL;
 
         QString path_to_session_data = this->launcher_.session_config.filename();
         if( path_to_session_data.isEmpty() ) {
@@ -629,15 +680,17 @@
                                                   , QFileDialog::DontConfirmOverwrite
                                                   );
         if( !path_to_session_data.isEmpty() ) {
+            this->log_ << ( QString("\n    Ready to save session: ").append(path_to_session_data).toStdString() );
             this->save_session( path_to_session_data );
         } else {
-            Log() << "\n    canceled.";
+            this->log_ << ("\n    Session/save... canceled.");
         }
     }
 
     void MainWindow::saveAsSessionAction_triggered()
     {
-        LOG_AND_CHECK_IGNORESIGNAL( NO_ARGUMENT );
+        this->log_call( 1, CALLEE0 );
+        CHECK_IGNORESIGNAL;
 
 //        QString path_to_session_data = this->launcher_.session_config.filename();
 //        if( path_to_session_data.isEmpty() ) {
@@ -652,13 +705,14 @@
 //        if( !path_to_session_data.isEmpty() ) {
 //            this->save_session( path_to_session_data );
 //        } else {
-//            Log() << "\n    canceled.";
+//            this->log() << "\n    canceled.";
 //        }
     }
 
     void MainWindow::save_session( QString const& path_to_session_data )
     {
-        LOG_CALLER(0) << QString("\n      path: '%1'").arg( path_to_session_data ).C_STR();
+        this->log_call( 1, CALLEE0, QString("\n      path: '%1'").arg( path_to_session_data ) );
+
         this->launcher_.session_config.save( path_to_session_data );
         this->save_session_path( path_to_session_data );
         QString msg = QString("Launcher session saved as '%1'.").arg(path_to_session_data);
@@ -838,8 +892,7 @@ remote_path_to( PathTo path_to, bool resolve )
  //-----------------------------------------------------------------------------
     MainWindow::~MainWindow()
     {
-        LOG_CALLER_INFO
-         << "\n    Launcher closing down";
+        this->log_call( 1, CALLEE0, "\n    Launcher closing down");
 
         for( QList<dc::DataConnectorBase*>::iterator iter = this->data_.begin(); iter!=this->data_.end(); ++iter ) {
             (*iter)->value_widget_to_config();
@@ -849,7 +902,6 @@ remote_path_to( PathTo path_to, bool resolve )
         this->getSessionConfigItem("windowWidth" )->set_value( windowSize.width () );
         this->getSessionConfigItem("windowHeight")->set_value( windowSize.height() );
 
-
         if ( this->launcher_.script.has_unsaved_changes() ) {
             QMessageBox::Button answer =
                     QMessageBox::question( this,TITLE
@@ -857,10 +909,10 @@ remote_path_to( PathTo path_to, bool resolve )
                                           "Do you want to save?"
                                          );
             if( answer==QMessageBox::Yes ) {
-                Log(1) << "\n    - Calling save()";
+                this->log_ << ( QString("\n    - Saving changes to ").append( this->local_path_to(Script) ).toStdString() );
                 this->saveJobscriptAction_triggered();
             } else {
-                Log(1) << "\n    - Discarding unsaved changes to script.";
+                this->log_ << ( QString("\n    - Discarding unsaved changes for ").append( this->local_path_to(Script) ).toStdString() );
             }
         }
 
@@ -879,16 +931,20 @@ remote_path_to( PathTo path_to, bool resolve )
 //        ssh::Libssh2Impl::cleanup();
 
         delete this->paletteRedForeground_;
-        Log() << "\n    Launcher closed.";
+        this->log_ << "\n    Launcher closed.";
     }
  //-----------------------------------------------------------------------------
     void MainWindow::setIgnoreSignals( bool ignore )
     {
+        this->log_call( 1, CALLEE( BOOL2STRING(ignore) ) );
+
         if( this->verbosity_ > 2 ) {
             if( ignore ) {
-                if(!this->ignoreSignals_ ) Log(1) << "\n>>> ignoring signals";
+                if(!this->ignoreSignals_ )
+                    this->log_ << "\n    Ignoring signals from here";
             } else {
-                if( this->ignoreSignals_ ) Log(1) << "\n>>> stopped ignoring signals";
+                if( this->ignoreSignals_ )
+                    this->log_ << "\n    Signals are no longer ignored from here.";
             }
         }
         this->ignoreSignals_ = ignore;
@@ -945,7 +1001,8 @@ remote_path_to( PathTo path_to, bool resolve )
  //------------------------------------------------------------------------------
     void MainWindow::clusterDependencies( bool updateWidgets )
     {
-        LOG_CALLER_INFO;
+        this->log_call( 1, CALLEE( BOOL2STRING(updateWidgets) ) );
+
         bool ok = true;
         {// act on config items only...
             IGNORE_SIGNALS_UNTIL_END_OF_SCOPE;
@@ -1044,6 +1101,8 @@ remote_path_to( PathTo path_to, bool resolve )
  //-----------------------------------------------------------------------------
     void MainWindow::walltimeUnitDependencies( bool updateWidgets )
     {
+        this->log_call( 1, CALLEE(BOOL2STRING(updateWidgets)) );
+
         IGNORE_SIGNALS_UNTIL_END_OF_SCOPE;
 
         this->walltime_->set_limit( this->clusterInfo().walltimeLimit() );
@@ -1056,10 +1115,7 @@ remote_path_to( PathTo path_to, bool resolve )
  //-----------------------------------------------------------------------------
     QString MainWindow::check_script_unsaved_changes()
     {
-        QString msg;
-        QTextStream ts(&msg);
-        ts << "\n    Checking unsaved changes : "
-           << ( this->launcher_.script.has_unsaved_changes() ? "true" : "false");
+        QString msg = QString("\n    Checking unsaved changes : ").append( BOOL2STRING( this->launcher_.script.has_unsaved_changes() ) );
 
         this->update_StatusbarWidgets();
         if( this->verbosity_ ) {
@@ -1074,11 +1130,10 @@ remote_path_to( PathTo path_to, bool resolve )
  // SLOTS
  //-----------------------------------------------------------------------------
 
-
-
 void MainWindow::on_wCluster_currentIndexChanged( QString const& arg1 )
 {
-    LOG_AND_CHECK_IGNORESIGNAL( arg1 );
+    this->log_call( 1, CALLEE(arg1) );
+    CHECK_IGNORESIGNAL
 
     this->launcher_.session_config["wCluster"].set_value(arg1);
     this->clusterDependencies(true);
@@ -1086,7 +1141,8 @@ void MainWindow::on_wCluster_currentIndexChanged( QString const& arg1 )
 
 void MainWindow::on_wNodeset_currentTextChanged(const QString &arg1)
 {
-    LOG_AND_CHECK_IGNORESIGNAL( arg1 );
+    this->log_call( 1, CALLEE(arg1) );
+    CHECK_IGNORESIGNAL
 
     this->getSessionConfigItem("wNodeset")->set_value(arg1);
     this->nodesetDependencies(true);
@@ -1094,6 +1150,8 @@ void MainWindow::on_wNodeset_currentTextChanged(const QString &arg1)
 
 void MainWindow::updateResourceItems()
 {
+    this->log_call( 1,CALLEE0);
+
     IGNORE_SIGNALS_UNTIL_END_OF_SCOPE;
 
     QStringList itemList({"wNNodes", "wNCoresPerNode", "wNCores", "wGbPerCore", "wGbTotal"});
@@ -1108,7 +1166,8 @@ void MainWindow::updateResourceItems()
 
 void MainWindow::on_wRequestNodes_clicked()
 {
-    LOG_AND_CHECK_IGNORESIGNAL(NO_ARGUMENT);
+    this->log_call( 1, CALLEE0 );
+    CHECK_IGNORESIGNAL
 
     NodesetInfo const& nodeset = this->nodesetInfo();
     try {
@@ -1129,7 +1188,8 @@ void MainWindow::on_wRequestNodes_clicked()
 
 void MainWindow::on_wAutomaticRequests_toggled(bool checked)
 {
-    LOG_AND_CHECK_IGNORESIGNAL( (checked?"true":"false") );
+    this->log_call( 1, CALLEE( BOOL2STRING(checked) ) );
+    CHECK_IGNORESIGNAL
 
     bool manual = !checked;
     this->ui->wRequestNodes->setEnabled(manual);
@@ -1138,10 +1198,10 @@ void MainWindow::on_wAutomaticRequests_toggled(bool checked)
 
 void MainWindow::on_wNNodes_valueChanged(int arg1)
 {
-    LOG_AND_CHECK_IGNORESIGNAL( QString().setNum(arg1) );
+    this->log_call( 1, CALLEE(arg1) );
+    CHECK_IGNORESIGNAL
 
     if( this->ui->wAutomaticRequests->isChecked() ) {
-        Log(1) <<"\n    Forwarding to on_wRequestNodes_clicked()";
         on_wRequestNodes_clicked();
     } else {
         this->pendingRequest_ = NodesAndCoresPerNode;
@@ -1150,10 +1210,10 @@ void MainWindow::on_wNNodes_valueChanged(int arg1)
 
 void MainWindow::on_wNCoresPerNode_valueChanged(int arg1)
 {
-    LOG_AND_CHECK_IGNORESIGNAL( QString().setNum(arg1) );
+    this->log_call( 1, CALLEE(arg1) );
+    CHECK_IGNORESIGNAL
 
     if( this->ui->wAutomaticRequests->isChecked() ) {
-        Log(1) <<"\n    Forwarding to on_wRequestNodes_clicked()";
         on_wRequestNodes_clicked();
     } else {
         this->pendingRequest_ = NodesAndCoresPerNode;
@@ -1162,10 +1222,10 @@ void MainWindow::on_wNCoresPerNode_valueChanged(int arg1)
 
 void MainWindow::on_wNCores_valueChanged(int arg1)
 {
-    LOG_AND_CHECK_IGNORESIGNAL( QString().setNum(arg1) );
+    this->log_call( 1, CALLEE(arg1) );
+    CHECK_IGNORESIGNAL
 
     if( this->ui->wAutomaticRequests->isChecked() ) {
-        Log(1) <<"\n    Forwarding to on_wRequestCores_clicked()";
         on_wRequestCores_clicked();
     } else {
         this->pendingRequest_ = CoresAndGbPerCore;
@@ -1174,10 +1234,10 @@ void MainWindow::on_wNCores_valueChanged(int arg1)
 
 void MainWindow::on_wGbPerCore_valueChanged(double arg1)
 {
-    LOG_AND_CHECK_IGNORESIGNAL( QString().setNum(arg1) )
+    this->log_call( 1, CALLEE(arg1) );
+    CHECK_IGNORESIGNAL
 
     if( this->ui->wAutomaticRequests->isChecked() ) {
-        Log(1) <<"\n    Forwarding to on_wRequestCores_clicked()";
         on_wRequestCores_clicked();
     } else {
         this->pendingRequest_ = CoresAndGbPerCore;
@@ -1186,7 +1246,8 @@ void MainWindow::on_wGbPerCore_valueChanged(double arg1)
 
 void MainWindow::on_wRequestCores_clicked()
 {
-    LOG_AND_CHECK_IGNORESIGNAL(NO_ARGUMENT);
+    this->log_call( 1, CALLEE0 );
+    CHECK_IGNORESIGNAL
 
     NodesetInfo const& nodeset = this->nodesetInfo();
     try {
@@ -1206,23 +1267,15 @@ void MainWindow::on_wRequestCores_clicked()
     this->pendingRequest_ = NoPendingRequest;
 }
 
-//bool MainWindow::can_authenticate()
-//{
-//    bool ok = !this->getSessionConfigItem("username"  )->value().toString().isEmpty()
-//            &&!this->getSessionConfigItem("privateKey")->value().toString().isEmpty()
-//            ;
-//    return ok;
-//}
-
 void MainWindow::on_wPages_currentChanged(int index_new_page)
 {
-    LOG_AND_CHECK_IGNORESIGNAL( QString().setNum(index_new_page) );
+    this->log_call( 1, CALLEE(index_new_page), QString("\n    Moving from page[%1] to page[%2].").arg(this->current_page_).arg(index_new_page) );
+    CHECK_IGNORESIGNAL
 
 //    this->authenticate( /*silent=*/ this->can_authenticate() && this->sshSession_.isConnected() );
 
     this->selected_job_.clear();
 
-    Log(1) << QString("\n    changing tab %1->%2: ").arg(this->current_page_).arg(index_new_page).C_STR();
     switch (index_new_page) {
     case 0:
         if( this->current_page_==1 )
@@ -1284,7 +1337,8 @@ void MainWindow::on_wPages_currentChanged(int index_new_page)
 
 void MainWindow::on_wEnforceNNodes_toggled(bool checked)
 {
-    LOG_AND_CHECK_IGNORESIGNAL( (checked?"true":"false") );
+    this->log_call( 1, CALLEE( BOOL2STRING(checked) ) );
+    CHECK_IGNORESIGNAL
 
     bool hide = !checked;
     this->launcher_.script.find_key("-W")->setHidden(hide);
@@ -1292,7 +1346,8 @@ void MainWindow::on_wEnforceNNodes_toggled(bool checked)
 
 void MainWindow::on_wSingleJob_toggled(bool checked)
 {
-    LOG_AND_CHECK_IGNORESIGNAL( (checked?"true":"false") );
+    this->log_call( 1, CALLEE( BOOL2STRING(checked) ) );
+    CHECK_IGNORESIGNAL
 
     bool hide = !checked;
     this->launcher_.script.find_key("naccesspolicy")->setHidden(hide);
@@ -1300,7 +1355,8 @@ void MainWindow::on_wSingleJob_toggled(bool checked)
 
 void MainWindow::on_wWalltime_editingFinished()
 {
-    LOG_AND_CHECK_IGNORESIGNAL(NO_ARGUMENT);
+    this->log_call( 1, CALLEE0 );
+    CHECK_IGNORESIGNAL
 
     QString input = this->ui->wWalltime->text();
     int s = this->walltime_->toInt(input);
@@ -1314,7 +1370,8 @@ void MainWindow::on_wWalltime_editingFinished()
 
 void MainWindow::on_wNotifyAddress_editingFinished()
 {
-    LOG_AND_CHECK_IGNORESIGNAL(NO_ARGUMENT);
+    this->log_call( 1, CALLEE0 );
+    CHECK_IGNORESIGNAL
 
     QString validated = validateEmailAddress( this->ui->wNotifyAddress->text() );
     if( validated.isEmpty() )
@@ -1346,31 +1403,37 @@ void MainWindow::update_abe( QChar c, bool checked )
         abe.remove(i,1);
     }
     ci_notifyWhen->set_value( abe );
-    Log(1) << QString("    abe set to: '%1'.").arg(abe).C_STR();
-
     this->getDataConnector("notifyWhen")->value_config_to_script();
 }
 
 void MainWindow::on_wNotifyAbort_toggled(bool checked)
 {
-    LOG_AND_CHECK_IGNORESIGNAL( (checked?"true":"false") )
+    this->log_call( 1, CALLEE( BOOL2STRING(checked) ) );
+    CHECK_IGNORESIGNAL
+
     this->update_abe('a', checked );
 }
 
 void MainWindow::on_wNotifyBegin_toggled(bool checked)
 {
-    LOG_AND_CHECK_IGNORESIGNAL( (checked?"true":"false") )
+    this->log_call( 1, CALLEE( BOOL2STRING(checked) ) );
+    CHECK_IGNORESIGNAL
+
     this->update_abe('b', checked );
 }
 
 void MainWindow::on_wNotifyEnd_toggled(bool checked)
 {
-    LOG_AND_CHECK_IGNORESIGNAL( (checked?"true":"false") )
+    this->log_call( 1, CALLEE( BOOL2STRING(checked) ) );
+    CHECK_IGNORESIGNAL
+
     this->update_abe('e', checked );
 }
 
 void MainWindow::warn( QString const& msg1, QString const& msg2 )
 {
+    this->log_call( 1, CALLEE0, QString("\n    message: ").append(msg1).append(msg2) );
+
     this->statusBar()->showMessage(msg1);
     QMessageBox::warning(this,TITLE,QString(msg1).append(msg2));
 }
@@ -1438,7 +1501,10 @@ Job ID                  Username    Queue    Jobname          SessID  NDS   TSK 
 
 bool MainWindow::retrieve( Job const& job, bool local, bool /*vsc_data*/ )
 {
+    this->log_call( 1, CALLEE0, QString("\n    Job: ").append( job.toString() ) );
+
     if( job.status()==Job::Retrieved ) return true;
+
     QString msg = QString("Retrieve job ").append( job.short_id() );
 
     if( !this->actionRequiringAuthentication(msg) ) return false;
@@ -1495,6 +1561,8 @@ bool MainWindow::retrieve( Job const& job, bool local, bool /*vsc_data*/ )
 
 bool MainWindow::lookForJobscript(QString const& job_folder, bool ask_to_load , bool create_if_inexistent)
 {// return false if canceled
+    this->log_call( 1, CALLEE0, QString("\n    in: ").append(job_folder) );
+
     QDir qdir;
     bool exists=false;
     if( !is_absolute_path(job_folder) ) {
@@ -1549,18 +1617,19 @@ bool MainWindow::lookForJobscript(QString const& job_folder, bool ask_to_load , 
             return false;
         }
     }
+    this->log_ <<  msg.toStdString();
     this->statusBar()->showMessage(msg);
     return true;
 }
 
 bool MainWindow::loadJobscript( QString const& filepath )
-{
+{    
     IGNORE_SIGNALS_UNTIL_END_OF_SCOPE;
+    this->log_call( 1, CALLEE0, QString("\n    loading job script '%1'.").arg(filepath) );
 
-    LOG_CALLER_INFO << QString("\n    loading job script '%1'.").arg(filepath).C_STR();
     try
     {
-        Log(1) << "\n    reading the job script ... ";
+        this->log_ << "\n    reading the job script ... ";
         this->launcher_.script.read(filepath);
      // make sure the jobscript's jobname corresponds to the name of the job folder.
         QDir qdir(filepath);
@@ -1569,42 +1638,39 @@ bool MainWindow::loadJobscript( QString const& filepath )
         if( const_cast<pbs::Script const&>(this->launcher_.script)["-N"] != jobfolder ) {
             this->launcher_.script["-N"]  = jobfolder;
         }
-        Log(1) << "done";
+        this->log_ << "\n    reading the job script ... done";
     } catch( std::runtime_error& e ) {
         QString msg = QString("An error occurred while reading the jobscript '%1'.\n Error:\n")
                          .arg( filepath )
                       .append( e.what() )
                       .append("\n\nEdit the script to correct it, then press 'Save' and 'Reload'.");
-        Log() << msg.C_STR();
+        this->log_ <<  msg.toStdString();
         QMessageBox::critical(this,TITLE,msg);
     }
 
     try
     {
      // the order is important!
-        Log(1) << "\n    Setting gui elements from job script ... ";
+        this->log_ << "\n    Setting gui elements from job script ... ";
         QStringList first({"wCluster","wNodeset","wNNodes", "wNCoresPerNode"}) ;
         for(QStringList::const_iterator iter = first.cbegin(); iter!=first.cend(); ++iter ) {
-            Log(1) << QString( "\n      %1 :").arg(*iter).C_STR();
             dc::DataConnectorBase* dataConnector = this->getDataConnector(*iter);
             if( dataConnector->value_script_to_config() ) {
                 dataConnector->value_config_to_widget();
-                Log(1) << "ok";
+                this->log_ << QString( "\n      %1 : ok").arg(*iter).toStdString();
             } else {
-                Log(1) << "unchanged (=ok)";
+                this->log_ << QString( "\n      %1 : unchanged (=ok)").arg(*iter).toStdString();
             }
         }
      // do the same for all other DataConnectors, for which the order does not matter.
      // the items in first are visited twice, but the second time has no effect.
         for( QList<dc::DataConnectorBase*>::Iterator iter = this->data_.begin(); iter!=this->data_.end(); ++iter )
         {
-            Log(1) << QString( "\n      %1 :").arg( (*iter)->name() ).C_STR();
-
             if( (*iter)->value_script_to_config() ) {
                 (*iter)->value_config_to_widget();
-                Log(1) << "ok";
+                this->log_ << QString( "\n      %1 : ok").arg((*iter)->name()).toStdString();
             } else {
-                Log(1) << "unchanged (=ok)";
+                this->log_ << QString( "\n      %1 : unchanged (=ok)").arg((*iter)->name()).toStdString();
             }
         }
      // a few special cases:
@@ -1622,7 +1688,7 @@ bool MainWindow::loadJobscript( QString const& filepath )
                          .arg( filepath )
                       .append( e.what() )
                       .append("\n\nEdit the script to correct it, then press 'Save' and 'Reload'.");
-        Log() << msg.C_STR();
+        this->log_ << msg.toStdString();
         QMessageBox::critical(this,TITLE,msg);
         return false;
     }
@@ -1634,10 +1700,11 @@ bool MainWindow::loadJobscript( QString const& filepath )
 
 bool MainWindow::saveJobscript( QString const& filepath )
 {
-    Log() << QString ("\n    writing script '%1' ... ").arg(filepath).C_STR();
+    this->log_call( 1,CALLEE0);
     try {
+        this->log_ << QString ("\n    Writing script '%1' ...").arg(filepath).toStdString();
         this->launcher_.script.write( filepath, /*warn_before_overwrite=*/false );
-        Log() << "done.";
+        this->log_ << " done.";
     } catch( pbs::WarnBeforeOverwrite &e ) {
         QMessageBox::StandardButton answer =
                 QMessageBox::question( this, TITLE
@@ -1653,9 +1720,9 @@ bool MainWindow::saveJobscript( QString const& filepath )
             f.copy(backup);
          // and save
             this->launcher_.script.write( filepath, false );
-            Log() << QString("done (overwritten, but made backup '%1').").arg(backup).C_STR();
+            this->log_ << QString(" done (overwritten, but made backup '%1')").arg(backup).toStdString();
         } else {
-            Log() << "aborted.";
+            this->log_ << " canceled";
             this->statusBar()->showMessage( QString("Job script NOT SAVED: '%1'").arg(filepath) );
             return false;
         }
@@ -1697,7 +1764,8 @@ bool MainWindow::saveJobscript( QString const& filepath )
 
 void MainWindow::on_wScript_textChanged()
 {
-    LOG_AND_CHECK_IGNORESIGNAL(NO_ARGUMENT);
+    this->log_call( 1, CALLEE0 );
+    CHECK_IGNORESIGNAL
 
     this->launcher_.script.set_has_unsaved_changes(true);
     this->check_script_unsaved_changes();
@@ -1705,7 +1773,8 @@ void MainWindow::on_wScript_textChanged()
 
 void MainWindow::on_wRefresh_clicked()
 {
-    LOG_AND_CHECK_IGNORESIGNAL(NO_ARGUMENT);
+    this->log_call( 1, CALLEE0 );
+    CHECK_IGNORESIGNAL
 
     cfg::Item* ci_joblist = this->getSessionConfigItem("job_list");
     JobList joblist( ci_joblist->value().toStringList() );
@@ -1714,6 +1783,7 @@ void MainWindow::on_wRefresh_clicked()
 
 QString MainWindow::selectedJob( QTextEdit* qTextEdit )
 {
+    this->log_call( 1, CALLEE0 );
     QString selection;
     QTextCursor cursor = qTextEdit->textCursor();
     cursor.select(QTextCursor::LineUnderCursor);
@@ -1724,15 +1794,19 @@ QString MainWindow::selectedJob( QTextEdit* qTextEdit )
       ) {
         this->statusBar()->showMessage("No job Selected");
         selection.clear();
+        this->log_ << "\n    Nothing selected";
     } else {
         qTextEdit->setTextCursor(cursor);
         selection = selection.split(':')[0];
+        this->log_ << QString("\n    selected: ").append(selection).toStdString();
     }
     return selection;
 }
 
 void MainWindow::clearSelection( QTextEdit* qTextEdit )
 {
+    this->log_call( 1, CALLEE0 );
+
     QTextCursor cursor = qTextEdit->textCursor();
     cursor.movePosition( QTextCursor::Start);
     qTextEdit->setTextCursor(cursor);
@@ -1740,7 +1814,8 @@ void MainWindow::clearSelection( QTextEdit* qTextEdit )
 
 void MainWindow::on_wRetrieveSelectedJob_clicked()
 {
-    LOG_AND_CHECK_IGNORESIGNAL(NO_ARGUMENT);
+    this->log_call( 1, CALLEE0 );
+    CHECK_IGNORESIGNAL
 
     if( this->selected_job_.isEmpty() ) {
         this->statusBar()->showMessage("Nothing selected.");
@@ -1776,7 +1851,8 @@ void MainWindow::on_wRetrieveSelectedJob_clicked()
 
 void MainWindow::on_wRetrieveAllJobs_clicked()
 {
-    LOG_AND_CHECK_IGNORESIGNAL(NO_ARGUMENT);
+    this->log_call( 1, CALLEE0 );
+    CHECK_IGNORESIGNAL
 
     cfg::Item* ci_joblist = this->getSessionConfigItem("job_list");
     JobList joblist( ci_joblist->value().toStringList() );
@@ -1877,7 +1953,8 @@ void MainWindow::deleteJob( QString const& jobid )
 
 void MainWindow::on_wDeleteSelectedJob_clicked()
 {
-    LOG_AND_CHECK_IGNORESIGNAL(NO_ARGUMENT);
+    this->log_call( 1, CALLEE0 );
+    CHECK_IGNORESIGNAL
 
     if( this->selected_job_.isEmpty() ) {
         this->statusBar()->showMessage("Nothing Selected.");
@@ -1889,25 +1966,29 @@ void MainWindow::on_wDeleteSelectedJob_clicked()
 
 void MainWindow::on_wCheckCopyToDesktop_toggled(bool checked)
 {
-    LOG_AND_CHECK_IGNORESIGNAL( (checked?"true":"false") )
+    this->log_call( 1, CALLEE( BOOL2STRING(checked) ) );
+    CHECK_IGNORESIGNAL
     this->getSessionConfigItem("wCheckCopyToDesktop")->set_value(checked);
 }
 
 void MainWindow::on_wCheckCopyToVscData_toggled(bool checked)
 {
-    LOG_AND_CHECK_IGNORESIGNAL( (checked?"true":"false") )
+    this->log_call( 1, CALLEE( BOOL2STRING(checked) ) );
+    CHECK_IGNORESIGNAL
     this->getSessionConfigItem("wCheckCopyToVscData")->set_value(checked);
 }
 
 void MainWindow::on_wCheckDeleteLocalJobFolder_toggled(bool checked)
 {
-    LOG_AND_CHECK_IGNORESIGNAL( (checked?"true":"false") )
+    this->log_call( 1, CALLEE( BOOL2STRING(checked) ) );
+    CHECK_IGNORESIGNAL
     this->getSessionConfigItem("wCheckDeleteLocalJobFolder")->set_value(checked);
 }
 
 void MainWindow::on_wCheckDeleteRemoteJobFolder_toggled(bool checked)
 {
-    LOG_AND_CHECK_IGNORESIGNAL( (checked?"true":"false") )
+    this->log_call( 1, CALLEE( BOOL2STRING(checked) ) );
+    CHECK_IGNORESIGNAL
     this->getSessionConfigItem("wCheckDeleteRemoteJobFolder")->set_value(checked);
 }
 
@@ -1958,6 +2039,8 @@ copy_folder_recursively
 
 void MainWindow::setupHome()
 {
+    this->log_call( 1, CALLEE0 );
+
  // get the location of the application and derive the location of the clusters info files.
  // see http://stackoverflow.com/questions/4515602/how-to-get-executable-name-in-qt
     QString applicationFilePath = QCoreApplication::applicationFilePath();
@@ -1975,9 +2058,9 @@ void MainWindow::setupHome()
 #endif
                               );
     }
-    Log() << "\n    Copying standard folders.";
+    this->log_ << "\n    Copying standard folders.";
     for ( int i=0; i<folders.size(); ++i ) {
-        Log() << copy_folder_recursively( path_to_folders[i], this->launcher_.homePath( folders[i] ) ).C_STR();
+        this->log_ << copy_folder_recursively( path_to_folders[i], this->launcher_.homePath( folders[i] ) ).toStdString();
     }
 }
 
@@ -2008,7 +2091,8 @@ QString MainWindow::get_path_to_clusters()
 
 void MainWindow::on_wSelectModule_currentIndexChanged(const QString &arg1)
 {
-    LOG_AND_CHECK_IGNORESIGNAL( arg1 )
+    this->log_call( 1, CALLEE(arg1) );
+    CHECK_IGNORESIGNAL
 
     if( arg1.startsWith("---") )
     {// ignore this dummy entry...
@@ -2042,7 +2126,8 @@ void MainWindow::on_wSelectModule_currentIndexChanged(const QString &arg1)
 
 void MainWindow::on_wFinished_selectionChanged()
 {
-    LOG_AND_CHECK_IGNORESIGNAL(NO_ARGUMENT);
+    this->log_call( 1, CALLEE0 );
+    CHECK_IGNORESIGNAL
 
     IGNORE_SIGNALS_UNTIL_END_OF_SCOPE;
     this->selected_job_ = this->selectedJob( this->ui->wFinished );
@@ -2081,7 +2166,8 @@ void MainWindow::authenticateAction_triggered()
   * otherwise cancel the authentication
   * authenticate()
   */
-    LOG_AND_CHECK_IGNORESIGNAL(NO_ARGUMENT)
+    this->log_call( 1, CALLEE0 );
+    CHECK_IGNORESIGNAL
 
     if( this->ssh.authenticated() ) {
         QString msg = QString("This session is already authenticated:"
@@ -2160,12 +2246,11 @@ bool MainWindow::authenticate(bool silent)
 {/*
   * Wrapper around this->ssh.authenticate() providing feedback to the user.
   */
+    this->log_call( 1, CALLEE( BOOL2STRING(silent) ) );
     if( this->ssh.authenticated() ) {
-        LOG_CALLER_INFO << "\n    already authenticated.";
+        this->log_ << "\n    Already authenticated";
         return true;
     }
-
-    LOG_CALLER_INFO;
 
     int rc = this->ssh.authenticate();
     QString msg;
@@ -2194,6 +2279,7 @@ bool MainWindow::authenticate(bool silent)
         msg = "Authentication failed: cause unknown.";
         break;
     }
+    this->log_ << QString("\n    ").append(msg).toStdString();
     this->statusBar()->showMessage(msg);
     this->update_StatusbarWidgets();
     if( rc==0 )
@@ -2293,7 +2379,8 @@ bool MainWindow::actionRequiringAuthentication(QString const& action )
 
 void MainWindow::localFileLocationAction_triggered()
 {
-    LOG_AND_CHECK_IGNORESIGNAL(NO_ARGUMENT);
+    this->log_call( 1, CALLEE0 );
+    CHECK_IGNORESIGNAL
 
  // warn the user of unsaved changes to current script
     if(  this->launcher_.script.has_unsaved_changes()
@@ -2344,7 +2431,8 @@ void MainWindow::localFileLocationAction_triggered()
 
 void MainWindow::remoteFileLocationAction_triggered()
 {
-    LOG_AND_CHECK_IGNORESIGNAL(NO_ARGUMENT);
+    this->log_call( 1, CALLEE0 );
+    CHECK_IGNORESIGNAL
 
     cfg::Item* ci = this->getSessionConfigItem("remoteFileLocation");
     QStringList options = ci->choices_as_QStringList();
@@ -2403,7 +2491,8 @@ void MainWindow::update_StatusbarWidgets()
 
  void MainWindow::createTemplateAction_triggered()
 {
-    LOG_AND_CHECK_IGNORESIGNAL(NO_ARGUMENT);
+     this->log_call( 1, CALLEE0 );
+     CHECK_IGNORESIGNAL
 
     if( this->job_folder().isEmpty() ) {
         this->statusBar()->showMessage("No job folder, cannot create template.");
@@ -2472,7 +2561,8 @@ void MainWindow::update_StatusbarWidgets()
 
 void MainWindow::selectTemplateAction_triggered()
 {
-    LOG_AND_CHECK_IGNORESIGNAL(NO_ARGUMENT);
+    this->log_call( 1, CALLEE0 );
+    CHECK_IGNORESIGNAL
 
     QString msg;
     if( this->job_folder().isEmpty() ) {
@@ -2613,6 +2703,7 @@ void MainWindow::newJobscriptAction_triggered()
     this->reloadJobscriptAction_->setEnabled(false);
     this->update_StatusbarWidgets();
 }
+
 void MainWindow::script_text_to_config()
 {
     QString text = this->ui->wScript->toPlainText();
@@ -2637,7 +2728,9 @@ void MainWindow::script_text_to_config()
 
 void MainWindow::saveJobscriptAction_triggered()
 {
-    LOG_AND_CHECK_IGNORESIGNAL(NO_ARGUMENT);
+    this->log_call( 1, CALLEE0 );
+    CHECK_IGNORESIGNAL
+
     switch( this->current_page_) {
     case 0:
     case MainWindowConstructedButNoPreviousPage:
@@ -2652,7 +2745,7 @@ void MainWindow::saveJobscriptAction_triggered()
 
     case 1:
     {// make sure that changes to the script text are parsed and saved
-        Log(1) <<"\n    parsing script text";
+        this->log_ << "\n    parsing script text";
         QString text = this->ui->wScript->toPlainText();
         this->script_text_to_config();
     }   break;
@@ -2693,6 +2786,8 @@ void MainWindow::saveJobscriptAction_triggered()
 
 void MainWindow::saveAsJobscriptAction_triggered()
 {
+    this->log_call( 1, CALLEE0 );
+
     QStringList folders;
     int verify_error;
     QDir dir( this->local_file_location() );
@@ -2873,7 +2968,8 @@ void MainWindow::reloadJobscriptAction_triggered()
 
 void MainWindow::submitJobscriptAction_triggered()
 {
-    LOG_AND_CHECK_IGNORESIGNAL(NO_ARGUMENT);
+    this->log_call( 1, CALLEE0 );
+    CHECK_IGNORESIGNAL
 
     if( !this->actionRequiringAuthentication("Submit job") ) {
         return;
@@ -2993,7 +3089,8 @@ void MainWindow::submitJobscriptAction_triggered()
 
 void MainWindow::showFileLocationsAction_triggered()
 {
-    LOG_AND_CHECK_IGNORESIGNAL(NO_ARGUMENT);
+    this->log_call( 1, CALLEE0 );
+    CHECK_IGNORESIGNAL
 
     QString job = this->job_folder();
     if( job.isEmpty() ) {
@@ -3047,7 +3144,8 @@ void MainWindow::showRemoteJobFolderAction_triggered()
 
 void MainWindow::on_wNewJobscriptButton_clicked()
 {
-    LOG_AND_CHECK_IGNORESIGNAL(NO_ARGUMENT);
+    this->log_call( 1, CALLEE0 );
+    CHECK_IGNORESIGNAL
 
     this->newJobscriptAction_triggered();
 }
@@ -3141,4 +3239,66 @@ error_message_missing_job_script
         msg.append("\n\n").append(msg1);
     }
     message(msg,message_box);
+}
+
+void
+MainWindow::
+removeRepoAction_triggered()
+{
+    if( ! this->isScriptOpen() ) {
+        this->statusBar()->showMessage("Action 'Remove job folder repository' canceled: no job script open.");
+        return;
+    }
+    if( !this->actionRequiringAuthentication("Remove job folder repository") ) {
+        return;
+    }
+    QString cmd = QString("du -sm %1/.git").arg( this->remote_path_to(JobFolder) );
+    int rc = this->ssh.execute( cmd, 180, "Obtain repository size of remote job folder repository (MB).");
+    QString size("unknown");
+    if( rc==0 ) {
+        size = this->ssh.standardOutput().split('.',QString::SkipEmptyParts)[0].trimmed().append(" MB");
+    }
+    QString msg = QString("Warning:\n You are about to remove the .git repository of job folder '%1'.\n"
+                          "Use this action only if the repository has grown too much over time and you "
+                          "no longer want to recover older versions of the jobfolder. If You remove the "
+                          "repository a new repository will be created corresponding to the current state "
+                          "of the job folder./n"
+                          "The current size of the repository is %2.\n\n Do you want to remove the job "
+                          "folder repository?")
+                     .arg( this->local_path_to(JobFolder) )
+                     .arg( size )
+                     ;
+    QMessageBox::StandardButton answer = QMessageBox::question(this, TITLE, msg );
+    if( answer!=QMessageBox::Yes )
+    {
+        this->statusBar()->showMessage("Action 'Remove job folder repository' canceled.");
+        return;
+    }
+    QString  local_job_folder = this-> local_path_to(JobFolder);
+    QString remote_job_folder = this->remote_path_to(JobFolder);
+
+    toolbox::Execute x( nullptr, &this->log_ );
+    x.set_working_directory( local_job_folder );
+#ifdef Q_OS_WIN
+    cmd = "del .git";
+#else
+    cmd = "rm -rf ,git";
+#endif
+    rc = x(cmd,120,"remove local job folder repository");
+    if( rc ) {
+        this->statusBar()->showMessage("Local job folder repository removed.");
+    } else {
+        this->statusBar()->showMessage("Local job folder repository failed. Canceling.");
+        return;
+    }
+    cmd = QString("cd %1 && rm -rf ./.git").arg( remote_job_folder );
+    rc = this->ssh.execute(cmd,300,"remove remote job folder repository");
+    if( rc ) {
+        this->statusBar()->showMessage("Remote job folder repository removed.");
+    } else {
+        this->statusBar()->showMessage("Remote job folder repository failed. Canceling.");
+        return;
+    }
+    this->ssh. local_save( local_job_folder );
+    this->ssh.remote_save( local_job_folder, remote_job_folder );
 }

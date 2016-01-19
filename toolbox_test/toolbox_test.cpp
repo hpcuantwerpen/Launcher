@@ -16,6 +16,7 @@ private Q_SLOTS:
     void testCase2();
     void testCase2b();
     void testCase3();
+    void testCase4();
 };
 
 ToolboxTest::ToolboxTest()
@@ -32,20 +33,20 @@ void ToolboxTest::testCase1()
 
 void ToolboxTest::testCase2()
 {
-    Log::filename = "log.log";
-    Log l1(1);
-    l1 << "blabla" << std::endl;
-    Log(2) << std::string("silence")<< std::endl;
-    Log(0) <<INFO<< std::string("really?")<< std::endl;
+    toolbox::Log log("log.log",1);
+    log << "blabla\n";
+    *log.ostream(2) << "silence\n";
+    log.cleanup();
+    log << "really?";
 }
 
 void ToolboxTest::testCase2b()
 {
-    Log::filename = "std::cout";
-    Log l1(1);
-    l1 << "blabla" << std::endl;
-    Log(2) << std::string("silence")<< std::endl;
-    Log(0) <<INFO<< std::string("really?")<< std::endl;
+    toolbox::Log log("std::cout",1);
+    log << "blabla\n";
+    *log.ostream(2) << "silence\n";
+    log.cleanup();
+    log << "really?";
 }
 
 void ToolboxTest::testCase3()
@@ -151,6 +152,29 @@ void ToolboxTest::testCase3()
 
     QDir("/Users/etijskens/Launcher/oops").removeRecursively();
     QDir("/Users/etijskens/oops").removeRecursively();
+}
+
+void ToolboxTest::testCase4()
+{
+    {
+        toolbox::Execute x;
+        x("ls .", 30, "test, no logging");
+    }
+    {
+        toolbox::Log log;
+        toolbox::Execute x(nullptr,&log);
+        x("ls .", 30, "test, logging to Log::sink");
+
+        log.set_log("std::cout");
+        x("ls .", 30, "test, logging to Log->std::cout");
+
+        log.set_log("std::cerr");
+        x("ls .", 30, "test, logging to Log->std::cerr");
+
+        log.set_log("test.txt");
+        log.clear();
+        x("ls .", 30, "test, logging to Log->./test.txt");
+    }
 }
 
 QTEST_APPLESS_MAIN(ToolboxTest)

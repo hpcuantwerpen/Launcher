@@ -1,74 +1,118 @@
 #ifndef LOG_H
 #define LOG_H
 
-#include <string>
+#include <iostream>
 #include <fstream>
-#include <QFileInfo>
+#include <sstream>
+#include <string>
+#include <limits>
 
-class Log;
+#include "property.h"
 
-template <class T> std::ostream& operator<<( Log const& log, T const& t );
- /* the Log argument is const& to allow for
-  *    Log(2) << ...
-  * which is more practical then
-  *    Log log(2);
-  *
-  */
+namespace toolbox
+{//-----------------------------------------------------------------------------
+    class Log
+    {
+    public:
+        enum {
+            Silent=0
+          , WriteAlways = std::numeric_limits<int>::min()
+        };
 
-class Log
-{/*
-  * send output to a file, by appending it.
-  *
-  * For implementation details see
-  * http://stackoverflow.com/questions/6240950/platform-independent-dev-null-in-c
-  *   if a null pointer is provided to the constructor of ostream, it automatically
-  *   sets the badbit and silently ignores any writes
-  */
+        Log( std::ostream* log_to, int verbosity=1 );
+        Log( std::string const& log_to = std::string(), int verbosity=1 );
+         /* Create a Log with the specified verbosity. All messages with
+          * verbosity_level <= verbosity that are  sent to the log are
+          * written to the log, and messages with verbosity_level > verbosity
+          * are ignored.
+          */
 
-    template <class T> friend std::ostream& ::operator<<( Log const& log, T const& t );
-public:
-    Log( int level=0 );
-    /* If level<=Log::verbosity the Log object behaves as a std::fstream for file Log::filename,
-     * otherwise as an ostream that acts as a sink
-     * If level<0 it always acts as a sink.
-     * The default level acts as a log file, unless Log::verbosity is negative.
-     */
-    ~Log();
-    static qint64 log_size();
-     /* return size of log file in bytes.
+        void set_log( std::string const& log_to = std::string() );
+        /* Specify where to log to. Valid strings are
+         * .  "std::cout"
+         * .  "std::cerr"
+         * .  "Log::sink" (or empty string)
+         * .  a filename
+         */
+
+        void set_log( std::ostream* po );
+        /* Specify where to log to.
+         */
+
+        template <class T>
+        void write( T const& t, int verbosity_level=1 ) {
+            std::ostream* o = this->ostream( verbosity_level );
+            *o << t << std::flush;
+            this->cleanup();
+        }
+
+        template <class T>
+        void operator<< ( T const& t ) {
+            this->write(t);
+        }
+//        void write      ( std::string const& s         , int verbosity_level = 1 );
+//        void operator() ( std::string const& s         , int verbosity_level = 1 );
+
+        void write      ( std::ostringstream const& oss, int verbosity_level = 1 );
+        void operator<< ( std::ostringstream const& oss );
+         /* Write a message to the log if the verbosity_level is <= than the Log's
+          * verbosity. Messages with a higher verbosity_level than the Log's verbosity
+          * are ignored.
+          * When logging to a file, the file is first opened, then the message is
+          * appened, and finally the file is closed again. This avoids that the log
+          * is corrupt after a program crash (except if it happens during logging).
+          * Messages with verbosity_level == WriteAlways are always written,
+          * even if the Log is silent (verbosity==0).
+          */
+
+        std::ostream* ostream ( int verbosity_level=1 );
+        std::ostream* ostream0( int verbosity_level=1 );
+        /* if OstreamLogWrapper holds a raw ostream* it is dereferenced and returned.
+         * if it holds a Log* it returns the Log's ostream
+         * if it holds nothing, ostream () returns a Log::sink,
+         *                      ostream0() returns nullptr
+         * if the client is logging to a file, he must call cleanup()
+         * before calling ostream() again.
+         */
+        void cleanup();
+        /* if the client is logging to a file, he must call cleanup()
+         * before calling ostream() again. It is good practice to call
+         * cleanup() always after writing to ostream().
+         */
+
+        PROPERTY_RW( int, verbosity, public, public, private)
+         /* Verbosity of the log.
+          * if verbosity <= 0
+          *   the log acts as a sink
+          * if verbosity == n
+          *   only log messages with verbosity_level <=n are written,
+          *   and messages with a higher verbosity_level are sinked.
+          * The default value is 1.
+          */
+
+//        PROPERTY_Rw( std::string, log, public, public, private )
+
+        bool clear();
+         /* Truncate the log file.
+          * (If Log is not logging to a file it does nothing).
+          */
+
+        static std::ostream sink;
+
+    private:
+        std::string log_;
+        std::ostream* ostream_ptr_;
+        std::ostream* newed_;
+    };
+
+    void operator<< ( Log& logger, std::ostringstream const& oss );
+     /* Send amessage with default verbosity_level (=1).
+      * use as
+      *     Log log(...);
       */
-    static void clear();
-     /* clear the log file.
-      */
-    static int verbosity;
-     /* -1 = no logging (silent)
-      */
-    static std::string filename;
-    /* if filename is "std::cout" output is sent to std::cout rather than to a file.
-     */
 
-private:
-    mutable std::ostream* f_;
-    mutable std::ostream* null_;
-};
 
-template <class T>
-std::ostream& operator<<( Log const& log, T const& t )
-{
-    if( log.f_ ) {
-        return *log.f_ << t;
-    } else {
-        return *log.null_ << t;
-    }
-}
 
-#define INFO     "\nInfo "
-#define DEBUG    "\nDebug "
-#define WARNING  "\nWARNING "
-#define CRITICAL "\nCRITICAL "
-#define FATAL    "\n!!! FATAL !!! "
-
-#define C_STR toUtf8().constData
- // allows for Log() << some_QString.C_STR();
-
+ //-----------------------------------------------------------------------------
+}// namespace toolbox
 #endif // LOG_H
