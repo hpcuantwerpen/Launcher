@@ -690,6 +690,9 @@ p, li { white-space: pre-wrap; }
           </item>
           <item row="1" column="0">
            <widget class="QCheckBox" name="wCheckCopyToVscData">
+            <property name="enabled">
+             <bool>false</bool>
+            </property>
             <property name="text">
              <string>Copy results to $VSC_DATA</string>
             </property>

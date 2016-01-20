@@ -150,7 +150,7 @@ namespace toolbox
         if( this->log_ ) {
             std::ostream* po = this->log_->ostream0();
             if( po ) {
-                *po << "<<< ["<< comment.toLatin1().constData() << ']';
+                *po << "\n<<< [ "<< comment.toLatin1().constData() << " ]";
                 for( int i=0; i < list.size(); ++i ) {
                     *po << "\n    " << list.at(i).toLatin1().constData();
                 }

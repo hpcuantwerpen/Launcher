@@ -146,7 +146,7 @@ namespace toolbox
             this->p_.start(cmd);
          // block, wait for completion of the command
             if( log_stream_ ) {
-                *log_stream_ << "<<< [" << comment.toLatin1().constData() << "]\n"
+                *log_stream_ << "\n<<< [ " << comment.toLatin1().constData() << " ]\n"
                             << this->starting().toLatin1().constData()
                             << std::endl;
             }
@@ -194,7 +194,7 @@ namespace toolbox
             this->p_.start(cmd);
             if( log_stream_ ) {
                 this->comment_ = comment;
-                *log_stream_ << "<<< [" << comment.toLatin1().constData() << "]\n"
+                *log_stream_ << "\n<<< [ " << comment.toLatin1().constData() << " ]\n"
                              << this->starting().toLatin1().constData()
                              << "\n>>>\n" << std::endl;
             }
@@ -207,7 +207,7 @@ namespace toolbox
         {
             this->stopped_ = QDateTime::currentDateTime();
             if( log_stream_ ) {
-                *log_stream_ << "<<< [" << this->comment_.toLatin1().constData() << "]\n"
+                *log_stream_ << "\n<<< [" << this->comment_.toLatin1().constData() << " ]\n"
                              << this->summary().toLatin1().constData()
                              << "\n>>>\n" << std::endl;
                 this->comment_.clear();

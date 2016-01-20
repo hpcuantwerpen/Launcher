@@ -339,8 +339,9 @@
         jobMenu_ ->addAction(reloadJobscriptAction_);
         jobMenu_ ->addAction(submitJobscriptAction_);
         jobMenu_ ->addAction(showFileLocationsAction_);
-        jobMenu_ ->addAction(showLocalJobFolderAction_);
-        jobMenu_ ->addAction(showRemoteJobFolderAction_);
+//        jobMenu_ ->addAction(showLocalJobFolderAction_);
+//        jobMenu_ ->addAction(showRemoteJobFolderAction_);
+        jobMenu_ ->addAction(removeRepoAction_);
 
         templatesMenu_ = menuBar()->addMenu("templates");
          // todo : test these
@@ -619,13 +620,13 @@
         this->getSessionConfigItem("wCheckCopyToDesktop", true );
         this->data_.append( dc::newDataConnector( this->ui->wCheckCopyToDesktop, "wCheckCopyToDesktop", "") );
 
-        this->getSessionConfigItem("CheckCopyToVscData", true );
+        this->getSessionConfigItem("CheckCopyToVscData", false );
         this->data_.append( dc::newDataConnector( this->ui->wCheckCopyToVscData, "CheckCopyToVscData", "") );
 
-        this->getSessionConfigItem("wCheckDeleteLocalJobFolder", true );
+        this->getSessionConfigItem("wCheckDeleteLocalJobFolder", false );
         this->data_.append( dc::newDataConnector( this->ui->wCheckDeleteLocalJobFolder, "wCheckDeleteLocalJobFolder", "") );
 
-        this->getSessionConfigItem("wCheckDeleteRemoteJobFolder", true );
+        this->getSessionConfigItem("wCheckDeleteRemoteJobFolder", false );
         this->data_.append( dc::newDataConnector( this->ui->wCheckDeleteRemoteJobFolder, "wCheckDeleteRemoteJobFolder", "") );
 
         this->setIgnoreSignals(false);
@@ -1638,7 +1639,7 @@ bool MainWindow::loadJobscript( QString const& filepath )
         if( const_cast<pbs::Script const&>(this->launcher_.script)["-N"] != jobfolder ) {
             this->launcher_.script["-N"]  = jobfolder;
         }
-        this->log_ << "\n    reading the job script ... done";
+        this->log_ << " done";
     } catch( std::runtime_error& e ) {
         QString msg = QString("An error occurred while reading the jobscript '%1'.\n Error:\n")
                          .arg( filepath )
