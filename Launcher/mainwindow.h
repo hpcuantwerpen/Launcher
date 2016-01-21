@@ -289,7 +289,7 @@ private:
     } pendingRequest_;
 
     QString selected_job_;
-    MessageBox messages_;
+//    MessageBox messages_;
     QString is_uptodate_for_;
     bool proceed_offline_;
     bool use_git_sync_;

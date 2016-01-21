@@ -161,7 +161,7 @@
       , verbosity_(INITIAL_VERBOSITY)
       , walltime_(nullptr)
       , pendingRequest_(NoPendingRequest)
-      , messages_(TITLE)
+//      , messages_(TITLE)
       , proceed_offline_(false)
     {
         this->log_call( 0, CALLEE0, QString("\n    Running Launcher version = ").append(VERSION) ) ;
@@ -216,8 +216,8 @@
         QFont font("Courier New",7);
 
         this->ui->wFinished   ->setFont(font);
-        this->ui->wNotFinished->setFont(font);
-        this->ui->wRetrieved  ->setFont(font);
+//        this->ui->wNotFinished->setFont(font);
+//        this->ui->wRetrieved  ->setFont(font);
 #endif
      // keep this the last line
         current_page_ = MainWindowConstructedButNoPreviousPage;
@@ -2977,9 +2977,16 @@ void MainWindow::submitJobscriptAction_triggered()
     }
 
     QString canceled = QString("Submit job '%1' CANCELED!").arg( this->job_folder() );
+
+    if( this->job_folder()==NEWJOB ) {
+        QMessageBox::critical(this,TITLE,"You must save your job script First.\n"
+                                         "(menu item Job script/Save)");
+        this->statusBar()->showMessage(canceled);
+        return;
+    }
+
     QString remote_job_folder = this->remote_path_to(JobFolder);
     QString  local_job_folder = this-> local_path_to(JobFolder,canceled);
-
     if(  this->launcher_.script.has_unsaved_changes()
      || !this->launcher_.script.touch_finished_found()
       )
