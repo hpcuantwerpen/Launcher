@@ -26,12 +26,37 @@ namespace toolbox
     Ssh::Ssh( Log* log )
       : log_(log)
       , verbose_(false)
-      , impl_(nullptr)
+      , connected_to_internet_(false)
+      , login_node_alive_(false)
       , authenticated_(false)
+      , impl_(nullptr)
+      , current_login_node_(-1)
     {
      // ping doesn't need impl_
         this->connected_to_internet_ = this->ping( "8.8.8.8", "test internet connection by pinging to google dns servers");
          // see http://etherealmind.com/what-is-the-best-ip-address-to-ping-to-test-my-internet-connection/
+    }
+
+    bool Ssh::set_login_nodes( QStringList const& login_nodes )
+    {
+        this->login_nodes_ = login_nodes;
+        if( login_nodes.isEmpty() ) {
+            this->current_login_node_ = -1;
+        } else {
+            this->set_login_node(0);
+        }
+        return true;
+    }
+
+    bool Ssh::set_login_node( int index )
+    {
+        if( index<0 || this->login_nodes().size()<=index ) {
+            return false;
+        } else {
+            this->current_login_node_ = index;
+            this->login_node_alive_ = false; // so it will be tested again.
+            return true;
+        }
     }
 
     bool Ssh::set_login_node( QString const& login_node )
@@ -39,12 +64,21 @@ namespace toolbox
         int index = this->login_nodes().indexOf(login_node);
         if( index==-1 ) {
             return false;
+        } else {
+            this->current_login_node_ = index;
+            this->login_node_alive_ = false;// so it will be tested again.
+             // login node successfully set, not necessarily alive or reachable
+            return true;
         }
-        this->login_node_ = login_node;
-        this->login_node_alive_ = this->ping( login_node, "Is the login node alive?");
-        return true;
-         // login node successfully set, not necessarily alive or reachable
-        //this->authenticated_ = false;
+    }
+
+    QString Ssh::login_node() const
+    {
+        if( this->current_login_node_ == -1 ) {
+            return QString();
+        } else {
+            return this->login_nodes_.at(this->current_login_node_);
+        }
     }
 
     bool Ssh::ping( QString const& to, QString const& comment ) const
@@ -76,7 +110,7 @@ namespace toolbox
      // copy the individual results
         if( alive ) *alive = ok;
      // can we access cluster on the current login node?
-        int index = this->login_nodes_.indexOf( this->login_node_ );
+        int index = this->current_login_node_;
         switch (index) {
         case 0: // generic login node
           { int n_alive = ok.count(true);
@@ -135,7 +169,7 @@ namespace toolbox
             bool ok = const_cast<Ssh*>(this)->test_login_nodes();
             if( !ok ) {
                 this->log( QStringList() << "The login node is not alive."
-                                         << QString("login node = ").append(this->login_node_)
+                                         << QString("login node = ").append(this->current_login_node_)
                          , "Authentication failed.");
                 return LOGINNODE_NOT_ALIVE;
             }
@@ -147,7 +181,7 @@ namespace toolbox
         }
         if( this->private_key_.isEmpty() ) {
             this->log( QStringList() << "The private key is missing."
-                                     << QString("user=").append(this->username_).append('@').append(this->login_node_)
+                                     << QString("user=").append(this->username_).append('@').append(this->current_login_node_)
                      , "Authentication failed.");
             return MISSING_PRIVATEKEY;
         }
@@ -155,7 +189,7 @@ namespace toolbox
         if( rc )
         {// failed
             this->log( QStringList() << "Wrong username/key/assphrase?"
-                                     << QString("user=").append(this->username_).append('@').append(this->login_node_)
+                                     << QString("user=").append(this->username_).append('@').append(this->current_login_node_)
                                      << QString("private key: ").append(this->private_key_)
                                      << "Clearing username and private key."
                      , "Authentication failed.");
@@ -306,13 +340,13 @@ namespace toolbox
         return this->impl_->remote_exists(remote_jobfolder_path);
     }
 
-    bool Ssh::remote_size( QString const& remote_jobfolder_path )
+    int Ssh::remote_size( QString const& remote_jobfolder_path )
     {
         QString cmd = QString("du -s %1/.git").arg( remote_jobfolder_path );
         int rc = this->execute( cmd, 180, "Obtain repository size of remote job folder repository (Bytes).");
         if( rc==0 ) {
             QString output = this->standardOutput();
-            rc = output.split('.',QString::SkipEmptyParts)[0].trimmed().toInt();
+            rc = output.split('\t',QString::SkipEmptyParts)[0].trimmed().toInt();
         } else {
             rc = -1;
         }

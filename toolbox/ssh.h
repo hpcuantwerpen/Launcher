@@ -60,13 +60,16 @@ namespace toolbox
           , REMOTE_COMMAND_NOT_DEFINED_BY_CLUSTER   = -100200
         };
      // properties
-        PROPERTY_RW( QStringList, login_nodes, public, public, private )
-        /* Get/set list of login nodes for the current cluster
-         * The first one is the generic login node
+        PROPERTY_Rw( QStringList, login_nodes, public, public, private )
+        /* Get/set list of login nodes for the current cluster.
+         * The setter also selects the first login node in the list as
+         * the current login node. This is expected to be the generic
+         * login node.
          */
-        PROPERTY_Rw( QString, login_node , public, public, private )
+        QString login_node() const;
+        bool set_login_node( QString const& login_node );
+        bool set_login_node( int select );
          /* Get/set login_node to be used to access the cluster
-          * The default is the generic login node.
           */
         PROPERTY_Rw( QString, username   , public, public, private )
         PROPERTY_Rw( QString, private_key, public, public, private )
@@ -131,13 +134,14 @@ namespace toolbox
         bool  local_exists( QString const&  local_jobfolder_path );
         bool remote_exists( QString const& remote_jobfolder_path );
 
-        bool remote_size( QString const& remote_jobfolder_path );
+        int remote_size( QString const& remote_jobfolder_path );
 
         void log( QString const& s ) const;
         void log( QStringList const& s, QString const& comment=QString() ) const;
         void log( char    const* s ) const;
     private:
         RemoteCommandMap_t remote_command_map_;
+        int current_login_node_;
     };
 
     bool ssh_available( Log *log=nullptr );

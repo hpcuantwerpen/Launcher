@@ -3257,6 +3257,14 @@ error_message_missing_job_script
     message(msg,message_box);
 }
 
+float kB( int B ) {
+    return B/1000.;
+}
+
+float MB( int B ) {
+    return B/1000000.;
+}
+
 void
 MainWindow::
 removeRepoAction_triggered()
@@ -3271,12 +3279,12 @@ removeRepoAction_triggered()
 
     QString  local_job_folder = this-> local_path_to(JobFolder);
     QString remote_job_folder = this->remote_path_to(JobFolder);
+    QString cmd;
 
-    QString cmd = QString("du -sm %1/.git").arg( this->remote_path_to(JobFolder) );
-    int sz0 = this->ssh.execute( cmd, 180, "Obtain repository size of remote job folder repository (MB).");
+    int sz0 = this->ssh.remote_size( remote_job_folder );
     QString size;
     if( sz0>=0 ) {
-        size = QString("The current size of the repository is %1 B.").arg(sz0);
+        size = QString("The current size of the repository is %1 kB.").arg( kB(sz0) );
     }
     QString msg = QString("Warning:\n"
                           "You are about to remove the .git repository of job folder '%1'.\n"
@@ -3321,22 +3329,36 @@ removeRepoAction_triggered()
  // local ----------------------------------------------------------------------
     QString status_remove_remote;
  // remote remove: removing all job folder contents
-    cmd = QString("rm -rf %1/*").arg( remote_job_folder );
+    cmd = QString("rm -rf %1").arg( remote_job_folder );
     rc = this->ssh.execute(cmd,300,"remove remote job folder (because of remove job folder repository)");
-    status_remove_remote = ( rc==0 ? "removed":"failed-to-remove");
- // remote recreate
-    rc = this->ssh.local_sync_to_remote(local_job_folder,remote_job_folder,/*save_first=*/false);
-    status_remove_remote.append(',').append( rc==0 ? "synchronized" : "failed-to-synchronize");
+    status_remove_remote = ( rc==0 ? "removed":"failed-to-remove");    
+ // remote mkdir
+    cmd = QString("mkdir %1").arg( remote_job_folder );
+    rc = this->ssh.execute(cmd,300,"recreate remote job folder)");
+    if( rc ) {
+        status_remove_remote = "mkdir-failed";
+    } else
+    {// remote recreate
+        rc = this->ssh.local_sync_to_remote(local_job_folder,remote_job_folder,/*save_first=*/false);
+        status_remove_remote.append(',').append( rc==0 ? "synchronized" : "failed-to-synchronize");
 
-    int sz1 = this->ssh.remote_size(remote_job_folder);
-
-    msg = QString("Remove job folder repository: [local:%1][remote:%2] remote size reduction: %3->%4")
-     .arg(status_remove_local )
-     .arg(status_remove_remote)
-     .arg(sz0)
-     .arg(sz1)
-    ;
+    }
 
 
+    msg = QString("Remove job folder repository: [local:%1][remote:%2]")
+             .arg(status_remove_local )
+             .arg(status_remove_remote)
+             ;
+//    if( rc== 0 ) {
+//        int sz1 = this->ssh.remote_size(remote_job_folder);
+//        if( sz1>0 ) {
+//            if( sz1>0 ) {
+//                msg.append( QString(" remote size reduction (kB): %1->%2").arg( kB(sz0) ).arg( kB(sz1) ) );
+//            } else {
+//                msg.append( QString(" remote size: %1 kB").arg( kB(sz1) ) );
+//            }
+//        }
+//    }
+//    for some reason the wrong size is reported here
     this->statusBar()->showMessage(msg);
 }
