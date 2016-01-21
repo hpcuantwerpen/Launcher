@@ -1004,7 +1004,6 @@ remote_path_to( PathTo path_to, bool resolve )
     {
         this->log_call( 1, CALLEE( BOOL2STRING(updateWidgets) ) );
 
-        bool ok = true;
         {// act on config items only...
             IGNORE_SIGNALS_UNTIL_END_OF_SCOPE;
             QString cluster = this->getSessionConfigItem("wCluster")->value().toString();
@@ -1023,9 +1022,11 @@ remote_path_to( PathTo path_to, bool resolve )
             this->nodesetDependencies     (updateWidgets);
             this->walltimeUnitDependencies(updateWidgets);
 
-            ok = this->ssh.set_login_node( clusterInfo.loginNodes()[0] );
+            this->ssh.set_login_nodes( clusterInfo.loginNodes() );
+         // ok = this->ssh.set_login_node ( clusterInfo.loginNodes()[0] );
             this->ssh.set_RemoteCommandMap( *clusterInfo.remote_commands() );
         }
+        bool ok = this->ssh.test_login_nodes();
         if( ok ) // login node is ok
         {// try to authenticate to refresh the list of available modules and the
          // remote file locations $VSC_DATA and $VSC_SCRATCH
@@ -1702,6 +1703,7 @@ bool MainWindow::loadJobscript( QString const& filepath )
 bool MainWindow::saveJobscript( QString const& filepath )
 {
     this->log_call( 1,CALLEE0);
+    QString msg;
     try {
         this->log_ << QString ("\n    Writing script '%1' ...").arg(filepath).toStdString();
         this->launcher_.script.write( filepath, /*warn_before_overwrite=*/false );
@@ -1732,11 +1734,11 @@ bool MainWindow::saveJobscript( QString const& filepath )
     QDir  d(filepath);
     d.cdUp();
     int rc = this->ssh.local_save( d.absolutePath() );
-    if( rc ) {
-        this->statusBar()->showMessage( QString("Job script saved: '%1', but local repository could not be updated!!").arg(filepath) );
-    } else {
-        this->statusBar()->showMessage( QString("Job script saved: '%1'").arg(filepath) );
-    }
+    msg = QString( rc ? "Job script saved: '%1', but local repository could not be updated!!"
+                      : "Job script saved: '%1', local repository updated"
+                 ).arg(filepath);
+    this->statusBar()->showMessage(msg);
+
  // just saved, hence no unsaved changes yet.
     this->launcher_.script.set_has_unsaved_changes(false);
     this->check_script_unsaved_changes();
@@ -2170,6 +2172,8 @@ void MainWindow::authenticateAction_triggered()
     this->log_call( 1, CALLEE0 );
     CHECK_IGNORESIGNAL
 
+    this->proceed_offline_ = false;
+
     if( this->ssh.authenticated() ) {
         QString msg = QString("This session is already authenticated:"
                               "\n  user: %1"
@@ -2273,7 +2277,8 @@ bool MainWindow::authenticate(bool silent)
         this->is_uptodate_for_.clear();
         break;
     case toolbox::Ssh::LOGINNODE_NOT_ALIVE:
-        msg = "Authentication failed: login node not alive.";
+        msg = "Authentication failed: current login node '%1' not alive.";
+        msg = msg.arg( this->ssh.login_node() );
         this->is_uptodate_for_.clear();
         break;
     default:
@@ -2316,27 +2321,30 @@ bool MainWindow::authenticate(bool silent)
     {// make some noise
         switch (rc) {
         case toolbox::Ssh::NO_INTERNET:
-        {   int answer = QMessageBox::question( this, TITLE
-                                              , msg.append("\nClick 'Proceed offline' if you are working "
-                                                           "offline and don't want to see this message again.")
-                                              ,"Proceed offline" // button0
-                                              ,"Ok"              // button1
-                                              , QString()        // button2
-                                              , 1                // default button
-                                              );
+        {   int answer = QMessageBox::question
+                    ( this, TITLE
+                    , msg.append("\nClick 'Proceed offline' if you want to work "
+                                 "offline and don't want to see this message again.")
+                    ,"Proceed offline" // button0
+                    ,"Ok"              // button1
+                    , QString()        // button2
+                    , 1                // default button
+                    );
             this->proceed_offline_ = (answer==0);
         }   break;
 
         case toolbox::Ssh::LOGINNODE_NOT_ALIVE:
-        {   int answer = QMessageBox::question( this, TITLE
-                                              , msg.append("\n(If your are working off-campus, you might need VPN to reach the cluster.)"
-                                                           "\n\nClick 'Proceed offline' if you are working "
-                                                           "offline and don't want to see this message again.")
-                                              ,"Proceed offline" // button0
-                                              ,"Ok"              // button1
-                                              , QString()        // button2
-                                              , 1                // default button
-                                              );
+        {   int answer = QMessageBox::question
+                    ( this, TITLE
+                    , msg.append("\n(If your are working off-campus, you might need "
+                                 "VPN to reach the cluster.)"
+                                 "\n\nClick 'Proceed offline' if you want to work "
+                                 "offline and don't want to see this message again.")
+                    ,"Proceed offline" // button0
+                    ,"Ok"              // button1
+                    , QString()        // button2
+                    , 1                // default button
+                    );
             this->proceed_offline_ = (answer==0);
         }   break;
         case toolbox::Ssh::MISSING_USERNAME:
@@ -3260,53 +3268,75 @@ removeRepoAction_triggered()
     if( !this->actionRequiringAuthentication("Remove job folder repository") ) {
         return;
     }
-    QString cmd = QString("du -sm %1/.git").arg( this->remote_path_to(JobFolder) );
-    int rc = this->ssh.execute( cmd, 180, "Obtain repository size of remote job folder repository (MB).");
-    QString size("unknown");
-    if( rc==0 ) {
-        size = this->ssh.standardOutput().split('.',QString::SkipEmptyParts)[0].trimmed().append(" MB");
-    }
-    QString msg = QString("Warning:\n You are about to remove the .git repository of job folder '%1'.\n"
-                          "Use this action only if the repository has grown too much over time and you "
-                          "no longer want to recover older versions of the jobfolder. If You remove the "
-                          "repository a new repository will be created corresponding to the current state "
-                          "of the job folder./n"
-                          "The current size of the repository is %2.\n\n Do you want to remove the job "
-                          "folder repository?")
-                     .arg( this->local_path_to(JobFolder) )
-                     .arg( size )
-                     ;
-    QMessageBox::StandardButton answer = QMessageBox::question(this, TITLE, msg );
-    if( answer!=QMessageBox::Yes )
-    {
-        this->statusBar()->showMessage("Action 'Remove job folder repository' canceled.");
-        return;
-    }
+
     QString  local_job_folder = this-> local_path_to(JobFolder);
     QString remote_job_folder = this->remote_path_to(JobFolder);
 
-    toolbox::Execute x( nullptr, &this->log_ );
-    x.set_working_directory( local_job_folder );
+    QString cmd = QString("du -sm %1/.git").arg( this->remote_path_to(JobFolder) );
+    int sz0 = this->ssh.execute( cmd, 180, "Obtain repository size of remote job folder repository (MB).");
+    QString size;
+    if( sz0>=0 ) {
+        size = QString("The current size of the repository is %1 B.").arg(sz0);
+    }
+    QString msg = QString("Warning:\n"
+                          "You are about to remove the .git repository of job folder '%1'.\n"
+                          "Use this action only if the repository has grown too much over time"
+                          " and you no longer want to recover older versions of the jobfolder. "
+                          "If you do remove the repository a new repository will be created "
+                          "corresponding to the current state of the LOCAL job folder. Note "
+                          "that all content in the remote job folder will be removed. Make "
+                          "sure that you have copied the results you need./n"
+                          "%2\n\n Do you want to remove the job folder repository?")
+                     .arg( this->local_path_to(JobFolder) )
+                     .arg( size )
+                     ;
+    QMessageBox::StandardButton answer = QMessageBox::question
+        ( this, TITLE, msg, QMessageBox::Yes|QMessageBox::No, QMessageBox::No );
+    if( answer!=QMessageBox::Yes ) {
+        this->statusBar()->showMessage("Action 'Remove job folder repository' canceled.");
+        return;
+    }
+
+    int rc;
+ // local ----------------------------------------------------------------------
+    QString status_remove_local;
+ // local remove : remove only .git repository
+    if( this->ssh.local_exists(local_job_folder) ) {
+        toolbox::Execute x( nullptr, &this->log_ );
+        x.set_working_directory( local_job_folder );
 #ifdef Q_OS_WIN
-    cmd = "del .git";
+        cmd = "del .git";
 #else
-    cmd = "rm -rf ,git";
+        cmd = "rm -rf .git";
 #endif
-    rc = x(cmd,120,"remove local job folder repository");
-    if( rc ) {
-        this->statusBar()->showMessage("Local job folder repository removed.");
+        rc = x(cmd,120,"remove local job folder repository");
+        status_remove_local = ( rc==0 ? "removed":"failed-to-remove");
     } else {
-        this->statusBar()->showMessage("Local job folder repository failed. Canceling.");
-        return;
+        status_remove_local = "inexisting";
     }
-    cmd = QString("cd %1 && rm -rf ./.git").arg( remote_job_folder );
-    rc = this->ssh.execute(cmd,300,"remove remote job folder repository");
-    if( rc ) {
-        this->statusBar()->showMessage("Remote job folder repository removed.");
-    } else {
-        this->statusBar()->showMessage("Remote job folder repository failed. Canceling.");
-        return;
-    }
-    this->ssh. local_save( local_job_folder );
-    this->ssh.remote_save( local_job_folder, remote_job_folder );
+ // local recreate
+    rc = this->ssh.local_save(local_job_folder);
+    status_remove_local.append(',').append( rc==0 ? "recreated" : "failed-to-save");
+
+ // local ----------------------------------------------------------------------
+    QString status_remove_remote;
+ // remote remove: removing all job folder contents
+    cmd = QString("rm -rf %1/*").arg( remote_job_folder );
+    rc = this->ssh.execute(cmd,300,"remove remote job folder (because of remove job folder repository)");
+    status_remove_remote = ( rc==0 ? "removed":"failed-to-remove");
+ // remote recreate
+    rc = this->ssh.local_sync_to_remote(local_job_folder,remote_job_folder,/*save_first=*/false);
+    status_remove_remote.append(',').append( rc==0 ? "synchronized" : "failed-to-synchronize");
+
+    int sz1 = this->ssh.remote_size(remote_job_folder);
+
+    msg = QString("Remove job folder repository: [local:%1][remote:%2] remote size reduction: %3->%4")
+     .arg(status_remove_local )
+     .arg(status_remove_remote)
+     .arg(sz0)
+     .arg(sz1)
+    ;
+
+
+    this->statusBar()->showMessage(msg);
 }

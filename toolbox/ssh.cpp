@@ -27,27 +27,67 @@ namespace toolbox
       : log_(log)
       , verbose_(false)
       , impl_(nullptr)
+      , authenticated_(false)
     {
      // ping doesn't need impl_
         this->connected_to_internet_ = this->ping( "8.8.8.8", "test internet connection by pinging to google dns servers");
          // see http://etherealmind.com/what-is-the-best-ip-address-to-ping-to-test-my-internet-connection/
     }
 
-    bool Ssh::set_login_node(const QString &login_node)
+    bool Ssh::set_login_node( QString const& login_node )
     {
+        int index = this->login_nodes().indexOf(login_node);
+        if( index==-1 ) {
+            return false;
+        }
         this->login_node_ = login_node;
-        this->login_node_alive_ = this->ping( login_node, "Are the login nodes alive?");
-        return this->login_node_alive_;
-        this->authenticated_ = false;
+        this->login_node_alive_ = this->ping( login_node, "Is the login node alive?");
+        return true;
+         // login node successfully set, not necessarily alive or reachable
+        //this->authenticated_ = false;
     }
 
     bool Ssh::ping( QString const& to, QString const& comment ) const
     {
+#ifdef Q_OS_WIN
+        QString ping_cmd("ping ");
+#else
         QString ping_cmd("ping -c 1 ");
+#endif
         ping_cmd.append( to );
         toolbox::Execute x( nullptr, this->log() );
         int rc = x( ping_cmd, 300, comment );
+#ifdef Q_OS_WIN
+        QString output = x.standardOutput();
+        bool ok = !output.contains("Destination net unreachable");
+        return ok;
+#else
         return rc==0;
+#endif
+    }
+
+    bool Ssh::test_login_nodes( QList<bool>* alive )
+    {
+        QList<bool> ok;
+        for( int i=0; i<this->login_nodes_.size(); ++i ) {
+            bool ok_i = this->ping( this->login_nodes_.at(i), "test login node");
+            ok.append(ok_i);
+        }
+     // copy the individual results
+        if( alive ) *alive = ok;
+     // can we access cluster on the current login node?
+        int index = this->login_nodes_.indexOf( this->login_node_ );
+        switch (index) {
+        case 0: // generic login node
+          { int n_alive = ok.count(true);
+            this->login_node_alive_ = ( n_alive>1 );
+          } break;
+        default: // specific login node
+          { bool ok_index = ok.at(index);
+            this->login_node_alive_ = ok_index ;
+          } break;
+        }
+        return this->login_node_alive();
     }
 
     bool Ssh::set_username( QString const& username )
@@ -92,8 +132,8 @@ namespace toolbox
         }
         if( !this->login_node_alive_ )
         {// retry
-            const_cast<Ssh*>(this)->login_node_alive_ = this->ping( this->login_node_, "Is the login node alive?" );
-            if( !this->login_node_alive_ ) {
+            bool ok = const_cast<Ssh*>(this)->test_login_nodes();
+            if( !ok ) {
                 this->log( QStringList() << "The login node is not alive."
                                          << QString("login node = ").append(this->login_node_)
                          , "Authentication failed.");
@@ -226,9 +266,61 @@ namespace toolbox
         this->add_RemoteCommandMap( map );
     }
 
+    int Ssh::local_save( QString const& local_jobfolder_path )
+    {// forward to impl_
+        return this->impl_->local_save(local_jobfolder_path);
+    }
+
+    int Ssh::local_sync_to_remote
+      ( QString const&  local_jobfolder_path
+      , QString const& remote_jobfolder_path
+      , bool           save_first
+      )
+    {// forward to impl_
+        return this->impl_->local_sync_to_remote(local_jobfolder_path,remote_jobfolder_path,save_first);
+    }
+
+    int Ssh::remote_save
+      ( QString const&  local_jobfolder_path
+      , QString const& remote_jobfolder_path )
+    {// forward to impl_
+        return this->impl_->remote_save(local_jobfolder_path,remote_jobfolder_path);
+    }
+
+    int Ssh::remote_sync_to_local
+      ( QString const&  local_jobfolder_path
+      , QString const& remote_jobfolder_path
+      , bool           save_first
+      )
+    {// forward to impl_
+        return this->impl_->remote_sync_to_local(local_jobfolder_path,remote_jobfolder_path,save_first);
+    }
+
+    bool Ssh::local_exists( QString const&  local_jobfolder_path )
+    {// forward to impl_
+        return this->impl_-> local_exists( local_jobfolder_path);
+    }
+
+    bool Ssh::remote_exists( QString const& remote_jobfolder_path )
+    {// forward to impl_
+        return this->impl_->remote_exists(remote_jobfolder_path);
+    }
+
+    bool Ssh::remote_size( QString const& remote_jobfolder_path )
+    {
+        QString cmd = QString("du -s %1/.git").arg( remote_jobfolder_path );
+        int rc = this->execute( cmd, 180, "Obtain repository size of remote job folder repository (Bytes).");
+        if( rc==0 ) {
+            QString output = this->standardOutput();
+            rc = output.split('.',QString::SkipEmptyParts)[0].trimmed().toInt();
+        } else {
+            rc = -1;
+        }
+        return rc;
+    }
  //=============================================================================
  // SshImpl::
- //=============================================================================
+ //====b=========================================================================
     SshImpl::
     SshImpl()
       : super_(nullptr)
