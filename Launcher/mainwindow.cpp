@@ -322,6 +322,9 @@
 
         removeRepoAction_ = new QAction("remove jobfolder repository ...", this );
         connect( removeRepoAction_, SIGNAL(triggered()), this, SLOT( removeRepoAction_triggered() ) );
+
+        createRepoAction_ = new QAction("create jobfolder repository ...", this );
+        connect( createRepoAction_, SIGNAL(triggered()), this, SLOT( createRepoAction_triggered() ) );
     }
 
     void MainWindow::createMenus()
@@ -342,6 +345,7 @@
 //        jobMenu_ ->addAction(showLocalJobFolderAction_);
 //        jobMenu_ ->addAction(showRemoteJobFolderAction_);
         jobMenu_ ->addAction(removeRepoAction_);
+        jobMenu_ ->addAction(createRepoAction_);
 
         templatesMenu_ = menuBar()->addMenu("templates");
          // todo : test these
@@ -1027,6 +1031,10 @@ remote_path_to( PathTo path_to, bool resolve )
             this->ssh.set_RemoteCommandMap( *clusterInfo.remote_commands() );
         }
         bool ok = this->ssh.test_login_nodes();
+        this->log_call( 1, CALLEE0, QString("\n    ... continued")
+                                    .append("\n    internet connection : ").append( this->ssh.connected_to_internet() ? "yes" : "no")
+                                    .append("\n    access to login node: ").append( this->ssh.login_node_alive()      ? "yes" : "no")
+                      );
         if( ok ) // login node is ok
         {// try to authenticate to refresh the list of available modules and the
          // remote file locations $VSC_DATA and $VSC_SCRATCH
@@ -3269,6 +3277,9 @@ void
 MainWindow::
 removeRepoAction_triggered()
 {
+    this->log_call( 1, CALLEE0);
+    this->statusBar()->clearMessage();
+
     if( ! this->isScriptOpen() ) {
         this->statusBar()->showMessage("Action 'Remove job folder repository' canceled: no job script open.");
         return;
@@ -3304,61 +3315,102 @@ removeRepoAction_triggered()
         this->statusBar()->showMessage("Action 'Remove job folder repository' canceled.");
         return;
     }
+    QString msg_local  = this->remove_repo_local ();
+    QString msg_remote = this->remove_repo_remote();
+    this->statusBar()->showMessage
+            ( QString("remove job folder repository [local:%1][remote:%2]")
+                 .arg(msg_local).arg(msg_remote)
+            );
+}
 
-    int rc;
- // local ----------------------------------------------------------------------
-    QString status_remove_local;
- // local remove : remove only .git repository
-    if( this->ssh.local_exists(local_job_folder) ) {
-        toolbox::Execute x( nullptr, &this->log_ );
-        x.set_working_directory( local_job_folder );
-#ifdef Q_OS_WIN
-        cmd = "del .git";
-#else
-        cmd = "rm -rf .git";
-#endif
-        rc = x(cmd,120,"remove local job folder repository");
-        status_remove_local = ( rc==0 ? "removed":"failed-to-remove");
-    } else {
-        status_remove_local = "inexisting";
+
+void
+MainWindow::
+createRepoAction_triggered()
+{
+    this->log_call( 1, CALLEE0);
+    this->statusBar()->clearMessage();
+
+    if( ! this->isScriptOpen() ) {
+        this->statusBar()->showMessage("Action 'Remove job folder repository' canceled: no job script open.");
+        return;
     }
- // local recreate
-    rc = this->ssh.local_save(local_job_folder);
-    status_remove_local.append(',').append( rc==0 ? "recreated" : "failed-to-save");
+    if( !this->actionRequiringAuthentication("Remove job folder repository") ) {
+        return;
+    }
 
- // local ----------------------------------------------------------------------
-    QString status_remove_remote;
- // remote remove: removing all job folder contents
-    cmd = QString("rm -rf %1").arg( remote_job_folder );
-    rc = this->ssh.execute(cmd,300,"remove remote job folder (because of remove job folder repository)");
-    status_remove_remote = ( rc==0 ? "removed":"failed-to-remove");    
- // remote mkdir
-    cmd = QString("mkdir %1").arg( remote_job_folder );
-    rc = this->ssh.execute(cmd,300,"recreate remote job folder)");
+    QString msg_local  = this->create_repo_local ();
+    QString msg_remote = this->create_repo_remote();
+    this->statusBar()->showMessage
+            ( QString("create job folder repository [local:%1][remote:%2]")
+                 .arg(msg_local).arg(msg_remote)
+            );
+}
+
+QString MainWindow::remove_repo_local()
+{
+    QString local_job_folder = this->local_path_to(JobFolder);
+    this->log_call( 1, CALLEE0, QString("\n    ").append(local_job_folder) );
+    QString msg;
+    QDir dir(local_job_folder);
+    if( dir.cd(".git") ) {
+        if( dir.removeRecursively() ) {
+            msg = "removed";
+        } else {
+            msg = "remove-failed";
+        }
+    } else {
+        msg = "inexisting";
+    }
+    this->log_ << QString("\n    ").append(msg).toStdString();
+    return msg;
+}
+
+QString MainWindow::remove_repo_remote()
+{
+    QString remote_job_folder = this->remote_path_to(JobFolder);
+    this->log_call( 1, CALLEE0, QString("\n    ").append(remote_job_folder) );
+
+    QString cmd = QString("rm -rf %1").arg( remote_job_folder );
+    int rc = this->ssh.execute(cmd,300,"remove remote job folder (because of remove job folder repository)");
+    QString msg( rc==0 ? "removed":"failed-to-remove");
+
+    this->log_ << QString("\n    ").append(msg).toStdString();
+    return msg;
+}
+
+QString MainWindow::create_repo_local()
+{
+    QString local_job_folder = this->local_path_to(JobFolder);
+    this->log_call( 1, CALLEE0, QString("\n    ").append(local_job_folder) );
+
+    int rc = this->ssh.local_save(local_job_folder);
+    QString msg( rc==0 ? "recreated" : "failed-to-create");
+
+    this->log_ << QString("\n    ").append(msg).toStdString();
+    return msg;
+}
+
+QString MainWindow::create_repo_remote()
+{
+    QString local_job_folder = this->local_path_to(JobFolder);
+    QString remote_job_folder = this->remote_path_to(JobFolder);
+    this->log_call( 1, CALLEE0, QString("\n    local : ").append( local_job_folder)
+                                .append("\n    remote: ").append(remote_job_folder)
+                    );
+
+    QString msg;
+    QString cmd = QString("mkdir %1").arg( remote_job_folder );
+    int rc = this->ssh.execute(cmd,300,"recreate remote job folder)");
     if( rc ) {
-        status_remove_remote = "mkdir-failed";
+        msg = "mkdir-failed";
     } else
     {// remote recreate
         rc = this->ssh.local_sync_to_remote(local_job_folder,remote_job_folder,/*save_first=*/false);
-        status_remove_remote.append(',').append( rc==0 ? "synchronized" : "failed-to-synchronize");
-
+        msg = ( rc==0 ? "synchronized" : "failed-to-synchronize");
     }
 
-
-    msg = QString("Remove job folder repository: [local:%1][remote:%2]")
-             .arg(status_remove_local )
-             .arg(status_remove_remote)
-             ;
-//    if( rc== 0 ) {
-//        int sz1 = this->ssh.remote_size(remote_job_folder);
-//        if( sz1>0 ) {
-//            if( sz1>0 ) {
-//                msg.append( QString(" remote size reduction (kB): %1->%2").arg( kB(sz0) ).arg( kB(sz1) ) );
-//            } else {
-//                msg.append( QString(" remote size: %1 kB").arg( kB(sz1) ) );
-//            }
-//        }
-//    }
-//    for some reason the wrong size is reported here
-    this->statusBar()->showMessage(msg);
+    this->log_ << QString("\n    ").append(msg).toStdString();
+    return msg;
 }
+

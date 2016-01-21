@@ -145,6 +145,7 @@ private slots:
     void showRemoteJobFolderAction_triggered();
     void useGitSynchronizationAction_triggered();
     void removeRepoAction_triggered();
+    void createRepoAction_triggered();
 
     void on_wWalltime_editingFinished();
 
@@ -228,6 +229,11 @@ public:
     void error_message_missing_job_folder         ( QString const& msg1=QString(), message_box_t message_box=QMessageBox::critical );
     void error_message_missing_job_script         ( QString const& msg1=QString(), message_box_t message_box=QMessageBox::critical );
 
+    QString remove_repo_local ();
+    QString remove_repo_remote();
+    QString create_repo_local ();
+    QString create_repo_remote();
+
 private:
     toolbox::Log& log_;
     Ui::MainWindow *ui;
@@ -256,7 +262,7 @@ private:
     QAction* showLocalJobFolderAction_;
     QAction* showRemoteJobFolderAction_;
     QAction* removeRepoAction_;
-
+    QAction* createRepoAction_;
 
     QMenu* templatesMenu_;
     QAction* selectTemplateAction_;
