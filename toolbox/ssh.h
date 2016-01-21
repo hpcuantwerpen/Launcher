@@ -20,6 +20,8 @@ namespace toolbox
         virtual int local_sync_to_remote( QString const& local_jobfolder_path, QString const& remote_jobfolder_path, bool save_first=true ) = 0;
         virtual int remote_save         ( QString const& local_jobfolder_path, QString const& remote_jobfolder_path ) = 0;
         virtual int remote_sync_to_local( QString const& local_jobfolder_path, QString const& remote_jobfolder_path, bool save_first=true ) = 0;
+        virtual bool local_exists       ( QString const& local_jobfolder_path ) = 0;
+        virtual bool remote_exists      (                                      QString const& remote_jobfolder_path ) = 0;
     protected:
         Ssh* super_;
     };
@@ -36,10 +38,10 @@ namespace toolbox
         virtual int remote_save         ( QString const& local_jobfolder_path, QString const& remote_jobfolder_path );
         virtual int remote_sync_to_local( QString const& local_jobfolder_path, QString const& remote_jobfolder_path, bool save_first=true );
     protected:
-               bool local_exists        ( QString const& local_jobfolder_path );
-                int local_create        ( QString const& local_jobfolder_path );
-               bool remote_exists       (                                      QString const& remote_jobfolder_path );
-                int remote_create       ( QString const& local_jobfolder_path, QString const& remote_jobfolder_path );
+        virtual bool local_exists       ( QString const& local_jobfolder_path );
+                 int local_create       ( QString const& local_jobfolder_path );
+        virtual bool remote_exists      (                                      QString const& remote_jobfolder_path );
+                 int remote_create      ( QString const& local_jobfolder_path, QString const& remote_jobfolder_path );
     };
 
     class Ssh
@@ -58,7 +60,14 @@ namespace toolbox
           , REMOTE_COMMAND_NOT_DEFINED_BY_CLUSTER   = -100200
         };
      // properties
+        PROPERTY_RW( QStringList, login_nodes, public, public, private )
+        /* Get/set list of login nodes for the current cluster
+         * The first one is the generic login node
+         */
         PROPERTY_Rw( QString, login_node , public, public, private )
+         /* Get/set login_node to be used to access the cluster
+          * The default is the generic login node.
+          */
         PROPERTY_Rw( QString, username   , public, public, private )
         PROPERTY_Rw( QString, private_key, public, public, private )
         PROPERTY_Rw( QString, passphrase , public, public, private )
@@ -79,14 +88,50 @@ namespace toolbox
         void set_RemoteCommandMap( RemoteCommandMap_t const& map );
 
     public:
-        bool ping(QString const& to , const QString &comment= QString()     ) const;
+
+        bool test_login_nodes( QList<bool>* alive=nullptr );
+         /* tests (ping) if all the login nodes can be reached and optionally
+          * copies the result to *alive.
+          * Returns true iff the cluster can be reached with the currently
+          * selected login node, that is,
+          *   . if the currently selected login node is the generic node,
+          *     at least one specific login node must be alive,
+          *   . if the currently selected login node is a specific node,
+          *     that specific login node must be alive.
+          * Failure to ping to the generic login node typically indicates
+          * that there is no internet connection. (In very rare cases the site
+          * is down).
+          * Failure to ping to a specific node arises
+          *   - if there is no internet connection
+          *   - if there is internet connection, but you are off-campus and
+          *     vpn is not connected
+          *   - if the login node is down
+          */
+        bool ping(QString const& to , const QString &comment= QString() ) const;
         int authenticate() const;
         bool set_impl( bool use_os );
+
         int execute( QString const& remote_cmd, int msecs, QString const& comment=QString(), bool wrap=true ) const;
-        int local_save          ( QString const& local_jobfolder_path )                                                             { return this->impl_->local_save          (local_jobfolder_path); }
-        int local_sync_to_remote( QString const& local_jobfolder_path, QString const& remote_jobfolder_path, bool save_first=true ) { return this->impl_->local_sync_to_remote(local_jobfolder_path,remote_jobfolder_path,save_first); }
-        int remote_save         ( QString const& local_jobfolder_path, QString const& remote_jobfolder_path )                       { return this->impl_->remote_save         (local_jobfolder_path,remote_jobfolder_path); }
-        int remote_sync_to_local( QString const& local_jobfolder_path, QString const& remote_jobfolder_path, bool save_first=true ) { return this->impl_->remote_sync_to_local(local_jobfolder_path,remote_jobfolder_path,save_first); }
+
+        int local_save( QString const& local_jobfolder_path );
+        int local_sync_to_remote
+          ( QString const&  local_jobfolder_path
+          , QString const& remote_jobfolder_path
+          , bool           save_first = true
+          );
+        int remote_save
+          ( QString const&  local_jobfolder_path
+          , QString const& remote_jobfolder_path
+          );
+        int remote_sync_to_local
+          ( QString const&  local_jobfolder_path
+          , QString const& remote_jobfolder_path
+          , bool           save_first = true
+          );
+        bool  local_exists( QString const&  local_jobfolder_path );
+        bool remote_exists( QString const& remote_jobfolder_path );
+
+        bool remote_size( QString const& remote_jobfolder_path );
 
         void log( QString const& s ) const;
         void log( QStringList const& s, QString const& comment=QString() ) const;
