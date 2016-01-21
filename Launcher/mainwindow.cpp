@@ -2909,9 +2909,14 @@ void MainWindow::openJobscriptAction_triggered()
         return;
     }
     if( verify_file(&dir,"pbs.sh") ) {
-        this->getSessionConfigItem("wProjectFolder")->set_value(folders.at(1));
+        this->ui->wNewJobscriptButton->setVisible(false);
+        this->ui->wResourcesGroup    ->setVisible(true );
+        this->ui->wScriptPage        ->setEnabled(true );
+
+     this->getSessionConfigItem("wProjectFolder")->set_value(folders.at(1));
         this->getSessionConfigItem("wJobname"      )->set_value(folders.at(2));
         this->loadJobscript( dir.filePath("pbs.sh") );
+
     } else {
         QString msg = QString("No job script found in Folder '%1'. \n"
                               "Create a new one?")
@@ -3269,6 +3274,8 @@ void
 MainWindow::
 removeRepoAction_triggered()
 {
+    this->log_call( 1, CALLEE0 );
+
     if( ! this->isScriptOpen() ) {
         this->statusBar()->showMessage("Action 'Remove job folder repository' canceled: no job script open.");
         return;
@@ -3317,7 +3324,7 @@ removeRepoAction_triggered()
 #else
         cmd = "rm -rf .git";
 #endif
-        rc = x(cmd,120,"remove local job folder repository");
+        rc = x(cmd,300,"remove local job folder repository");
         status_remove_local = ( rc==0 ? "removed":"failed-to-remove");
     } else {
         status_remove_local = "inexisting";
