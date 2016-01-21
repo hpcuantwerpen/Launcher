@@ -2917,9 +2917,14 @@ void MainWindow::openJobscriptAction_triggered()
         return;
     }
     if( verify_file(&dir,"pbs.sh") ) {
-        this->getSessionConfigItem("wProjectFolder")->set_value(folders.at(1));
+        this->ui->wNewJobscriptButton->setVisible(false);
+        this->ui->wResourcesGroup    ->setVisible(true );
+        this->ui->wScriptPage        ->setEnabled(true );
+
+     this->getSessionConfigItem("wProjectFolder")->set_value(folders.at(1));
         this->getSessionConfigItem("wJobname"      )->set_value(folders.at(2));
         this->loadJobscript( dir.filePath("pbs.sh") );
+
     } else {
         QString msg = QString("No job script found in Folder '%1'. \n"
                               "Create a new one?")

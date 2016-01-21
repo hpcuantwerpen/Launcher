@@ -228,7 +228,7 @@ namespace toolbox
                 for( int i=0; i < list.size(); ++i ) {
                     *po << "\n    " << list.at(i).toLatin1().constData();
                 }
-                *po << "\n>>>\n";
+                *po << "\n>>>\n" << std::flush;
             }
             this->log_->cleanup();
         }

@@ -128,6 +128,7 @@ namespace toolbox
     {
     public:
         Execute( QObject* parent=nullptr, Log* log=nullptr );
+        virtual ~Execute() {}
 
         int operator()( QString const& cmd, int secs=30, QString const& comment=QString() );
          /* Times out after secs. (blocking)
