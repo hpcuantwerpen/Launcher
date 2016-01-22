@@ -3320,8 +3320,10 @@ removeRepoAction_triggered()
         this->statusBar()->showMessage("Action 'Remove job folder repository' canceled.");
         return;
     }
-    QString msg_local  = this->remove_repo_local ();
-    QString msg_remote = this->remove_repo_remote();
+    QString msg_local;
+    QString msg_remote;
+    this->remove_repo_local (&msg_local);
+    this->remove_repo_remote(&msg_remote);
     this->statusBar()->showMessage
             ( QString("remove job folder repository [local:%1][remote:%2]")
                  .arg(msg_local).arg(msg_remote)
@@ -3344,34 +3346,52 @@ createRepoAction_triggered()
         return;
     }
 
-    QString msg_local  = this->create_repo_local ();
-    QString msg_remote = this->create_repo_remote();
+    QString msg("create job folder repository ");
+    QString msg_local;
+    QString msg_remote("local-repo-missing");
+    if( this->create_repo_local (&msg_local ) ) {
+        this->create_repo_remote(&msg_remote);
+    }
     this->statusBar()->showMessage
-            ( QString("create job folder repository [local:%1][remote:%2]")
-                 .arg(msg_local).arg(msg_remote)
-            );
+        ( QString("create job folder repository [local:%1][remote:%2]")
+             .arg(msg_local).arg(msg_remote)
+        );
 }
 
-QString MainWindow::remove_repo_local()
+bool MainWindow::remove_repo_local( QString* pmsg )
 {
     QString local_job_folder = this->local_path_to(JobFolder);
     this->log_call( 1, CALLEE0, QString("\n    ").append(local_job_folder) );
-    QString msg;
-    QDir dir(local_job_folder);
-    if( dir.cd(".git") ) {
-        if( dir.removeRecursively() ) {
-            msg = "removed";
-        } else {
-            msg = "remove-failed";
-        }
-    } else {
-        msg = "inexisting";
+
+    bool exists = this->ssh.local_exists(local_job_folder);
+    bool ok = exists;
+    if( exists )
+    {
+#if defined(Q_OS_WIN) || defined(LOCAL_REMOVE_REPO_WITH_RM)
+     // to remove the .git directory we use the rm provided with git.
+     // . QDir::removeRecursively() does not delete ./git/objects on windows
+     // . del and rmdir do not work as an os command in toolbox::Execute
+        toolbox::Execute x(nullptr,&this->log_);
+        x.set_working_directory(local_job_folder);
+        QString cmd = QString("rm -rf .git");
+        int rc = x(cmd,300,"remove local job folder repository");
+        ok = (rc==0);
+#else
+        ok = dir.removeRecursively();
+#endif
     }
+    QString msg = ( exists
+                  ? ( ok ? "removed" : "remove-failed" )
+                  : "inexisting"
+                  );
     this->log_ << QString("\n    ").append(msg).toStdString();
-    return msg;
+    if( pmsg ) {
+        *pmsg = msg;
+    }
+    return ok;
 }
 
-QString MainWindow::remove_repo_remote()
+bool MainWindow::remove_repo_remote( QString* pmsg )
 {
     QString remote_job_folder = this->remote_path_to(JobFolder);
     this->log_call( 1, CALLEE0, QString("\n    ").append(remote_job_folder) );
@@ -3381,22 +3401,32 @@ QString MainWindow::remove_repo_remote()
     QString msg( rc==0 ? "removed":"failed-to-remove");
 
     this->log_ << QString("\n    ").append(msg).toStdString();
-    return msg;
+
+    bool ok = (rc==0);
+    if( pmsg ) {
+        *pmsg = msg;
+    }
+    return ok;
 }
 
-QString MainWindow::create_repo_local()
+bool MainWindow::create_repo_local( QString* pmsg )
 {
     QString local_job_folder = this->local_path_to(JobFolder);
     this->log_call( 1, CALLEE0, QString("\n    ").append(local_job_folder) );
 
     int rc = this->ssh.local_save(local_job_folder);
-    QString msg( rc==0 ? "recreated" : "failed-to-create");
+    QString msg( rc==0 ? "created" : "failed-to-create");
 
     this->log_ << QString("\n    ").append(msg).toStdString();
-    return msg;
+
+    bool ok = (rc==0);
+    if( pmsg ) {
+        *pmsg = msg;
+    }
+    return ok;
 }
 
-QString MainWindow::create_repo_remote()
+bool MainWindow::create_repo_remote( QString* pmsg )
 {
     QString local_job_folder = this->local_path_to(JobFolder);
     QString remote_job_folder = this->remote_path_to(JobFolder);
@@ -3416,6 +3446,11 @@ QString MainWindow::create_repo_remote()
     }
 
     this->log_ << QString("\n    ").append(msg).toStdString();
-    return msg;
+
+    bool ok = (rc==0);
+    if( pmsg ) {
+        *pmsg = msg;
+    }
+    return ok;
 }
 

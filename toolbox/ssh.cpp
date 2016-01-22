@@ -20,6 +20,13 @@ namespace toolbox
         return rc==0;
     }
 
+    bool rm_available( Log *log )
+    {
+        Execute x( nullptr, log );
+        int rc = x("rm --help",300,"Test availability of git command.");
+        return rc==0;
+    }
+
  //=============================================================================
  // Ssh::
  //=============================================================================
@@ -94,7 +101,7 @@ namespace toolbox
 #ifdef Q_OS_WIN
         QString output = x.standardOutput();
         bool ok = !output.contains("Destination net unreachable");
-        return ok;
+        return ok && (rc==0);
 #else
         return rc==0;
 #endif
@@ -240,9 +247,14 @@ namespace toolbox
             delete this->impl_;
             this->impl_ = nullptr;
         }
-        if( use_os ) {
+        if( use_os )
+        {// on mac osx and unix rm and ssh are usually preinstalled, and git
+         // is installed easily.
+         // on windows git comes with its own version of ssh and rm in its
+         // Git\user\bin directory
             bool ok  = ssh_available( this->log() );
                  ok &= git_available( this->log() );
+                 ok &=  rm_available( this->log() );
             if( ok ) {
                 this->impl_ = new SshImpl_os_ssh(this);
             }

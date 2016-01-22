@@ -1,6 +1,8 @@
 #ifndef MAINWINDOW_H
 #define MAINWINDOW_H
 
+#define LOCAL_REMOVE_REPO_WITH_RM
+
 #include <QMainWindow>
 #include <QComboBox>
 #include <QDoubleSpinBox>
@@ -229,10 +231,10 @@ public:
     void error_message_missing_job_folder         ( QString const& msg1=QString(), message_box_t message_box=QMessageBox::critical );
     void error_message_missing_job_script         ( QString const& msg1=QString(), message_box_t message_box=QMessageBox::critical );
 
-    QString remove_repo_local ();
-    QString remove_repo_remote();
-    QString create_repo_local ();
-    QString create_repo_remote();
+    bool remove_repo_local ( QString* pmsg=nullptr );
+    bool remove_repo_remote( QString* pmsg=nullptr );
+    bool create_repo_local ( QString* pmsg=nullptr );
+    bool create_repo_remote( QString* pmsg=nullptr );
 
 private:
     toolbox::Log& log_;
