@@ -254,7 +254,10 @@ namespace toolbox
          // Git\user\bin directory
             bool ok  = ssh_available( this->log() );
                  ok &= git_available( this->log() );
+#ifdef Q_OS_WIN
                  ok &=  rm_available( this->log() );
+                  // supposedly ok on mac osx and linux
+#endif
             if( ok ) {
                 this->impl_ = new SshImpl_os_ssh(this);
             }

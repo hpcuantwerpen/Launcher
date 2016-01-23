@@ -3300,17 +3300,14 @@ removeRepoAction_triggered()
     int sz0 = this->ssh.remote_size( remote_job_folder );
     QString size;
     if( sz0>=0 ) {
-        size = QString("The current size of the repository is %1 kB.").arg( kB(sz0) );
+        size = QString(" ( currently %1 kB)").arg( kB(sz0) );
     }
-    QString msg = QString("Warning:\n"
-                          "You are about to remove the .git repository of job folder '%1'.\n"
-                          "Use this action only if the repository has grown too much over time"
-                          " and you no longer want to recover older versions of the jobfolder. "
-                          "If you do remove the repository a new repository will be created "
-                          "corresponding to the current state of the LOCAL job folder. Note "
-                          "that all content in the remote job folder will be removed. Make "
-                          "sure that you have copied the results you need./n"
-                          "%2\n\n Do you want to remove the job folder repository?")
+    QString msg = QString("If you remove the job folder repository '%1', you discard\n"
+                          "  . the history of your job folder\n"
+                          "  . all contents of the remote job folder\n"
+                          "This action is typically used to reduce the size of the (remote) "
+                          "repository%2.\n\n"
+                          "Do you want to remove the job folder repository?")
                      .arg( this->local_path_to(JobFolder) )
                      .arg( size )
                      ;
@@ -3322,12 +3319,29 @@ removeRepoAction_triggered()
     }
     QString msg_local;
     QString msg_remote;
-    this->remove_repo_local (&msg_local);
-    this->remove_repo_remote(&msg_remote);
+    bool ok  = this->remove_repo_local (&msg_local );
+         ok &= this->remove_repo_remote(&msg_remote);
     this->statusBar()->showMessage
             ( QString("remove job folder repository [local:%1][remote:%2]")
                  .arg(msg_local).arg(msg_remote)
             );
+
+    if( !this->ssh. local_exists( local_job_folder)
+     && !this->ssh.remote_exists(remote_job_folder) )
+    {
+        QString msg = QString("Do you want to create a new job folder repository (based "
+                              "on the contents of the local job folder)?\nIf not it will "
+                              "automatically be created when you submit.")
+                         .arg( this->local_path_to(JobFolder) )
+                         .arg( size )
+                         ;
+        QMessageBox::StandardButton answer = QMessageBox::question
+            ( this, TITLE, msg, QMessageBox::Yes|QMessageBox::No, QMessageBox::No );
+        if( answer!=QMessageBox::Yes ) {
+            this->statusBar()->showMessage("Action 'Remove job folder repository' canceled.");
+            return;
+        }
+    }
 }
 
 
@@ -3346,6 +3360,12 @@ createRepoAction_triggered()
         return;
     }
 
+    if( this->ssh.local_exists( this->local_path_to(JobFolder) ) ) {
+        this->statusBar()->showMessage("Canceled: local job folder repository already existing");
+    }
+    if( this->ssh.remote_exists( this->remote_path_to(JobFolder) ) ) {
+        this->statusBar()->showMessage("Canceled: remote job folder repository already existing");
+    }
     QString msg("create job folder repository ");
     QString msg_local;
     QString msg_remote("local-repo-missing");
