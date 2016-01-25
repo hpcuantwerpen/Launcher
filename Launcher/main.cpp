@@ -4,7 +4,7 @@
 //#include <QFile>
 #include <QDir>
 #include <toolbox.h>
-#include <qmessagebox.h>
+#include <QMessageBox>
 
 
 #ifdef QT_DEBUG

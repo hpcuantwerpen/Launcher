@@ -26,7 +26,6 @@ SOURCES  += main.cpp        \
             clusterinfo.cpp \
             dataconnector.cpp \
             job.cpp \
-    messagebox.cpp \
     walltime.cpp
 
 HEADERS  += mainwindow.h   \
@@ -35,7 +34,6 @@ HEADERS  += mainwindow.h   \
             clusterinfo.h \
             dataconnector.h \
             job.h \
-    messagebox.h \
     walltime.h
 
 FORMS    += mainwindow.ui

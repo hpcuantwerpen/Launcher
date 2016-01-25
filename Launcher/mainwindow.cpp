@@ -161,7 +161,7 @@
       , verbosity_(INITIAL_VERBOSITY)
       , walltime_(nullptr)
       , pendingRequest_(NoPendingRequest)
-//      , messages_(TITLE)
+      , file_system_model( nullptr )
       , proceed_offline_(false)
     {
         this->log_call( 0, CALLEE0, QString("\n    Running Launcher version = ").append(VERSION) ) ;
@@ -653,7 +653,7 @@
         this->file_system_model = new QFileSystemModel(this);
         QString s = this->local_file_location();
         this->file_system_model->setRootPath(s);
-        QTreeView& tree = *(this->ui->wViewLocal);
+        QTreeView& tree = *(this->ui->wLocalFileView);
         tree.setModel(this->file_system_model);
         if( !s.isEmpty()) {
             const QModelIndex rootIndex = this->file_system_model->index(QDir::cleanPath(s));
@@ -662,7 +662,18 @@
         }
 //        tree.setIndentation(20);
         tree.setSortingEnabled(true);
+
         this->statusBar()->showMessage("tree");
+
+        QString txt;
+        if( this->ssh.authenticated() ) {
+            QString cmd = QString("tree ").append( this->remote_file_location() );
+            this->ssh.execute(cmd,300,"get tree of remote root folder");
+            txt = this->ssh.standardOutput();
+        } else {
+            txt = "You must authenticate to see the remote files location.";
+        }
+        this->ui->wRemoteFileView->setPlainText(txt);
     }
 
     bool MainWindow::isScriptOpen() const {
@@ -3474,3 +3485,36 @@ bool MainWindow::create_repo_remote( QString* pmsg )
     return ok;
 }
 
+
+void MainWindow::on_wRefreshLocalFileView_clicked()
+{
+    this->log_call(1,CALLEE0);
+
+//    this->file_system_model = new QFileSystemModel(this);
+    QString s = this->local_file_location();
+    this->file_system_model->setRootPath(s);
+    QTreeView& tree = *(this->ui->wLocalFileView);
+//    tree.setModel(this->file_system_model);
+    if( !s.isEmpty()) {
+        const QModelIndex rootIndex = this->file_system_model->index(QDir::cleanPath(s));
+        if( rootIndex.isValid() )
+            tree.setRootIndex(rootIndex);
+    }
+//        tree.setIndentation(20);
+//    tree.setSortingEnabled(true);
+
+    this->statusBar()->showMessage("tree");
+}
+
+void MainWindow::on_wRefreshRemoteFileView_clicked()
+{
+    QString txt;
+    if( this->ssh.authenticated() ) {
+        QString cmd = QString("tree ").append( this->remote_file_location() );
+        this->ssh.execute(cmd,300,"get tree of remote root folder");
+        txt = this->ssh.standardOutput();
+    } else {
+        txt = "You must authenticate to see the remote files location.";
+    }
+    this->ui->wRemoteFileView->setPlainText(txt);
+}

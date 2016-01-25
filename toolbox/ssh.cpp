@@ -267,7 +267,7 @@ namespace toolbox
         }
     }
 
-    int Ssh::execute(QString const& remote_cmd, int msecs, QString const& comment , bool wrap) const
+    int Ssh::execute(QString const& remote_cmd, int secs, QString const& comment , bool wrap) const
     {
         if( !this->impl_ ) {
             return IMPL_MEMBER_NOT_SET;
@@ -296,7 +296,7 @@ namespace toolbox
         } else {
             wrapped_cmd = remote_cmd;
         }
-        int rc = this->impl_->remote_execute(wrapped_cmd,msecs,comment);
+        int rc = this->impl_->remote_execute(wrapped_cmd,secs,comment);
         return rc;
     }
 
@@ -388,7 +388,7 @@ namespace toolbox
 
     int
     SshImpl_os_ssh::
-    remote_execute(QString const& remote_cmd, int msecs , const QString &comment)
+    remote_execute(QString const& remote_cmd, int secs , const QString &comment)
     {// wrap the remote_cmd in a ssh command
         QString ssh_cmd = QString("ssh -i %1 %2@%3 \"%4\"")
                              .arg( this->super_->private_key() )
@@ -397,7 +397,7 @@ namespace toolbox
                              .arg( remote_cmd );
 
         toolbox::Execute x( nullptr, this->super_->log() );
-        int rc = x( ssh_cmd, msecs, comment );
+        int rc = x( ssh_cmd, secs, comment );
         this->super_->set_standardOutput( x.standardOutput() );
         this->super_->set_standardError( x.standardError () );
         return rc;

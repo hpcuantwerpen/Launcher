@@ -15,6 +15,7 @@
 #include <QtDebug>
 #include <QTime>
 #include <QFileSystemModel>
+#include <QLabel>
 
 #include <launcher.h>
 //#include <ssh2tools.h>
@@ -24,7 +25,6 @@
 
 #include <iostream>
 
-#include "messagebox.h"
 #include "version.h"
 #include "verify.h"
 #include "log.h"
@@ -153,6 +153,10 @@ private slots:
 
     void on_wNewJobscriptButton_clicked();
 
+    void on_wRefreshLocalFileView_clicked();
+
+    void on_wRefreshRemoteFileView_clicked();
+
 public:
     void setupHome();
     void setIgnoreSignals( bool ignore=true );
@@ -223,6 +227,7 @@ public:
 //    bool can_authenticate();
     void update_WindowTitle();
     void update_StatusbarWidgets();
+
 
     typedef QMessageBox::StandardButton (*message_box_t)( QWidget*, QString const&, QString const&, QMessageBox::StandardButtons, QMessageBox::StandardButton );
     QMessageBox::StandardButton message( QString msg, message_box_t message_box=&QMessageBox::warning );

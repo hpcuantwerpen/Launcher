@@ -15,7 +15,7 @@ namespace toolbox
     public:
         SshImpl();
         virtual ~SshImpl();
-        virtual int remote_execute( QString const& remote_cmd, int msecs, QString const& comment=QString() ) = 0;
+        virtual int remote_execute( QString const& remote_cmd, int secs, QString const& comment=QString() ) = 0;
         virtual int local_save          ( QString const& local_jobfolder_path ) = 0;
         virtual int local_sync_to_remote( QString const& local_jobfolder_path, QString const& remote_jobfolder_path, bool save_first=true ) = 0;
         virtual int remote_save         ( QString const& local_jobfolder_path, QString const& remote_jobfolder_path ) = 0;
@@ -31,7 +31,7 @@ namespace toolbox
     public:
         SshImpl_os_ssh( Ssh* super ) { super_ = super; }
         virtual ~SshImpl_os_ssh();
-        virtual int remote_execute( QString const& remote_cmd, int msecs,QString const& comment=QString() );
+        virtual int remote_execute( QString const& remote_cmd, int secs,QString const& comment=QString() );
 
         virtual int local_save          ( QString const& local_jobfolder_path );
         virtual int local_sync_to_remote( QString const& local_jobfolder_path, QString const& remote_jobfolder_path, bool save_first=true );
@@ -114,7 +114,7 @@ namespace toolbox
         int authenticate() const;
         bool set_impl( bool use_os );
 
-        int execute( QString const& remote_cmd, int msecs, QString const& comment=QString(), bool wrap=true ) const;
+        int execute( QString const& remote_cmd, int secs, QString const& comment=QString(), bool wrap=true ) const;
 
         int local_save( QString const& local_jobfolder_path );
         int local_sync_to_remote
