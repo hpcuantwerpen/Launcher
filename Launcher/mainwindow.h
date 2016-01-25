@@ -16,6 +16,7 @@
 #include <QTime>
 #include <QFileSystemModel>
 #include <QLabel>
+#include <QMessageBox>
 
 #include <launcher.h>
 //#include <ssh2tools.h>

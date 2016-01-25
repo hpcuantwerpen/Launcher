@@ -726,6 +726,9 @@ p, li { white-space: pre-wrap; }
             </property>
            </widget>
           </item>
+          <item row="1" column="1">
+           <widget class="QPlainTextEdit" name="wRemoteFileView"/>
+          </item>
           <item row="0" column="0">
            <widget class="QPushButton" name="wRefreshLocalFileView">
             <property name="text">
@@ -733,13 +736,30 @@ p, li { white-space: pre-wrap; }
             </property>
            </widget>
           </item>
-          <item row="1" column="1">
-           <widget class="QPlainTextEdit" name="wRemoteFileView"/>
-          </item>
           <item row="1" column="0">
            <widget class="QTreeView" name="wLocalFileView">
             <property name="enabled">
              <bool>true</bool>
+            </property>
+           </widget>
+          </item>
+          <item row="2" column="0">
+           <widget class="QCheckBox" name="wLocalJobFolderHasDotGit">
+            <property name="enabled">
+             <bool>false</bool>
+            </property>
+            <property name="text">
+             <string>Local job folder repository found (.git)</string>
+            </property>
+           </widget>
+          </item>
+          <item row="2" column="1">
+           <widget class="QCheckBox" name="wRemoteJobFolderHasDotGit">
+            <property name="enabled">
+             <bool>false</bool>
+            </property>
+            <property name="text">
+             <string>Remote job folder repository found (.git)</string>
             </property>
            </widget>
           </item>

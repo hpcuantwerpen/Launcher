@@ -160,8 +160,8 @@
       , ssh( &log )
       , verbosity_(INITIAL_VERBOSITY)
       , walltime_(nullptr)
-      , pendingRequest_(NoPendingRequest)
       , file_system_model( nullptr )
+      , pendingRequest_(NoPendingRequest)
       , proceed_offline_(false)
     {
         this->log_call( 0, CALLEE0, QString("\n    Running Launcher version = ").append(VERSION) ) ;
@@ -238,7 +238,7 @@
             s.append( this->check_script_unsaved_changes() ) ;
         }
         std::ostream* po = this->log_.ostream(verbosity_level);
-        *po << s.toStdString();
+        *po << s.toStdString() << std::flush;
         this->log_.cleanup();
     }
 
@@ -650,30 +650,31 @@
         this->check_script_unsaved_changes(); // ?? nessecary ?? todo
         this->update_StatusbarWidgets();
 
-        this->file_system_model = new QFileSystemModel(this);
-        QString s = this->local_file_location();
-        this->file_system_model->setRootPath(s);
-        QTreeView& tree = *(this->ui->wLocalFileView);
-        tree.setModel(this->file_system_model);
-        if( !s.isEmpty()) {
-            const QModelIndex rootIndex = this->file_system_model->index(QDir::cleanPath(s));
-            if( rootIndex.isValid() )
-                tree.setRootIndex(rootIndex);
-        }
-//        tree.setIndentation(20);
-        tree.setSortingEnabled(true);
 
-        this->statusBar()->showMessage("tree");
+//        this->file_system_model = new QFileSystemModel(this);
+//        QString s = this->local_file_location();
+//        this->file_system_model->setRootPath(s);
+//        QTreeView& tree = *(this->ui->wLocalFileView);
+//        tree.setModel(this->file_system_model);
+//        if( !s.isEmpty()) {
+//            const QModelIndex rootIndex = this->file_system_model->index(QDir::cleanPath(s));
+//            if( rootIndex.isValid() )
+//                tree.setRootIndex(rootIndex);
+//        }
+////        tree.setIndentation(20);
+//        tree.setSortingEnabled(true);
 
-        QString txt;
-        if( this->ssh.authenticated() ) {
-            QString cmd = QString("tree ").append( this->remote_file_location() );
-            this->ssh.execute(cmd,300,"get tree of remote root folder");
-            txt = this->ssh.standardOutput();
-        } else {
-            txt = "You must authenticate to see the remote files location.";
-        }
-        this->ui->wRemoteFileView->setPlainText(txt);
+//        this->statusBar()->showMessage("tree");
+
+//        QString txt;
+//        if( this->ssh.authenticated() ) {
+//            QString cmd = QString("tree ").append( this->remote_file_location() );
+//            this->ssh.execute(cmd,300,"get tree of remote root folder");
+//            txt = this->ssh.standardOutput();
+//        } else {
+//            txt = "You must authenticate to see the remote files location.";
+//        }
+//        this->ui->wRemoteFileView->setPlainText(txt);
     }
 
     bool MainWindow::isScriptOpen() const {
@@ -1348,6 +1349,12 @@ void MainWindow::on_wPages_currentChanged(int index_new_page)
             this->ui->wCheckDeleteRemoteJobFolder->setEnabled(ok);
             JobList joblist( this->getSessionConfigItem("job_list")->value().toStringList() );
             this->refreshJobs( joblist );
+        }
+        break;
+    case 3:
+        {
+            this->on_wRefreshLocalFileView_clicked();
+            this->on_wRefreshRemoteFileView_clicked();
         }
         break;
     default:
@@ -3046,6 +3053,8 @@ void MainWindow::submitJobscriptAction_triggered()
         this->statusBar()->showMessage("Local to remote synchronization failed. Job NOT submitted.");
         return;
     }
+    this->ui-> wLocalJobFolderHasDotGit->setChecked(true);
+    this->ui->wRemoteJobFolderHasDotGit->setChecked(true);
 
 /*
  // test if the remote job folder is inexisting or empty
@@ -3419,6 +3428,9 @@ bool MainWindow::remove_repo_local( QString* pmsg )
     if( pmsg ) {
         *pmsg = msg;
     }
+    if( ok ) {
+        this->ui->wLocalJobFolderHasDotGit->setChecked(false);
+    }
     return ok;
 }
 
@@ -3437,6 +3449,9 @@ bool MainWindow::remove_repo_remote( QString* pmsg )
     if( pmsg ) {
         *pmsg = msg;
     }
+    if( ok ) {
+        this->ui->wRemoteJobFolderHasDotGit->setChecked(false);
+    }
     return ok;
 }
 
@@ -3453,6 +3468,9 @@ bool MainWindow::create_repo_local( QString* pmsg )
     bool ok = (rc==0);
     if( pmsg ) {
         *pmsg = msg;
+    }
+    if( ok ) {
+        this->ui->wLocalJobFolderHasDotGit->setChecked(true);
     }
     return ok;
 }
@@ -3482,39 +3500,69 @@ bool MainWindow::create_repo_remote( QString* pmsg )
     if( pmsg ) {
         *pmsg = msg;
     }
+    if( ok ) {
+        this->ui->wRemoteJobFolderHasDotGit->setChecked(true);
+    }
     return ok;
 }
 
 
 void MainWindow::on_wRefreshLocalFileView_clicked()
 {
+    if( !this->isScriptOpen() ) {
+        return;
+    }
     this->log_call(1,CALLEE0);
 
-//    this->file_system_model = new QFileSystemModel(this);
-    QString s = this->local_file_location();
+    QString s = this->local_path_to(JobFolder);
+    this->ui->wRefreshLocalFileView->setText( QString("Refresh ").append(s) );
+
+    if(this->file_system_model ) {
+        delete this->file_system_model;
+    }
+    this->file_system_model = new QFileSystemModel(this);
+    this->file_system_model->setFilter(QDir::AllEntries);
     this->file_system_model->setRootPath(s);
-    QTreeView& tree = *(this->ui->wLocalFileView);
-//    tree.setModel(this->file_system_model);
+    this->ui->wLocalFileView->setModel(this->file_system_model);
+
     if( !s.isEmpty()) {
         const QModelIndex rootIndex = this->file_system_model->index(QDir::cleanPath(s));
         if( rootIndex.isValid() )
-            tree.setRootIndex(rootIndex);
+            this->ui->wLocalFileView->setRootIndex(rootIndex);
     }
-//        tree.setIndentation(20);
-//    tree.setSortingEnabled(true);
+//    tree.setIndentation(20);
+    this->ui->wLocalFileView->setSortingEnabled(true);
 
     this->statusBar()->showMessage("tree");
+    bool has_dot_git = QDir(s).cd(".git");
+    this->ui->wLocalJobFolderHasDotGit->setChecked(has_dot_git);
+//
+    this->ui->wLocalJobFolderHasDotGit->setEnabled(false);
 }
 
 void MainWindow::on_wRefreshRemoteFileView_clicked()
 {
+    if( !this->isScriptOpen() ) {
+        return;
+    }
+    this->log_call(1,CALLEE0);
+
     QString txt;
+    bool has_dot_git = false;
+
+    QString remote_job_folder = this->remote_path_to(JobFolder);
+    this->ui->wRefreshRemoteFileView->setText( QString("Refresh ").append(remote_job_folder) );
     if( this->ssh.authenticated() ) {
-        QString cmd = QString("tree ").append( this->remote_file_location() );
+        QString cmd = QString("tree ").append( remote_job_folder );
         this->ssh.execute(cmd,300,"get tree of remote root folder");
         txt = this->ssh.standardOutput();
+        cmd = QString("ls %1/.git").arg( remote_job_folder );
+        int rc = this->ssh.execute(cmd,300,"has .git?");
+        has_dot_git = (rc==0);
     } else {
         txt = "You must authenticate to see the remote files location.";
     }
     this->ui->wRemoteFileView->setPlainText(txt);
+    this->ui->wRemoteJobFolderHasDotGit->setChecked(has_dot_git);
+//    this->ui->wLocalJobFolderHasDotGit->setEnabled(false);
 }
