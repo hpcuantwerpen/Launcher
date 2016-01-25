@@ -447,7 +447,7 @@ namespace toolbox
 
         toolbox::Execute x( nullptr, this->super_->log() );
         x.set_working_directory(local_jobfolder_path);
-        rc = x("git push origin master",3600,"local_sync_to_remote (git) step 1/2");
+        rc = x("git push --verbose origin master",3600,"local_sync_to_remote (git) step 1/2");
         if(rc) return rc;
         //todo : there must be a better way to do this than blocking! this may be a problem with large files.
         //the difficulty is the command below that requires the previous command to be finished

@@ -2260,9 +2260,9 @@ void MainWindow::authenticateAction_triggered()
         private_key = QFileDialog::getOpenFileName( this, QString("Select your (%1) PRIVATE key file :").arg(username), start_in );
         if( this->ssh.set_private_key(private_key) ) {
             if( this->authenticate( /*silent=*/false ) ) {
-                this->update_StatusbarWidgets();
                 this->getSessionConfigItem("username"  )->set_value( this->ssh.username   () );
                 this->getSessionConfigItem("privateKey")->set_value( this->ssh.private_key() );
+                this->update_StatusbarWidgets();
             }
         } else {
             this->statusBar()->showMessage( QString( "Authentication canceled : private key '%1' not found.").arg(private_key) );
@@ -3053,9 +3053,13 @@ void MainWindow::submitJobscriptAction_triggered()
         this->statusBar()->showMessage("Local to remote synchronization failed. Job NOT submitted.");
         return;
     }
-    this->ui-> wLocalJobFolderHasDotGit->setChecked(true);
-    this->ui->wRemoteJobFolderHasDotGit->setChecked(true);
-
+    if( this->current_page_==3 ) {
+        this->on_wRefreshLocalFileView_clicked();
+        this->on_wRefreshRemoteFileView_clicked();
+    } else {
+        this->ui-> wLocalJobFolderHasDotGit->setChecked(true);
+        this->ui->wRemoteJobFolderHasDotGit->setChecked(true);
+    }
 /*
  // test if the remote job folder is inexisting or empty
     QString cmd("ls %1");
@@ -3349,11 +3353,12 @@ removeRepoAction_triggered()
     if( !this->ssh. local_exists( local_job_folder)
      && !this->ssh.remote_exists(remote_job_folder) )
     {
-        QString msg = QString("Do you want to create a new job folder repository (based "
+        QString msg = QString("Remove job folder repository finished successfully.\n"
+                              "Do you want to create a new job folder repository (based "
                               "on the contents of the local job folder)?\nIf not it will "
                               "automatically be created when you submit.")
-                         .arg( this->local_path_to(JobFolder) )
-                         .arg( size )
+//                         .arg( this->local_path_to(JobFolder) )
+//                         .arg( size )
                          ;
         QMessageBox::StandardButton answer = QMessageBox::question
             ( this, TITLE, msg, QMessageBox::Yes|QMessageBox::No, QMessageBox::No );
@@ -3429,7 +3434,11 @@ bool MainWindow::remove_repo_local( QString* pmsg )
         *pmsg = msg;
     }
     if( ok ) {
-        this->ui->wLocalJobFolderHasDotGit->setChecked(false);
+        if( this->current_page_==3 ) {
+            this->on_wRefreshLocalFileView_clicked();
+        } else {
+            this->ui->wLocalJobFolderHasDotGit->setChecked(false);
+        }
     }
     return ok;
 }
@@ -3450,7 +3459,11 @@ bool MainWindow::remove_repo_remote( QString* pmsg )
         *pmsg = msg;
     }
     if( ok ) {
-        this->ui->wRemoteJobFolderHasDotGit->setChecked(false);
+        if( this->current_page_==3 ) {
+            this->on_wRefreshRemoteFileView_clicked();
+        } else {
+            this->ui->wRemoteJobFolderHasDotGit->setChecked(false);
+        }
     }
     return ok;
 }
@@ -3470,7 +3483,11 @@ bool MainWindow::create_repo_local( QString* pmsg )
         *pmsg = msg;
     }
     if( ok ) {
-        this->ui->wLocalJobFolderHasDotGit->setChecked(true);
+        if( this->current_page_==3 ) {
+            this->on_wRefreshLocalFileView_clicked();
+        } else {
+            this->ui-> wLocalJobFolderHasDotGit->setChecked(true);
+        }
     }
     return ok;
 }
@@ -3484,7 +3501,7 @@ bool MainWindow::create_repo_remote( QString* pmsg )
                     );
 
     QString msg;
-    QString cmd = QString("mkdir %1").arg( remote_job_folder );
+    QString cmd = QString("mkdir -p %1").arg( remote_job_folder );
     int rc = this->ssh.execute(cmd,300,"recreate remote job folder)");
     if( rc ) {
         msg = "mkdir-failed";
@@ -3501,7 +3518,11 @@ bool MainWindow::create_repo_remote( QString* pmsg )
         *pmsg = msg;
     }
     if( ok ) {
-        this->ui->wRemoteJobFolderHasDotGit->setChecked(true);
+        if( this->current_page_==3 ) {
+            this->on_wRefreshRemoteFileView_clicked();
+        } else {
+            this->ui->wRemoteJobFolderHasDotGit->setChecked(true);
+        }
     }
     return ok;
 }
@@ -3521,7 +3542,7 @@ void MainWindow::on_wRefreshLocalFileView_clicked()
         delete this->file_system_model;
     }
     this->file_system_model = new QFileSystemModel(this);
-    this->file_system_model->setFilter(QDir::AllEntries);
+    this->file_system_model->setFilter(QDir::AllEntries|QDir::NoDotAndDotDot);
     this->file_system_model->setRootPath(s);
     this->ui->wLocalFileView->setModel(this->file_system_model);
 
