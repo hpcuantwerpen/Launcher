@@ -171,9 +171,21 @@
 
         createActions();
         createMenus();
-//        this->useGitSynchronizationAction_triggered();
      // so far there is only one implementation, so we don't need the line above.
-        this->ssh.set_impl(true);
+        if( !this->ssh.set_impl(true) )
+        {
+            QString msg("Error: Launcher is lacking indispensable components.\n");
+#ifdef Q_OS_WIN
+            msg.append("Make sure that git for Windows is installed (https://git-scm.com/downloads) "
+                       "is installed and that <your_git_install_dir>\\Git\\usr\\bin is on your path. "
+                       "The commands 'git', 'ssh' and 'rm' must be available on your command line.");
+#else // #ifdef Q_OS_WIN
+            msg.append("Make sure that git is installed, and that the commands 'git' and 'ssh' are available "
+                       "from the command line.");
+#endif // #ifdef Q_OS_WIN
+            this->log_<< QString("    ").append(msg);
+            QMessageBox::critical(this,TITLE,msg);
+        }
 
 //        ssh::Libssh2Impl::autoOpen = true;
 
