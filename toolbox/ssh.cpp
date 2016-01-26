@@ -367,6 +367,11 @@ namespace toolbox
         }
         return rc;
     }
+
+    void Ssh::adjust_homedotsshconfig() {
+        this->impl_->adjust_homedotsshconfig();
+    }
+
  //=============================================================================
  // SshImpl::
  //====b=========================================================================
@@ -559,6 +564,18 @@ namespace toolbox
                  ;
         rc = x(cmd,120,"remote_create (git) step 3/3");
         return rc;
+    }
+
+    void SshImpl_os_ssh::adjust_homedotsshconfig()
+    {
+        QDir dir( QDir::homePath() );
+        dir.mkdir(".ssh");
+        dir.cd(".ssh");
+        if( dir.exists("config") ){
+
+        } else {
+        }
+
     }
 
 }// namespace toolbox

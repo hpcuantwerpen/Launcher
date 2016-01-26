@@ -2338,51 +2338,55 @@ bool MainWindow::authenticate(bool silent)
 
             this->is_uptodate_for_ = cluster;
         }
-
+#ifdef Q_OS_WIN // only windows?
+        this->ssh.adjust_homedotsshconfig();
+#endif // Q_OS_WIN
         return true;
-    }
-    if( silent || this->proceed_offline_ )
-    {// be silent
     } else
-    {// make some noise
-        switch (rc) {
-        case toolbox::Ssh::NO_INTERNET:
-        {   int answer = QMessageBox::question
-                    ( this, TITLE
-                    , msg.append("\nClick 'Proceed offline' if you want to work "
-                                 "offline and don't want to see this message again.")
-                    ,"Proceed offline" // button0
-                    ,"Ok"              // button1
-                    , QString()        // button2
-                    , 1                // default button
-                    );
-            this->proceed_offline_ = (answer==0);
-        }   break;
+    {// authentication failed:
+        if( silent || this->proceed_offline_ )
+        {// be silent
+        } else
+        {// make some noise
+            switch (rc) {
+            case toolbox::Ssh::NO_INTERNET:
+            {   int answer = QMessageBox::question
+                        ( this, TITLE
+                        , msg.append("\nClick 'Proceed offline' if you want to work "
+                                     "offline and don't want to see this message again.")
+                        ,"Proceed offline" // button0
+                        ,"Ok"              // button1
+                        , QString()        // button2
+                        , 1                // default button
+                        );
+                this->proceed_offline_ = (answer==0);
+            }   break;
 
-        case toolbox::Ssh::LOGINNODE_NOT_ALIVE:
-        {   int answer = QMessageBox::question
-                    ( this, TITLE
-                    , msg.append("\n(If your are working off-campus, you might need "
-                                 "VPN to reach the cluster.)"
-                                 "\n\nClick 'Proceed offline' if you want to work "
-                                 "offline and don't want to see this message again.")
-                    ,"Proceed offline" // button0
-                    ,"Ok"              // button1
-                    , QString()        // button2
-                    , 1                // default button
-                    );
-            this->proceed_offline_ = (answer==0);
-        }   break;
-        case toolbox::Ssh::MISSING_USERNAME:
-        case toolbox::Ssh::MISSING_PRIVATEKEY:
-            QMessageBox::warning( this, TITLE, "You must authenticate first (menu Session/Authenticate...)");
-        default:
-            msg = "Authentication failed: wrong login node/username/private key?";
-            QMessageBox::warning( this, TITLE, msg.append("You re-authenticate  (menu Session/Authenticate...)") );
-            break;
+            case toolbox::Ssh::LOGINNODE_NOT_ALIVE:
+            {   int answer = QMessageBox::question
+                        ( this, TITLE
+                        , msg.append("\n(If your are working off-campus, you might need "
+                                     "VPN to reach the cluster.)"
+                                     "\n\nClick 'Proceed offline' if you want to work "
+                                     "offline and don't want to see this message again.")
+                        ,"Proceed offline" // button0
+                        ,"Ok"              // button1
+                        , QString()        // button2
+                        , 1                // default button
+                        );
+                this->proceed_offline_ = (answer==0);
+            }   break;
+            case toolbox::Ssh::MISSING_USERNAME:
+            case toolbox::Ssh::MISSING_PRIVATEKEY:
+                QMessageBox::warning( this, TITLE, "You must authenticate first (menu Session/Authenticate...)");
+            default:
+                msg = "Authentication failed: wrong login node/username/private key?";
+                QMessageBox::warning( this, TITLE, msg.append("You re-authenticate  (menu Session/Authenticate...)") );
+                break;
+            }
         }
+        return false;
     }
-    return false;
 }
 
 bool MainWindow::actionRequiringAuthentication(QString const& action )

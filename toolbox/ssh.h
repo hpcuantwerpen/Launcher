@@ -22,6 +22,8 @@ namespace toolbox
         virtual int remote_sync_to_local( QString const& local_jobfolder_path, QString const& remote_jobfolder_path, bool save_first=true ) = 0;
         virtual bool local_exists       ( QString const& local_jobfolder_path ) = 0;
         virtual bool remote_exists      (                                      QString const& remote_jobfolder_path ) = 0;
+        virtual void adjust_homedotsshconfig() {}
+
     protected:
         Ssh* super_;
     };
@@ -42,6 +44,7 @@ namespace toolbox
                  int local_create       ( QString const& local_jobfolder_path );
         virtual bool remote_exists      (                                      QString const& remote_jobfolder_path );
                  int remote_create      ( QString const& local_jobfolder_path, QString const& remote_jobfolder_path );
+        virtual void adjust_homedotsshconfig() {}
     };
 
     class Ssh
@@ -91,7 +94,6 @@ namespace toolbox
         void set_RemoteCommandMap( RemoteCommandMap_t const& map );
 
     public:
-
         bool test_login_nodes( QList<bool>* alive=nullptr );
          /* tests (ping) if all the login nodes can be reached and optionally
           * copies the result to *alive.
@@ -136,9 +138,15 @@ namespace toolbox
 
         int remote_size( QString const& remote_jobfolder_path );
 
+        void adjust_homedotsshconfig();
+         /* Set up home/.ssh/config for git to use the correct key
+          * for pushing to the remote repository.
+          */
+
         void log( QString const& s ) const;
         void log( QStringList const& s, QString const& comment=QString() ) const;
         void log( char    const* s ) const;
+
     private:
         RemoteCommandMap_t remote_command_map_;
         int current_login_node_;
