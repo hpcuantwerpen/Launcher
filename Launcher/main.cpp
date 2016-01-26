@@ -32,7 +32,7 @@ int main(int argc, char *argv[])
         log<<"Log file cleared (debug version running).";
 #   else
         qint64 const max_size_kB = 512;
-        qint64 log_size_kB = QFileInfo( log.filename().c_str() ).size()/1024;
+        qint64 log_size_kB = QFileInfo( log.log().c_str() ).size()/1024;
         if( log_size_kB > max_size_kB )
         {
             QString msg = QString("The size of the log file exceeds %1 kB (%2 kB). "
@@ -44,7 +44,7 @@ int main(int argc, char *argv[])
             QMessageBox::Button answer = QMessageBox::question(nullptr,"Launcher",msg);
             if( answer==QMessageBox::Yes ) {
                 log.clear();
-                log("Log file cleared on demand.");
+                log << "Log file cleared on demand.";
             }
         }
 #   endif

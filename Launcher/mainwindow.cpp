@@ -183,7 +183,7 @@
             msg.append("Make sure that git is installed, and that the commands 'git' and 'ssh' are available "
                        "from the command line.");
 #endif // #ifdef Q_OS_WIN
-            this->log_<< QString("    ").append(msg);
+            this->log_<< QString("    ").append(msg).toLatin1().constData();
             QMessageBox::critical(this,TITLE,msg);
         }
 

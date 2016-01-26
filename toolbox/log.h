@@ -39,6 +39,10 @@ namespace toolbox
         /* Specify where to log to.
          */
 
+        std::string const& log() const {
+            return this->log_;
+        }
+
         template <class T>
         void write( T const& t, int verbosity_level=1 ) {
             std::ostream* o = this->ostream( verbosity_level );
