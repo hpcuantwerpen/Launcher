@@ -3555,13 +3555,10 @@ void MainWindow::on_wRefreshLocalFileView_clicked()
         if( rootIndex.isValid() )
             this->ui->wLocalFileView->setRootIndex(rootIndex);
     }
-//    tree.setIndentation(20);
     this->ui->wLocalFileView->setSortingEnabled(true);
 
-    this->statusBar()->showMessage("tree");
     bool has_dot_git = QDir(s).cd(".git");
     this->ui->wLocalJobFolderHasDotGit->setChecked(has_dot_git);
-//
     this->ui->wLocalJobFolderHasDotGit->setEnabled(false);
 }
 
