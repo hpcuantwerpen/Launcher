@@ -2338,9 +2338,9 @@ bool MainWindow::authenticate(bool silent)
 
             this->is_uptodate_for_ = cluster;
         }
-#ifdef Q_OS_WIN // only windows?
-        this->ssh.adjust_homedotsshconfig();
-#endif // Q_OS_WIN
+//#ifdef Q_OS_WIN // only windows?
+        this->ssh.adjust_homedotsshconfig(cluster);
+//#endif // Q_OS_WIN
         return true;
     } else
     {// authentication failed:
@@ -3590,4 +3590,16 @@ void MainWindow::on_wRefreshRemoteFileView_clicked()
     this->ui->wRemoteFileView->setPlainText(txt);
     this->ui->wRemoteJobFolderHasDotGit->setChecked(has_dot_git);
 //    this->ui->wLocalJobFolderHasDotGit->setEnabled(false);
+}
+
+void MainWindow::on_pushButton_clicked()
+{
+    if( !this->isScriptOpen() ) {
+        return;
+    }
+    this->log_call(1,CALLEE0);
+
+    if( this->remove_repo_remote() ) {
+        this->statusBar()->showMessage("Remote job folder repository removed.");
+    }
 }

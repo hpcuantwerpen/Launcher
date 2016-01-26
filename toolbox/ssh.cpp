@@ -2,6 +2,7 @@
 #include "throw_.h"
 #include "external.h"
 #include <QDir>
+#include <QRegularExpression>
 
 
 namespace toolbox
@@ -368,9 +369,14 @@ namespace toolbox
         return rc;
     }
 
-    void Ssh::adjust_homedotsshconfig() {
-        this->impl_->adjust_homedotsshconfig();
+    void Ssh::adjust_homedotsshconfig( QString const& cluster ) {
+        this->impl_->adjust_homedotsshconfig( cluster );
     }
+
+    QString const& Ssh::host() const {
+        return this->impl_->host();
+    }
+
 
  //=============================================================================
  // SshImpl::
@@ -558,7 +564,7 @@ namespace toolbox
         x.set_working_directory(local_jobfolder_path);
         cmd = QString("git remote add origin ssh://%1@%2:%3/%4")
                  .arg( this->super_->username() )
-                 .arg( this->super_->login_node() )
+                 .arg( this->host() )
                  .arg( remote_jobfolder_path )
                  .arg(".git")
                  ;
@@ -566,14 +572,57 @@ namespace toolbox
         return rc;
     }
 
-    void SshImpl_os_ssh::adjust_homedotsshconfig()
+    void SshImpl_os_ssh::adjust_homedotsshconfig( QString const & cluster )
     {
         QDir dir( QDir::homePath() );
         dir.mkdir(".ssh");
         dir.cd(".ssh");
+        this->host_ = QString("Launcher-%1-%2").arg(cluster).arg( this->super_->username() );
+        QString new_entry =
+            QString("Host %1\n"
+                        "  HostName %2\n"
+                        "  User %3\n"
+                        "  IdentityFile %4\n"
+                        "  IdentitiesOnly yes\n")
+               .arg( this->host() )
+               .arg( this->super_->login_node() )
+               .arg( this->super_->username() )
+               .arg( this->super_->private_key() )
+               ;
         if( dir.exists("config") ){
-
+            QFile dotssh_config(dir.filePath("config"));
+            dotssh_config.open(QIODevice::ReadOnly);
+            QString s = dotssh_config.readAll();
+            dotssh_config.close();
+            QStringList entries;
+            bool found = false;
+            QRegularExpression re("(\\w+)\\s+(.+)\\n(\\s+.+\\n)*");
+            QRegularExpressionMatchIterator i = re.globalMatch(s);
+            while (i.hasNext()) {
+                QRegularExpressionMatch m = i.next();
+                QString c0 = m.captured(0);
+                QString c1 = m.captured(1);
+                QString c2 = m.captured(2);
+                if( c1.toLower()== "host" && c2==this->host() ) {
+                    entries << new_entry;
+                    found = true;
+                } else {
+                    entries << c0;
+                }
+            }
+            if( !found ) {
+                entries << new_entry;
+            }
+            dotssh_config.open(QIODevice::WriteOnly);
+            for( int i=0; i<entries.size(); ++i) {
+                dotssh_config.write( entries.at(i).toLatin1() );
+            }
+            dotssh_config.close();
         } else {
+            QFile dotssh_config(dir.filePath("config"));
+            dotssh_config.open(QIODevice::WriteOnly);
+            dotssh_config.write( new_entry.toLatin1() );
+            dotssh_config.close();
         }
 
     }

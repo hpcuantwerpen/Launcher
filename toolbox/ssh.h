@@ -22,10 +22,12 @@ namespace toolbox
         virtual int remote_sync_to_local( QString const& local_jobfolder_path, QString const& remote_jobfolder_path, bool save_first=true ) = 0;
         virtual bool local_exists       ( QString const& local_jobfolder_path ) = 0;
         virtual bool remote_exists      (                                      QString const& remote_jobfolder_path ) = 0;
-        virtual void adjust_homedotsshconfig() {}
+        virtual void adjust_homedotsshconfig( QString const& /*cluster*/ ) {}
+        QString const& host() const { return host_; }
 
     protected:
         Ssh* super_;
+        QString host_;
     };
 
     class SshImpl_os_ssh : public SshImpl
@@ -44,7 +46,7 @@ namespace toolbox
                  int local_create       ( QString const& local_jobfolder_path );
         virtual bool remote_exists      (                                      QString const& remote_jobfolder_path );
                  int remote_create      ( QString const& local_jobfolder_path, QString const& remote_jobfolder_path );
-        virtual void adjust_homedotsshconfig() {}
+        virtual void adjust_homedotsshconfig( QString const& cluster );
     };
 
     class Ssh
@@ -138,10 +140,11 @@ namespace toolbox
 
         int remote_size( QString const& remote_jobfolder_path );
 
-        void adjust_homedotsshconfig();
+        void adjust_homedotsshconfig( QString const& cluster );
          /* Set up home/.ssh/config for git to use the correct key
           * for pushing to the remote repository.
           */
+        QString const& host() const;
 
         void log( QString const& s ) const;
         void log( QStringList const& s, QString const& comment=QString() ) const;

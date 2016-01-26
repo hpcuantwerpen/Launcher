@@ -158,6 +158,8 @@ private slots:
 
     void on_wRefreshRemoteFileView_clicked();
 
+    void on_pushButton_clicked();
+
 public:
     void setupHome();
     void setIgnoreSignals( bool ignore=true );
