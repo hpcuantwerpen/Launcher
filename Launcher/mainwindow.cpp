@@ -3379,8 +3379,9 @@ removeRepoAction_triggered()
         QMessageBox::StandardButton answer = QMessageBox::question
             ( this, TITLE, msg, QMessageBox::Yes|QMessageBox::No, QMessageBox::No );
         if( answer!=QMessageBox::Yes ) {
-            this->statusBar()->showMessage("Action 'Remove job folder repository' canceled.");
             return;
+        } else {
+            this->createRepoAction_triggered();
         }
     }
 }
