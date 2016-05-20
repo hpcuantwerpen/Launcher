@@ -4,6 +4,7 @@
 #include <QDir>
 #include <QRegularExpression>
 
+#define DONT_PING
 
 namespace toolbox
 {
@@ -28,6 +29,7 @@ namespace toolbox
         return rc==0;
     }
 
+
  //=============================================================================
  // Ssh::
  //=============================================================================
@@ -40,7 +42,7 @@ namespace toolbox
       , impl_(nullptr)
       , current_login_node_(-1)
     {
-     // ping doesn't need impl_
+     // (ping doesn't need impl_)
         this->connected_to_internet_ = this->ping( "8.8.8.8", "test internet connection by pinging to google dns servers");
          // see http://etherealmind.com/what-is-the-best-ip-address-to-ping-to-test-my-internet-connection/
     }
@@ -91,20 +93,24 @@ namespace toolbox
 
     bool Ssh::ping( QString const& to, QString const& comment ) const
     {
-#ifdef Q_OS_WIN
-        QString ping_cmd("ping ");
+#ifdef DONT_PING
+        return true;
 #else
+  #ifdef Q_OS_WIN
+        QString ping_cmd("ping ");
+  #else
         QString ping_cmd("ping -c 1 ");
-#endif
+  #endif
         ping_cmd.append( to );
         toolbox::Execute x( nullptr, this->log() );
         int rc = x( ping_cmd, 300, comment );
-#ifdef Q_OS_WIN
+  #ifdef Q_OS_WIN
         QString output = x.standardOutput();
         bool ok = !output.contains("Destination net unreachable");
         return ok && (rc==0);
-#else
+  #else
         return rc==0;
+  #endif
 #endif
     }
 

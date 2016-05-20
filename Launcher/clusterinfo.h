@@ -84,7 +84,7 @@
             return features_;
         }
         QStringList scriptActions() const {
-            return scriptActions();
+            return scriptActions_;
         }
         bool isDefault() const {
             return isDefault_;
