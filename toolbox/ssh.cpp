@@ -4,7 +4,8 @@
 #include <QDir>
 #include <QRegularExpression>
 
-#define DONT_PING
+// #define DONT_PING_TO_GENERIC_LOGIN_NODE
+   #define DONT_PING_TO_INDIVIDUAL_LOGIN_NODES
 
 namespace toolbox
 {
@@ -93,32 +94,41 @@ namespace toolbox
 
     bool Ssh::ping( QString const& to, QString const& comment ) const
     {
-#ifdef DONT_PING
-        return true;
-#else
-  #ifdef Q_OS_WIN
+      #ifdef Q_OS_WIN
         QString ping_cmd("ping ");
-  #else
+      #else
         QString ping_cmd("ping -c 1 ");
-  #endif
+      #endif
         ping_cmd.append( to );
         toolbox::Execute x( nullptr, this->log() );
         int rc = x( ping_cmd, 300, comment );
-  #ifdef Q_OS_WIN
+      #ifdef Q_OS_WIN
         QString output = x.standardOutput();
         bool ok = !output.contains("Destination net unreachable");
         return ok && (rc==0);
-  #else
+      #else
         return rc==0;
-  #endif
-#endif
+      #endif
     }
 
     bool Ssh::test_login_nodes( QList<bool>* alive )
     {
         QList<bool> ok;
-        for( int i=0; i<this->login_nodes_.size(); ++i ) {
-            bool ok_i = this->ping( this->login_nodes_.at(i), "test login node");
+     // ping to generic login node
+        ok.append(
+            #ifdef DONT_PING_TO_GENERIC_LOGIN_NODE
+                   true
+            #else
+                   this->ping( this->login_nodes_.at(0), "test login node")
+            #endif
+                 );
+        for( int i=1; i<this->login_nodes_.size(); ++i ) {
+            bool ok_i =
+              #ifdef DONT_PING_TO_INDIVIDUAL_LOGIN_NODES
+                    true; // assumed
+              #else
+                    this->ping( this->login_nodes_.at(i), "test login node");
+              #endif
             ok.append(ok_i);
         }
      // copy the individual results
