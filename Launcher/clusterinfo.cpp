@@ -206,7 +206,11 @@
             for( int i=0; i<list.size(); ++i)             {
                 this->clusterInfo_->login_nodes_.append( list.at(i).toString() );
             }
-        }{//walltime_limit
+        }{//login port
+            List_t const& list = this->rawClusterInfo_["login_port"];
+            this->clusterInfo_->login_port_ = list.at(0).toInt();
+        }
+        {//walltime_limit
             List_t const& list = this->rawClusterInfo_["walltime_limit"];
             QString walltime_limit = list.at(0).toString();
             QChar unit = walltime_limit.right(1).at(0);

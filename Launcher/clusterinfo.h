@@ -139,6 +139,7 @@
         typedef QMap<QString,QString> RemoteCommands_t;
 
         PROPERTY_RO( QString, filename )
+        PROPERTY_RO( int, login_port )
 
     private:
         QString name_;

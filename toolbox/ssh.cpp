@@ -4,31 +4,38 @@
 #include <QDir>
 #include <QRegularExpression>
 
-// #define DONT_PING_TO_GENERIC_LOGIN_NODE
-   #define DONT_PING_TO_INDIVIDUAL_LOGIN_NODES
 
 namespace toolbox
 {
-    bool ssh_available( Log* log )
+    bool is_ssh_available( Log* log )
     {
         Execute x( nullptr, log );
         int rc = x("ssh -V",300,"Test availability of OS ssh command.");
         return rc==0;
     }
 
-    bool git_available( Log *log )
+    bool is_git_available( Log *log )
     {
         Execute x( nullptr, log );
         int rc = x("git --version",300,"Test availability of git command.");
         return rc==0;
     }
 
-    bool rm_available( Log *log )
+    bool is_rm_available( Log *log )
     {
         Execute x( nullptr, log );
         int rc = x("rm --help",300,"Test availability of git command.");
         return rc==0;
     }
+
+#ifndef NO_TESTS_JUST_SSH
+    bool is_telnet_available( Log *log )
+    {
+        Execute x( nullptr, log );
+        int rc = x("echo \"^]close\" | telnet 127.0.0.1 22",30,"Test availability of telnet command.");
+        return rc==0;
+    }
+#endif //#ifndef NO_TESTS_JUST_SSH
 
 
  //=============================================================================
@@ -37,15 +44,25 @@ namespace toolbox
     Ssh::Ssh( Log* log )
       : log_(log)
       , verbose_(false)
+    #ifndef NO_TESTS_JUST_SSH
       , connected_to_internet_(false)
       , login_node_alive_(false)
-      , authenticated_(false)
+    #endif//NO_TESTS_JUST_SSH
+      , authenticated_(NOT_AUTHENTICATED)
       , impl_(nullptr)
       , current_login_node_(-1)
     {
-     // (ping doesn't need impl_)
-        this->connected_to_internet_ = this->ping( "8.8.8.8", "test internet connection by pinging to google dns servers");
-         // see http://etherealmind.com/what-is-the-best-ip-address-to-ping-to-test-my-internet-connection/
+      #ifndef NO_TESTS_JUST_SSH
+        this->telnet_available_ = is_telnet_available( this->log() );
+        if( this->telnet_available_ )
+        {//
+            this->connected_to_internet_ = true;
+        } else
+        {// (ping doesn't need impl_)
+            this->connected_to_internet_ = this->ping( "8.8.8.8", "test internet connection by pinging to google dns servers");
+             // see http://etherealmind.com/what-is-the-best-ip-address-to-ping-to-test-my-internet-connection/
+        }
+      #endif//NO_TESTS_JUST_SSH
     }
 
     bool Ssh::set_login_nodes( QStringList const& login_nodes )
@@ -65,7 +82,9 @@ namespace toolbox
             return false;
         } else {
             this->current_login_node_ = index;
+          #ifndef NO_TESTS_JUST_SSH
             this->login_node_alive_ = false; // so it will be tested again.
+          #endif//NO_TESTS_JUST_SSH
             return true;
         }
     }
@@ -77,8 +96,10 @@ namespace toolbox
             return false;
         } else {
             this->current_login_node_ = index;
+          #ifndef NO_TESTS_JUST_SSH
             this->login_node_alive_ = false;// so it will be tested again.
              // login node successfully set, not necessarily alive or reachable
+          #endif//NO_TESTS_JUST_SSH
             return true;
         }
     }
@@ -101,7 +122,7 @@ namespace toolbox
       #endif
         ping_cmd.append( to );
         toolbox::Execute x( nullptr, this->log() );
-        int rc = x( ping_cmd, 300, comment );
+        int rc = x( ping_cmd, 30, comment );
       #ifdef Q_OS_WIN
         QString output = x.standardOutput();
         bool ok = !output.contains("Destination net unreachable");
@@ -111,25 +132,47 @@ namespace toolbox
       #endif
     }
 
+    bool Ssh::telnet( QString const& to, int port, QString const& comment ) const
+    {
+        QString telnet_cmd("echo \"^]close\" | telnet %1 %2");
+        telnet_cmd = telnet_cmd.arg( to ).arg( port );
+        toolbox::Execute x( nullptr, this->log() );
+        int rc = x( telnet_cmd, 30, comment );
+        return rc==0;
+    }
+
     bool Ssh::test_login_nodes( QList<bool>* alive )
     {
+      #ifdef NO_TESTS_JUST_SSH
+        return true;
+      #else
         QList<bool> ok;
-     // ping to generic login node
-        ok.append(
-            #ifdef DONT_PING_TO_GENERIC_LOGIN_NODE
-                   true
-            #else
-                   this->ping( this->login_nodes_.at(0), "test login node")
-            #endif
-                 );
-        for( int i=1; i<this->login_nodes_.size(); ++i ) {
-            bool ok_i =
-              #ifdef DONT_PING_TO_INDIVIDUAL_LOGIN_NODES
-                    true; // assumed
-              #else
-                    this->ping( this->login_nodes_.at(i), "test login node");
-              #endif
-            ok.append(ok_i);
+        if( this->telnet_available() )
+        {// telnet to generic login node
+            this->telnet( this->login_nodes_.at(0), this->login_port_, "test login node");
+            for( int i=1; i<this->login_nodes_.size(); ++i ) {
+               bool ok_i = this->telnet( this->login_nodes_.at(0), this->login_port_, "test login node");
+               ok.append(ok_i);
+           }
+        } else
+        {// try ping instead of telnet
+         // ping to generic login node
+            ok.append(
+                #ifdef DONT_PING_TO_GENERIC_LOGIN_NODE
+                       true
+                #else
+                       this->ping( this->login_nodes_.at(0), "test login node")
+                #endif
+                     );
+            for( int i=1; i<this->login_nodes_.size(); ++i ) {
+                bool ok_i =
+                  #ifdef DONT_PING_TO_INDIVIDUAL_LOGIN_NODES
+                        true; // assumed
+                  #else
+                        this->ping( this->login_nodes_.at(i), "test login node");
+                  #endif
+                ok.append(ok_i);
+            }
         }
      // copy the individual results
         if( alive ) *alive = ok;
@@ -146,6 +189,7 @@ namespace toolbox
           } break;
         }
         return this->login_node_alive();
+      #endif//NO_TESTS_JUST_SSH
     }
 
     bool Ssh::set_username( QString const& username )
@@ -153,14 +197,14 @@ namespace toolbox
         this->username_ = username;
         this->private_key_.clear();
         this->passphrase_ .clear();
-        this->authenticated_ = false;
+        this->authenticated_ = AUTHENTICATION_FAILED;
      // cannot test at this point
         return true;
     }
 
     bool Ssh::set_private_key( QString const& filepath )
     {
-        this->authenticated_ = false;
+        this->authenticated_ = AUTHENTICATION_FAILED;
      // test existence
         if( !QFile(filepath).exists() ) {
             this->private_key_.clear();
@@ -173,7 +217,8 @@ namespace toolbox
 
     int Ssh::authenticate() const
     {
-        const_cast<Ssh*>(this)->authenticated_ = false;
+        const_cast<Ssh*>(this)->authenticated_ = AUTHENTICATION_FAILED;
+      #ifndef NO_TESTS_JUST_SSH
         if( !this->connected_to_internet() )
         {// retry
             const_cast<Ssh*>(this)->connected_to_internet_ = this->ping( "8.8.8.8", "test internet connection pinging to google dns servers");
@@ -183,11 +228,13 @@ namespace toolbox
                 return NO_INTERNET;
             }
         }
+      #endif//NO_TESTS_JUST_SSH
         if( this->login_node().isEmpty() ) {
             this->log( QStringList() << "No login node provided."
                      , "Authentication failed.");
             return MISSING_LOGINNODE;
         }
+      #ifndef NO_TESTS_JUST_SSH
         if( !this->login_node_alive_ )
         {// retry
             bool ok = const_cast<Ssh*>(this)->test_login_nodes();
@@ -198,6 +245,7 @@ namespace toolbox
                 return LOGINNODE_NOT_ALIVE;
             }
         }
+      #endif//NO_TESTS_JUST_SSH
         if( this->username_.isEmpty() ) {
             this->log( QStringList() << "No username provided."
                      , "Authentication failed.");
@@ -224,7 +272,7 @@ namespace toolbox
             const_cast<Ssh*>(this)->private_key_.clear();
             const_cast<Ssh*>(this)->username_   .clear();
         } else {
-            const_cast<Ssh*>(this)->authenticated_ = true;
+            const_cast<Ssh*>(this)->authenticated_ = AUTHENTICATED;
         }
         return rc;
     }
@@ -269,10 +317,10 @@ namespace toolbox
          // is installed easily.
          // on windows git comes with its own version of ssh and rm in its
          // Git\user\bin directory
-            bool ok  = ssh_available( this->log() );
-                 ok &= git_available( this->log() );
+            bool ok  = is_ssh_available( this->log() );
+                 ok &= is_git_available( this->log() );
 #ifdef Q_OS_WIN
-                 ok &=  rm_available( this->log() );
+                 ok &=  is_rm_available( this->log() );
                   // supposedly ok on mac osx and linux
 #endif
             if( ok ) {

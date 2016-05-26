@@ -7,6 +7,10 @@
 #include <QString>
 #include <QMap>
 
+// #define DONT_PING_TO_GENERIC_LOGIN_NODE
+// #define DONT_PING_TO_INDIVIDUAL_LOGIN_NODES
+   #define NO_TESTS_JUST_SSH // run no tests, authenticate rightaway.
+
 namespace toolbox
 {
     class Ssh;
@@ -64,6 +68,11 @@ namespace toolbox
           , IMPL_MEMBER_NOT_SET                     = -100100
           , REMOTE_COMMAND_NOT_DEFINED_BY_CLUSTER   = -100200
         };
+        enum AuthenticationStatus
+        {   AUTHENTICATION_FAILED = -1
+          , NOT_AUTHENTICATED     =  0
+          , AUTHENTICATED         =  1
+        };
      // properties
         PROPERTY_Rw( QStringList, login_nodes, public, public, private )
         /* Get/set list of login nodes for the current cluster.
@@ -71,6 +80,10 @@ namespace toolbox
          * the current login node. This is expected to be the generic
          * login node.
          */
+      #ifndef NO_TESTS_JUST_SSH
+        PROPERTY_RW( int, login_port, public, public, private )
+      #endif//NO_TESTS_JUST_SSH
+
         QString login_node() const;
         bool set_login_node( QString const& login_node );
         bool set_login_node( int select );
@@ -83,13 +96,19 @@ namespace toolbox
         PROPERTY_RW( Log*   , log        , public, public, private )
         PROPERTY_RW( bool   , verbose    , public, public, private )
 
+      #ifndef NO_TESTS_JUST_SSH
         PROPERTY_RO( bool, connected_to_internet ) // internet connection ok? can ping 8.8.8.8
         PROPERTY_RO( bool, login_node_alive      ) // can ping to login_node?
-        PROPERTY_RO( bool, authenticated         ) // successfully authenticated before?
+      #endif //#ifndef NO_TESTS_JUST_SSH
+        PROPERTY_RO( AuthenticationStatus, authenticated )
         PROPERTY_RO( SshImpl*, impl  )
 
         PROPERTY_RW( QString , standardError, public, public, private )
         PROPERTY_RW( QString , standardOutput, public, public, private )
+
+      #ifndef NO_TESTS_JUST_SSH
+        PROPERTY_RW( bool, telnet_available, public, protected, protected )
+      #endif//NO_TESTS_JUST_SSH
 
         typedef QMap<QString,QString> RemoteCommandMap_t;
         void add_RemoteCommandMap( RemoteCommandMap_t const& map );
@@ -114,7 +133,9 @@ namespace toolbox
           *     vpn is not connected
           *   - if the login node is down
           */
-        bool ping(QString const& to , const QString &comment= QString() ) const;
+        bool ping  ( QString const& to,           QString const& comment=QString() ) const;
+        bool telnet( QString const& to, int port, QString const& comment=QString() ) const;
+
         int authenticate() const;
         bool set_impl( bool use_os );
 

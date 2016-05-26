@@ -12,6 +12,7 @@
 
 #include <warn_.h>
 //#include <ssh2tools.h>
+#include <ssh.h>
 #include <cmath>
 #include <time.h>
 
@@ -1051,14 +1052,19 @@ remote_path_to( PathTo path_to, bool resolve )
             this->walltimeUnitDependencies(updateWidgets);
 
             this->ssh.set_login_nodes( clusterInfo.loginNodes() );
+          #ifndef NO_TESTS_JUST_SSH
+            this->ssh.set_login_port ( clusterInfo.login_port() );
+          #endif//NO_TESTS_JUST_SSH
          // ok = this->ssh.set_login_node ( clusterInfo.loginNodes()[0] );
             this->ssh.set_RemoteCommandMap( *clusterInfo.remote_commands() );
         }
         bool ok = this->ssh.test_login_nodes();
+      #ifndef NO_TESTS_JUST_SSH
         this->log_call( 1, CALLEE0, QString("\n    ... continued")
                                     .append("\n    internet connection : ").append( this->ssh.connected_to_internet() ? "yes" : "no")
                                     .append("\n    access to login node: ").append( this->ssh.login_node_alive()      ? "yes" : "no")
                       );
+      #endif//NO_TESTS_JUST_SSH
         if( ok ) // login node is ok
         {// try to authenticate to refresh the list of available modules and the
          // remote file locations $VSC_DATA and $VSC_SCRATCH
@@ -2514,6 +2520,20 @@ void MainWindow::update_WindowTitle()
 
 void MainWindow::update_StatusbarWidgets()
 {
+#ifdef NO_TESTS_JUST_SSH
+    QString s;
+    switch( this->ssh.authenticated() ) {
+    case toolbox::Ssh::AUTHENTICATED:
+        s = QString("[%1@%2]").arg( this->username() ).arg( this->ssh.login_node() );
+        break;
+    case toolbox::Ssh::NOT_AUTHENTICATED:
+        s = "[not authenticated]";
+        break;
+    case toolbox::Ssh::AUTHENTICATION_FAILED:
+        s = "[authentication failed]";
+        break;
+    }
+#else
     QString s = QString("[%1]")
                    .arg( this->ssh.authenticated()
                        ? ( this->username().append('@').append( this->ssh.login_node() ) )
@@ -2522,6 +2542,7 @@ void MainWindow::update_StatusbarWidgets()
                          : QString("not authenticated")
                          )
                        );
+#endif//NO_TESTS_JUST_SSH
     this->wAuthenticationStatus_->setText(s);
 
     s = this->job_folder();
