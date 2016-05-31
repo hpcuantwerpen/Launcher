@@ -167,7 +167,6 @@
     {
         this->log_call( 0, CALLEE0, QString("\n    Running Launcher version = ").append(VERSION) ) ;
 
-
         ui->setupUi(this);
 
         createActions();
@@ -548,13 +547,7 @@
      // this->ui->wCluster
         QString path_to_clusters = this->get_path_to_clusters();
         if( path_to_clusters.isEmpty() ) {
-            QString msg("No "
-                        ""
-                        ""
-                        ""
-                        ""
-                        ""
-                        "s found (.info files).\n   ABORTING!");
+            QString msg("No clusters found (.info files).\n   ABORTING!");
             QMessageBox::critical( this, TITLE, msg );
             throw_<NoClustersFound>( msg.toStdString().c_str() );
         } else {
@@ -1058,8 +1051,9 @@ remote_path_to( PathTo path_to, bool resolve )
          // ok = this->ssh.set_login_node ( clusterInfo.loginNodes()[0] );
             this->ssh.set_RemoteCommandMap( *clusterInfo.remote_commands() );
         }
-        bool ok = this->ssh.test_login_nodes();
+        bool ok = true;
       #ifndef NO_TESTS_JUST_SSH
+        ok = this->ssh.test_login_nodes();
         this->log_call( 1, CALLEE0, QString("\n    ... continued")
                                     .append("\n    internet connection : ").append( this->ssh.connected_to_internet() ? "yes" : "no")
                                     .append("\n    access to login node: ").append( this->ssh.login_node_alive()      ? "yes" : "no")
@@ -2301,37 +2295,14 @@ bool MainWindow::authenticate(bool silent)
         return true;
     }
 
-    int rc = this->ssh.authenticate();
-    QString msg;
-    switch (rc) {
-    case 0:
-        msg = "Authentication successfull.";
-        break;
-    case toolbox::Ssh::MISSING_USERNAME:
-        msg = "Authentication failed: missing username.";
-        break;
-    case toolbox::Ssh::MISSING_LOGINNODE:
-        msg = "Authentication failed: missing login node.";
-        break;
-    case toolbox::Ssh::MISSING_PRIVATEKEY:
-        msg = "Authentication failed: missing private key.";
-        break;
-    case toolbox::Ssh::NO_INTERNET:
-        msg = "Authentication failed: no internet connection.";
-        this->is_uptodate_for_.clear();
-        break;
-    case toolbox::Ssh::LOGINNODE_NOT_ALIVE:
-        msg = "Authentication failed: current login node '%1' not alive.";
-        msg = msg.arg( this->ssh.login_node() );
-        this->is_uptodate_for_.clear();
-        break;
-    default:
-        msg = "Authentication failed: cause unknown.";
-        break;
-    }
-    this->log_ << QString("\n    ").append(msg).toStdString();
+    QString msg, details;
+    int rc = this->ssh.authenticate( msg, details );
     this->statusBar()->showMessage(msg);
     this->update_StatusbarWidgets();
+    if( !details.isEmpty() ) {
+        QMessageBox::warning(this,TITLE,details);
+    }
+
     if( rc==0 )
     {
         QString cluster = this->getSessionConfigItem("wCluster")->value().toString();

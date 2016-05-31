@@ -4,27 +4,27 @@
 #include <QDir>
 #include <QRegularExpression>
 
-
+#define ONE_MINUTE 60
 namespace toolbox
 {
     bool is_ssh_available( Log* log )
     {
         Execute x( nullptr, log );
-        int rc = x("ssh -V",300,"Test availability of OS ssh command.");
+        int rc = x("ssh -V",ONE_MINUTE,"Test availability of OS ssh command.");
         return rc==0;
     }
 
     bool is_git_available( Log *log )
     {
         Execute x( nullptr, log );
-        int rc = x("git --version",300,"Test availability of git command.");
+        int rc = x("git --version",ONE_MINUTE,"Test availability of git command.");
         return rc==0;
     }
 
     bool is_rm_available( Log *log )
     {
         Execute x( nullptr, log );
-        int rc = x("rm --help",300,"Test availability of git command.");
+        int rc = x("rm --help",ONE_MINUTE,"Test availability of git command.");
         return rc==0;
     }
 
@@ -32,7 +32,7 @@ namespace toolbox
     bool is_telnet_available( Log *log )
     {
         Execute x( nullptr, log );
-        int rc = x("echo \"^]close\" | telnet 127.0.0.1 22",30,"Test availability of telnet command.");
+        int rc = x("echo \"^]close\" | telnet 127.0.0.1 22",ONE_MINUTE,"Test availability of telnet command.");
         return rc==0;
     }
 #endif //#ifndef NO_TESTS_JUST_SSH
@@ -122,7 +122,7 @@ namespace toolbox
       #endif
         ping_cmd.append( to );
         toolbox::Execute x( nullptr, this->log() );
-        int rc = x( ping_cmd, 30, comment );
+        int rc = x( ping_cmd, 0.5*ONE_MINUTE, comment );
       #ifdef Q_OS_WIN
         QString output = x.standardOutput();
         bool ok = !output.contains("Destination net unreachable");
@@ -137,15 +137,14 @@ namespace toolbox
         QString telnet_cmd("echo \"^]close\" | telnet %1 %2");
         telnet_cmd = telnet_cmd.arg( to ).arg( port );
         toolbox::Execute x( nullptr, this->log() );
-        int rc = x( telnet_cmd, 30, comment );
+        int rc = x( telnet_cmd, 0.5*ONE_MINUTE, comment );
         return rc==0;
     }
 
+#ifndef NO_TESTS_JUST_SSH
+ // todo fix or remove this this
     bool Ssh::test_login_nodes( QList<bool>* alive )
     {
-      #ifdef NO_TESTS_JUST_SSH
-        return true;
-      #else
         QList<bool> ok;
         if( this->telnet_available() )
         {// telnet to generic login node
@@ -189,22 +188,21 @@ namespace toolbox
           } break;
         }
         return this->login_node_alive();
-      #endif//NO_TESTS_JUST_SSH
     }
+#endif//NO_TESTS_JUST_SSH
 
     bool Ssh::set_username( QString const& username )
     {
         this->username_ = username;
         this->private_key_.clear();
         this->passphrase_ .clear();
-        this->authenticated_ = AUTHENTICATION_FAILED;
-     // cannot test at this point
-        return true;
+        this->authenticated_ = NOT_AUTHENTICATED;
+        return !username.isEmpty();
     }
 
     bool Ssh::set_private_key( QString const& filepath )
     {
-        this->authenticated_ = AUTHENTICATION_FAILED;
+        this->authenticated_ = NOT_AUTHENTICATED;
      // test existence
         if( !QFile(filepath).exists() ) {
             this->private_key_.clear();
@@ -215,23 +213,22 @@ namespace toolbox
         }
     }
 
-    int Ssh::authenticate() const
+    int Ssh::authenticate(QString& msg, QString& details ) const
     {
-        const_cast<Ssh*>(this)->authenticated_ = AUTHENTICATION_FAILED;
+        const_cast<Ssh*>(this)->authenticated_ = NOT_AUTHENTICATED;
       #ifndef NO_TESTS_JUST_SSH
         if( !this->connected_to_internet() )
         {// retry
             const_cast<Ssh*>(this)->connected_to_internet_ = this->ping( "8.8.8.8", "test internet connection pinging to google dns servers");
             if( !this->connected_to_internet_ ) {
-                this->log( QStringList() << "No internet connection."
-                         , "Authentication failed.");
+                this->log("Authentication failed:", QStringList() << "No internet connection." );
                 return NO_INTERNET;
             }
         }
       #endif//NO_TESTS_JUST_SSH
         if( this->login_node().isEmpty() ) {
-            this->log( QStringList() << "No login node provided."
-                     , "Authentication failed.");
+            msg = "Not authenticated: no login node provided.";
+            this->log("Insufficient information for authentication:", QStringList() << "No login node provided.");
             return MISSING_LOGINNODE;
         }
       #ifndef NO_TESTS_JUST_SSH
@@ -239,38 +236,78 @@ namespace toolbox
         {// retry
             bool ok = const_cast<Ssh*>(this)->test_login_nodes();
             if( !ok ) {
-                this->log( QStringList() << "The login node is not alive."
-                                         << QString("login node = ").append(this->current_login_node_)
-                         , "Authentication failed.");
+                this->log("Authentication failed:"
+                         , QStringList() << "The login node is not alive."
+                                         << QString("login node = ").append(this->login_node() )
+                         );
                 return LOGINNODE_NOT_ALIVE;
             }
         }
       #endif//NO_TESTS_JUST_SSH
         if( this->username_.isEmpty() ) {
-            this->log( QStringList() << "No username provided."
-                     , "Authentication failed.");
+            msg = "Insufficient information for authentication: no username provided.";
+            this->log("Insufficient information for authentication:", QStringList() << "No username provided.");
             return MISSING_USERNAME;
         }
         if( this->private_key_.isEmpty() ) {
-            this->log( QStringList() << "The private key is missing."
-                                     << QString("user=").append(this->username_).append('@').append(this->current_login_node_)
-                     , "Authentication failed.");
+            msg = "Insufficient information for authentication: no private key provided.";
+            this->log("Insufficient information for authentication:", QStringList() << "No private key provided.");
             return MISSING_PRIVATEKEY;
         }
-        int rc = this->execute("exit", 60, "Can authenticate?" );
+        int rc = this->execute("exit", 0.5*ONE_MINUTE, "Can authenticate?" );
         if( rc )
         {// failed
-            this->log( QStringList() << "Wrong username/key/assphrase?"
-                                     << QString("user=").append(this->username_).append('@').append(this->current_login_node_)
-                                     << QString("private key: ").append(this->private_key_)
-                                     << "Clearing username and private key."
-                     , "Authentication failed.");
-
-         // todo ? Under windows catch access denied errors due to keys with passprhases
-
-         // clear the private key and the user name
-            const_cast<Ssh*>(this)->private_key_.clear();
-            const_cast<Ssh*>(this)->username_   .clear();
+            const_cast<Ssh*>(this)->authenticated_ = AUTHENTICATION_FAILED;
+            QStringList lst;
+         // Attempt to find out why ...
+            if( this->standardError().contains("ssh: Could not resolve hostname") )
+            {// no connection
+                details = "Authentication failed:";
+                lst << QString("Failed connecting to login-node '%1'.").arg(this->login_node())
+                    << "\nPossible causes:"
+                    << "\nVerify your internet connection, e.g.:"
+                    << "    $> ping 8.8.8.8"
+                    << "\nVerify that the login-nodes are up and running, e.g.:"
+                    << QString("    $> ping %1").arg(this->login_node())
+                    ;
+                msg = "Authentication failed: connection could not be established.";
+                rc = CONNECTION_FAILED;
+            } else if( this->standardError().contains("debug1: Connecting to") )
+            {// no connection
+                details = "Authentication failed:";
+                lst << QString("Failed connecting to login-node '%1'.").arg(this->login_node())
+                    << "\nPossible causes:"
+                    << "\nSome VSC clusters cannot be reached without a VPN connection when you are off-campus."
+                    << "\nVerify that the login-nodes are up and running, e.g.:"
+                    << QString("    $> ping %1").arg(this->login_node())
+                    ;
+                msg = "Authentication failed: connection could not be established.";
+                rc = CONNECTION_FAILED;
+            } else
+            {// incorrect key use
+                details = "Authentication failed : there is a problem with the private ssh key.";
+                lst << QString("\nFailed connecting user=%1@%2").arg(this->username_).arg(this->login_node())
+                    << QString("with private key: '%1'.").arg(this->private_key_)
+                    << "\nPossible causes:"
+                    << "\nThe wrong key was specified."
+                  #ifdef Q_OS_WIN
+                    << "\nWindows users must use a key without a passphrase."
+                    << "\nThe key is not in openssh format (Putty keys must be converted first)."
+                  #else
+                    << "\nThe passphrase is wrong."
+                  #endif
+                   << "\n(Clearing username and private key)."
+                   ;
+                msg = "Authentication failed: there is a problem with the ssh key.";
+             // clear the private key and the user name
+                const_cast<Ssh*>(this)->private_key_.clear();
+                const_cast<Ssh*>(this)->username_   .clear();
+                rc = SSH_KEY_ERROR;
+            }
+            this->log("Authentication failed:", lst );
+            for( int i=0; i < lst.size(); ++i ) {
+                details.append("\n").append( lst.at(i) );
+            }
         } else {
             const_cast<Ssh*>(this)->authenticated_ = AUTHENTICATED;
         }
@@ -291,14 +328,14 @@ namespace toolbox
         }
     }
 
-    void Ssh::log( QStringList const& list, QString const& comment ) const
+    void Ssh::log( QString const& comment, QStringList const& lst ) const
     {
         if( this->log_ ) {
             std::ostream* po = this->log_->ostream0();
             if( po ) {
                 *po << "\n<<< [ "<< comment.toLatin1().constData() << " ]";
-                for( int i=0; i < list.size(); ++i ) {
-                    *po << "\n    " << list.at(i).toLatin1().constData();
+                for( int i=0; i < lst.size(); ++i ) {
+                    *po << "\n    " << lst.at(i).toLatin1().constData();
                 }
                 *po << "\n>>>\n" << std::flush;
             }
@@ -355,9 +392,10 @@ namespace toolbox
                     wrapped_cmd = remote_cmd;
                 }
             }
-            this->log( QStringList() << QString("original: ").append(  remote_cmd )
+            this->log("Remote command wrapped:"
+                     , QStringList() << QString("original: ").append(  remote_cmd )
                                      << QString("wrapped : ").append( wrapped_cmd )
-                     , "remote command wrapped");
+                     );
         } else {
             wrapped_cmd = remote_cmd;
         }
@@ -423,7 +461,7 @@ namespace toolbox
     int Ssh::remote_size( QString const& remote_jobfolder_path )
     {
         QString cmd = QString("du -s %1/.git").arg( remote_jobfolder_path );
-        int rc = this->execute( cmd, 180, "Obtain repository size of remote job folder repository (Bytes).");
+        int rc = this->execute( cmd, 3*ONE_MINUTE, "Obtain repository size of remote job folder repository (Bytes).");
         if( rc==0 ) {
             QString output = this->standardOutput();
             rc = output.split('\t',QString::SkipEmptyParts)[0].trimmed().toInt();
@@ -465,7 +503,7 @@ namespace toolbox
     SshImpl_os_ssh::
     remote_execute(QString const& remote_cmd, int secs , const QString &comment)
     {// wrap the remote_cmd in a ssh command
-        QString ssh_cmd = QString("ssh -i %1 %2@%3 \"%4\"")
+        QString ssh_cmd = QString("ssh -v -i %1 %2@%3 \"%4\"")
                              .arg( this->super_->private_key() )
                              .arg( this->super_->username() )
                              .arg( this->super_->login_node() )
@@ -489,13 +527,13 @@ namespace toolbox
         x.set_working_directory(local_jobfolder_path);
         int rc = 0;
         if( this->super_->verbose() ) {
-            rc = x("git status",120,"local_save (git) step 1/3");
+            rc = x("git status",2*ONE_MINUTE,"local_save (git) step 1/3");
             if(rc) return rc;
         }
-        rc = x("git add --verbose .",120,"local_save (git) step 2/3");
+        rc = x("git add --verbose .",2*ONE_MINUTE,"local_save (git) step 2/3");
         if(rc) return rc;
 
-        rc = x("git commit --all --message=\"local save\" ",120,"local_save (git) step 3/3");
+        rc = x("git commit --all --message=\"local save\" ",2*ONE_MINUTE,"local_save (git) step 3/3");
         QString const& output( x.standardOutput() );
         if( rc && output.contains("nothing to commit") )
         {// this is ok too. (we cannot rely on "git allow -a --allow-empty -m 'blabla'"
@@ -528,7 +566,7 @@ namespace toolbox
         //the difficulty is the command below that requires the previous command to be finished
 
         QString cmd = QString("cd %1 && git reset --hard").arg(remote_jobfolder_path);
-        rc = this->remote_execute(cmd,120,"local_sync_to_remote (git) step 2/2");
+        rc = this->remote_execute(cmd,2*ONE_MINUTE,"local_sync_to_remote (git) step 2/2");
         return rc;
     }
 
@@ -538,8 +576,9 @@ namespace toolbox
     {
         QDir jobfolder( local_jobfolder_path ); // assuming this exists
         bool exists = jobfolder.exists(".git");
-        this->super_->log( QStringList() << ( exists ? "local repository exists." : "local repository does not exist." )
-                         ,"local_exists (git) step 1/1");
+        this->super_->log("local_exists (git) step 1/1"
+                         , QStringList() << ( exists ? "local repository exists." : "local repository does not exist." )
+                         );
         return exists;
     }
 
@@ -549,7 +588,7 @@ namespace toolbox
     {
         toolbox::Execute x( nullptr, this->super_->log() );;
         x.set_working_directory(local_jobfolder_path);
-        int rc = x("git init",120,"local_create (git) step 1/1");
+        int rc = x("git init",2*ONE_MINUTE,"local_create (git) step 1/1");
         return rc;
     }
 
@@ -564,16 +603,16 @@ namespace toolbox
         }
         if( this->super_->verbose() ) {
             QString cmd = QString("cd %1 && git status").arg(remote_jobfolder_path);
-            rc = this->remote_execute(cmd,300,"remote_save (git) step 1/3");
+            rc = this->remote_execute(cmd,ONE_MINUTE,"remote_save (git) step 1/3");
             if(rc) return rc;
         }
 
         QString cmd = QString("cd %1 && git add --verbose .").arg(remote_jobfolder_path);
-        rc = this->remote_execute(cmd,300,"remote_save (git) step 2/3");
+        rc = this->remote_execute(cmd,ONE_MINUTE,"remote_save (git) step 2/3");
         if(rc) return rc;
 
         cmd = QString("cd %1 && git commit --all --message='remote save' ").arg(remote_jobfolder_path);
-        rc = this->remote_execute(cmd,300,"remote_save (git) step 3/3");
+        rc = this->remote_execute(cmd,ONE_MINUTE,"remote_save (git) step 3/3");
         QString const& output( this->super_->standardOutput() );
         if( rc && output.contains("nothing to commit") )
         {// this is ok too. (we cannot rely on "git allow -a --allow-empty -m 'blabla'"
@@ -595,7 +634,7 @@ namespace toolbox
 
         toolbox::Execute x( nullptr, this->super_->log() );
         x.set_working_directory(local_jobfolder_path);
-        rc = x("git pull origin master",6000,"remote_sync_to_local (git) step 1/1");
+        rc = x("git pull origin master",10*ONE_MINUTE,"remote_sync_to_local (git) step 1/1");
         return rc;
         //todo : there must be a better way to do this than blocking! this may be a problem with large files.
         //the difficulty is the command below that requires the previous command to be finished
@@ -604,7 +643,7 @@ namespace toolbox
     bool SshImpl_os_ssh::remote_exists( QString const& remote_jobfolder_path )
     {
         QString cmd = QString("ls %1/.git").arg( remote_jobfolder_path );
-        int rc = this->remote_execute(cmd,60,"remote_exists (git) step 1/1");
+        int rc = this->remote_execute(cmd, ONE_MINUTE, "remote_exists (git) step 1/1");
         return rc==0;
     }
 
@@ -614,14 +653,14 @@ namespace toolbox
     {
         int rc=-1;
         QString cmd = QString("mkdir -p ").append( remote_jobfolder_path );
-        rc = this->remote_execute(cmd,120,"remote_create (git) step 1/3");
+        rc = this->remote_execute(cmd,2*ONE_MINUTE,"remote_create (git) step 1/3");
         if( rc ) return rc;
 
         cmd = QString("cd ")  .append( remote_jobfolder_path )
               .append(" && git init")
               .append(" && git config receive.denyCurrentBranch ignore")
               ;
-        rc = this->remote_execute(cmd,120,"remote_create (git) step 2/3");
+        rc = this->remote_execute(cmd,2*ONE_MINUTE,"remote_create (git) step 2/3");
         if( rc ) return rc;
 
         toolbox::Execute x( nullptr, this->super_->log() );
@@ -632,7 +671,7 @@ namespace toolbox
                  .arg( remote_jobfolder_path )
                  .arg(".git")
                  ;
-        rc = x(cmd,120,"remote_create (git) step 3/3");
+        rc = x(cmd,2*ONE_MINUTE,"remote_create (git) step 3/3");
         return rc;
     }
 

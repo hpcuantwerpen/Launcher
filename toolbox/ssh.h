@@ -65,6 +65,8 @@ namespace toolbox
           , MISSING_PRIVATEKEY                      = -100002
           , NO_INTERNET                             = -100003
           , LOGINNODE_NOT_ALIVE                     = -100004
+          , CONNECTION_FAILED                       = -100005
+          , SSH_KEY_ERROR                           = -100006
           , IMPL_MEMBER_NOT_SET                     = -100100
           , REMOTE_COMMAND_NOT_DEFINED_BY_CLUSTER   = -100200
         };
@@ -115,6 +117,7 @@ namespace toolbox
         void set_RemoteCommandMap( RemoteCommandMap_t const& map );
 
     public:
+      #ifndef NO_TESTS_JUST_SSH
         bool test_login_nodes( QList<bool>* alive=nullptr );
          /* tests (ping) if all the login nodes can be reached and optionally
           * copies the result to *alive.
@@ -133,10 +136,11 @@ namespace toolbox
           *     vpn is not connected
           *   - if the login node is down
           */
+      #endif//NO_TESTS_JUST_SSH
         bool ping  ( QString const& to,           QString const& comment=QString() ) const;
         bool telnet( QString const& to, int port, QString const& comment=QString() ) const;
 
-        int authenticate() const;
+        int authenticate( QString& msg, QString& details ) const;
         bool set_impl( bool use_os );
 
         int execute( QString const& remote_cmd, int secs, QString const& comment=QString(), bool wrap=true ) const;
@@ -168,7 +172,7 @@ namespace toolbox
         QString const& host() const;
 
         void log( QString const& s ) const;
-        void log( QStringList const& s, QString const& comment=QString() ) const;
+        void log( QString const& comment, QStringList const& lst ) const;
         void log( char    const* s ) const;
 
     private:

@@ -19,36 +19,36 @@ fi
 # build release version:
 ################################################################################
 #cd into build directory
-cd ~/qws/build-Launcher-Desktop_Qt_5_5_0_clang_64bit-Release
+cd ~/qws/build-Launcher-Desktop_Qt_5_5_1_clang_64bit-Release
 #run qmake, make
-~/QtNew/5.5/clang_64/bin/qmake ~/qws/Launcher/Launcher.pro -r -spec macx-clang CONFIG+=x86_64
+~/Qt/5.5/clang_64/bin/qmake ~/qws/Launcher/Launcher.pro -r -spec macx-clang CONFIG+=x86_64
 make
 
 
 ################################################################################
 # copy Launcher.app to build_directory/distribute/macosx
 ################################################################################
-mkdir -p ~/qws/build-Launcher-Desktop_Qt_5_5_0_clang_64bit-Release/distribute/macosx/
-rm -rf   ~/qws/build-Launcher-Desktop_Qt_5_5_0_clang_64bit-Release/distribute/macosx/*
+mkdir -p ~/qws/build-Launcher-Desktop_Qt_5_5_1_clang_64bit-Release/distribute/macosx/
+rm -rf   ~/qws/build-Launcher-Desktop_Qt_5_5_1_clang_64bit-Release/distribute/macosx/*
 
 #copy Launcher.app, clusters and jobs
 echo copying Launcher.app
-cp -R ~/qws/build-Launcher-Desktop_Qt_5_5_0_clang_64bit-Release/Launcher/Launcher.app ~/qws/build-Launcher-Desktop_Qt_5_5_0_clang_64bit-Release/distribute/macosx/
+cp -R ~/qws/build-Launcher-Desktop_Qt_5_5_1_clang_64bit-Release/Launcher/Launcher.app ~/qws/build-Launcher-Desktop_Qt_5_5_1_clang_64bit-Release/distribute/macosx/
 echo copying clusters/*
-cp -rf ~/qws/Launcher/Launcher/clusters                                               ~/qws/build-Launcher-Desktop_Qt_5_5_0_clang_64bit-Release/distribute/macosx/Launcher.app/Contents/Resources
+cp -rf ~/qws/Launcher/Launcher/clusters                                               ~/qws/build-Launcher-Desktop_Qt_5_5_1_clang_64bit-Release/distribute/macosx/Launcher.app/Contents/Resources
 echo copying jobs/*
-cp -rf ~/qws/Launcher/Launcher/jobs                                                   ~/qws/build-Launcher-Desktop_Qt_5_5_0_clang_64bit-Release/distribute/macosx/Launcher.app/Contents/Resources
+cp -rf ~/qws/Launcher/Launcher/jobs                                                   ~/qws/build-Launcher-Desktop_Qt_5_5_1_clang_64bit-Release/distribute/macosx/Launcher.app/Contents/Resources
 
 echo Running macdeployqt
-~/QtNew/5.5/clang_64/bin/macdeployqt ~/qws/build-Launcher-Desktop_Qt_5_5_0_clang_64bit-Release/distribute/macosx/Launcher.app -dmg
+~/Qt/5.5/clang_64/bin/macdeployqt ~/qws/build-Launcher-Desktop_Qt_5_5_1_clang_64bit-Release/distribute/macosx/Launcher.app -dmg
 
 echo ls -l Resources
-ls -l ~/qws/build-Launcher-Desktop_Qt_5_5_0_clang_64bit-Release/distribute/macosx/Launcher.app/Contents/Resources
+ls -l ~/qws/build-Launcher-Desktop_Qt_5_5_1_clang_64bit-Release/distribute/macosx/Launcher.app/Contents/Resources
 echo cat qt.conf
-cat ~/qws/build-Launcher-Desktop_Qt_5_5_0_clang_64bit-Release/distribute/macosx/Launcher.app/Contents/resources/qt.conf
+cat ~/qws/build-Launcher-Desktop_Qt_5_5_1_clang_64bit-Release/distribute/macosx/Launcher.app/Contents/resources/qt.conf
 
 # rename_dmg
-DMG_HOME=~/qws/build-Launcher-Desktop_Qt_5_5_0_clang_64bit-Release/distribute/macosx/
+DMG_HOME=~/qws/build-Launcher-Desktop_Qt_5_5_1_clang_64bit-Release/distribute/macosx/
 cd $DMG_HOME
 rm -f ttt.dmg
 hdiutil convert Launcher.dmg -format UDRW -o ttt.dmg
