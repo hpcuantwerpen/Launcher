@@ -48,7 +48,8 @@ namespace toolbox
       , connected_to_internet_(false)
       , login_node_alive_(false)
     #endif//NO_TESTS_JUST_SSH
-      , authenticated_(NOT_AUTHENTICATED)
+      , authentication_status_(NOT_AUTHENTICATED)
+      , authenticated_before_ (false)
       , impl_(nullptr)
       , current_login_node_(-1)
     {
@@ -196,13 +197,13 @@ namespace toolbox
         this->username_ = username;
         this->private_key_.clear();
         this->passphrase_ .clear();
-        this->authenticated_ = NOT_AUTHENTICATED;
+        this->authentication_status_ = NOT_AUTHENTICATED;
         return !username.isEmpty();
     }
 
     bool Ssh::set_private_key( QString const& filepath )
     {
-        this->authenticated_ = NOT_AUTHENTICATED;
+        this->authentication_status_ = NOT_AUTHENTICATED;
      // test existence
         if( !QFile(filepath).exists() ) {
             this->private_key_.clear();
@@ -213,9 +214,10 @@ namespace toolbox
         }
     }
 
-    int Ssh::authenticate(QString& msg, QString& details ) const
+    Ssh::AuthenticationError
+    Ssh::authenticate( QString& msg, QString& details ) const
     {
-        const_cast<Ssh*>(this)->authenticated_ = NOT_AUTHENTICATED;
+        const_cast<Ssh*>(this)->authentication_status_ = NOT_AUTHENTICATED;
       #ifndef NO_TESTS_JUST_SSH
         if( !this->connected_to_internet() )
         {// retry
@@ -257,7 +259,7 @@ namespace toolbox
         int rc = this->execute("exit", 0.5*ONE_MINUTE, "Can authenticate?" );
         if( rc )
         {// failed
-            const_cast<Ssh*>(this)->authenticated_ = AUTHENTICATION_FAILED;
+            const_cast<Ssh*>(this)->authentication_status_ = AUTHENTICATION_FAILED;
             QStringList lst;
          // Attempt to find out why ...
             if( this->standardError().contains("ssh: Could not resolve hostname") )
@@ -286,6 +288,7 @@ namespace toolbox
             } else
             {// incorrect key use
                 details = "Authentication failed : there is a problem with the private ssh key.";
+                msg = "Authentication failed: there is a problem with the ssh key.";
                 lst << QString("\nFailed connecting user=%1@%2").arg(this->username_).arg(this->login_node())
                     << QString("with private key: '%1'.").arg(this->private_key_)
                     << "\nPossible causes:"
@@ -296,12 +299,13 @@ namespace toolbox
                   #else
                     << "\nThe passphrase is wrong."
                   #endif
-                   << "\n(Clearing username and private key)."
-                   ;
-                msg = "Authentication failed: there is a problem with the ssh key.";
-             // clear the private key and the user name
-                const_cast<Ssh*>(this)->private_key_.clear();
-                const_cast<Ssh*>(this)->username_   .clear();
+                    ;
+                if( !this->authenticated_before() )
+                {// clear the private key and the user name
+                    lst << "\n(Clearing username and private key).";
+                    const_cast<Ssh*>(this)->private_key_.clear();
+                    const_cast<Ssh*>(this)->username_   .clear();
+                }
                 rc = SSH_KEY_ERROR;
             }
             this->log("Authentication failed:", lst );
@@ -309,9 +313,9 @@ namespace toolbox
                 details.append("\n").append( lst.at(i) );
             }
         } else {
-            const_cast<Ssh*>(this)->authenticated_ = AUTHENTICATED;
+            const_cast<Ssh*>(this)->authentication_status_ = AUTHENTICATED;
         }
-        return rc;
+        return static_cast<AuthenticationError>( rc );
     }
 
     void Ssh::log( char const* s ) const

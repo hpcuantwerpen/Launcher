@@ -178,7 +178,7 @@
 #ifdef Q_OS_WIN
             msg.append("Make sure that git for Windows is installed (https://git-scm.com/downloads) "
                        "is installed and that <your_git_install_dir>\\Git\\usr\\bin is on your path. "
-                       "The commands 'git', 'ssh' and 'rm' must be available on your command line.");
+                       "The commands 'git', 'ssh' and 'rm' must then be available on your command line.");
 #else // #ifdef Q_OS_WIN
             msg.append("Make sure that git is installed, and that the commands 'git' and 'ssh' are available "
                        "from the command line.");
@@ -186,8 +186,6 @@
             this->log_<< QString("    ").append(msg).toLatin1().constData();
             QMessageBox::critical(this,TITLE,msg);
         }
-
-//        ssh::Libssh2Impl::autoOpen = true;
 
         this->paletteRedForeground_ = new QPalette();
         this->paletteRedForeground_->setColor(QPalette::Text,Qt::red);
@@ -521,7 +519,12 @@
 
      // username and keys
         this->getSessionConfigItem("username"  , QString() );
-        this->getSessionConfigItem("privateKey", QString() );
+        ci = this->getSessionConfigItem("privateKey", QString() );
+        if( !ci->value().toString().isEmpty() )
+        {// a private key is only stored if it was possible to authenticate.
+         // !! this is the only place outside this->ssh where this member function may be called !!
+            this->ssh.set_authenticated_before(true);
+        }
         this->getSessionConfigItem("passphraseNeeded", true );
 
         ci = this->getSessionConfigItem("wWalltime","1:00:00");
@@ -1305,8 +1308,6 @@ void MainWindow::on_wPages_currentChanged(int index_new_page)
 {
     this->log_call( 1, CALLEE(index_new_page), QString("\n    Moving from page[%1] to page[%2].").arg(this->current_page_).arg(index_new_page) );
     CHECK_IGNORESIGNAL
-
-//    this->authenticate( /*silent=*/ this->can_authenticate() && this->sshSession_.isConnected() );
 
     this->selected_job_.clear();
 
@@ -2205,7 +2206,6 @@ void MainWindow::authenticateAction_triggered()
   * ask for a private key
   * if we get one store it in the sshSession_
   * otherwise cancel the authentication
-  * authenticate()
   */
     this->log_call( 1, CALLEE0 );
     CHECK_IGNORESIGNAL
@@ -2213,14 +2213,45 @@ void MainWindow::authenticateAction_triggered()
     this->proceed_offline_ = false;
 
     if( this->ssh.authenticated() ) {
-        QString msg = QString("This session is already authenticated:"
-                              "\n  user: %1"
-                              "\n  key : %2"
-                              "\n\nDo you want to re-authenticate?")
-                         .arg( this->ssh.username() )
-                         .arg( this->ssh.private_key() );
+        QString msg = QString(  "This session is already authenticated as:"
+                              "\n  user: %1@%2"
+                              "\n  key : %3"
+                              "\n\nDo you want to re-authenticate?"
+                             ).arg( this->ssh.username() )
+                              .arg( this->ssh.login_node() )
+                              .arg( this->ssh.private_key() );
         QMessageBox::StandardButton answer = QMessageBox::question(this,TITLE,msg);
-        if( answer!=QMessageBox::Yes ) return;
+        if( answer!=QMessageBox::Yes )
+            return;
+    } else if( this->ssh.authenticated_before() ) {
+        QString msg = QString("To authenticate as:"
+                              "\n  user: %1@%2"
+                              "\n  key : %3"
+                              "\npress 'OK',"
+                              "\n\nTo authenticate with different credentials press 'Enter new credentials...'."
+                             ).arg( this->ssh.username() )
+                              .arg( this->ssh.login_node())
+                              .arg( this->ssh.private_key() )
+                         ;
+        int answer = QMessageBox::question( this, TITLE, msg
+                                          , "Cancel"                    // button0
+                                          , "OK"                        // button1
+                                          , "Enter new credentials..."  // button2
+                                          , 1                           // default button
+                                          );
+        switch(answer) {
+        case 1: // OK
+            this->authenticate( /*silent=*/false );
+            this->update_StatusbarWidgets();
+//            } else {
+//                this->statusBar()->showMessage( QString("Authentication failed!") );
+//            }
+            // fall through
+        case 0: // Cancel
+            return;
+        case 2: // enter new credentials
+            break;
+        }
     }
 
  // Ask for username username
@@ -2261,10 +2292,10 @@ void MainWindow::authenticateAction_triggered()
 //         "Consult the VSC website for how to convert your PuTTY keys.]\n";
 //#endif
     int answer = QMessageBox::question( this, TITLE, msg
-                                      , "Cancel"    // button0
-                                      , "Continue..."          // button1
-                                      , QString()               // button2
-                                      , 1                       // default button
+                                      , "Cancel"        // button0
+                                      , "Continue..."   // button1
+                                      , QString()       // button2
+                                      , 1               // default button
                                       );
     QString private_key;
     switch( answer ) {
@@ -2299,9 +2330,6 @@ bool MainWindow::authenticate(bool silent)
     int rc = this->ssh.authenticate( msg, details );
     this->statusBar()->showMessage(msg);
     this->update_StatusbarWidgets();
-    if( !details.isEmpty() ) {
-        QMessageBox::warning(this,TITLE,details);
-    }
 
     if( rc==0 )
     {
@@ -2333,44 +2361,27 @@ bool MainWindow::authenticate(bool silent)
         return true;
     } else
     {// authentication failed:
-        if( silent || this->proceed_offline_ )
-        {// be silent
-        } else
-        {// make some noise
-            switch (rc) {
-            case toolbox::Ssh::NO_INTERNET:
-            {   int answer = QMessageBox::question
-                        ( this, TITLE
-                        , msg.append("\nClick 'Proceed offline' if you want to work "
-                                     "offline and don't want to see this message again.")
+        if( !details.isEmpty() ) {
+            if( silent || this->proceed_offline_ )
+            {// be silent
+            } else
+            {// make some noise
+                details.append("\n\nPress 'Proceed offline' if you want to work "
+                               "offline and don't want to see this message again.");
+                int answer = QMessageBox::question
+                        ( this, TITLE, details
                         ,"Proceed offline" // button0
                         ,"Ok"              // button1
                         , QString()        // button2
                         , 1                // default button
                         );
                 this->proceed_offline_ = (answer==0);
-            }   break;
+            }
 
-            case toolbox::Ssh::LOGINNODE_NOT_ALIVE:
-            {   int answer = QMessageBox::question
-                        ( this, TITLE
-                        , msg.append("\n(If your are working off-campus, you might need "
-                                     "VPN to reach the cluster.)"
-                                     "\n\nClick 'Proceed offline' if you want to work "
-                                     "offline and don't want to see this message again.")
-                        ,"Proceed offline" // button0
-                        ,"Ok"              // button1
-                        , QString()        // button2
-                        , 1                // default button
-                        );
-                this->proceed_offline_ = (answer==0);
-            }   break;
+            switch (rc) {
             case toolbox::Ssh::MISSING_USERNAME:
             case toolbox::Ssh::MISSING_PRIVATEKEY:
                 QMessageBox::warning( this, TITLE, "You must authenticate first (menu Session/Authenticate...)");
-            default:
-                msg = "Authentication failed: wrong login node/username/private key?";
-                QMessageBox::warning( this, TITLE, msg.append("You re-authenticate  (menu Session/Authenticate...)") );
                 break;
             }
         }
@@ -2493,7 +2504,7 @@ void MainWindow::update_StatusbarWidgets()
 {
 #ifdef NO_TESTS_JUST_SSH
     QString s;
-    switch( this->ssh.authenticated() ) {
+    switch( this->ssh.authentication_status() ) {
     case toolbox::Ssh::AUTHENTICATED:
         s = QString("[%1@%2]").arg( this->username() ).arg( this->ssh.login_node() );
         break;

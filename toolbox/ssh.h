@@ -58,7 +58,7 @@ namespace toolbox
     public:
         Ssh( Log* log=nullptr );
 
-        enum
+        enum AuthenticationError
         {// ERROR CODES
             MISSING_USERNAME                        = -100000
           , MISSING_LOGINNODE                       = -100001
@@ -102,7 +102,11 @@ namespace toolbox
         PROPERTY_RO( bool, connected_to_internet ) // internet connection ok? can ping 8.8.8.8
         PROPERTY_RO( bool, login_node_alive      ) // can ping to login_node?
       #endif //#ifndef NO_TESTS_JUST_SSH
-        PROPERTY_RO( AuthenticationStatus, authenticated )
+        PROPERTY_RO( AuthenticationStatus, authentication_status )
+        bool authenticated() const {
+            return authentication_status_ == AUTHENTICATED;
+        }
+        PROPERTY_RW( bool, authenticated_before, public, public, private )
         PROPERTY_RO( SshImpl*, impl  )
 
         PROPERTY_RW( QString , standardError, public, public, private )
@@ -140,7 +144,7 @@ namespace toolbox
         bool ping  ( QString const& to,           QString const& comment=QString() ) const;
         bool telnet( QString const& to, int port, QString const& comment=QString() ) const;
 
-        int authenticate( QString& msg, QString& details ) const;
+        AuthenticationError authenticate( QString& msg, QString& details ) const;
         bool set_impl( bool use_os );
 
         int execute( QString const& remote_cmd, int secs, QString const& comment=QString(), bool wrap=true ) const;
