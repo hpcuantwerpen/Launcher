@@ -1068,7 +1068,7 @@ remote_path_to( PathTo path_to, bool resolve )
             if( this->ssh.set_username( this->username() ) ) {
                 if( this->ssh.set_private_key( this->getSessionConfigItem("privateKey")->value().toString() ) )
                 {// attempt silent authentication
-                    this->authenticate();
+                    this->authenticate(/*silent=*/false);
                 }
             }
         }
@@ -2367,7 +2367,10 @@ bool MainWindow::authenticate(bool silent)
             } else
             {// make some noise
                 details.append("\n\nPress 'Proceed offline' if you want to work "
-                               "offline and don't want to see this message again.");
+                               "offline and don't want to see this message again."
+                               "\n\nWhen the problem is fixed, you can re-authenticate "
+                               "using menu item Session/Authenticate..."
+                               );
                 int answer = QMessageBox::question
                         ( this, TITLE, details
                         ,"Proceed offline" // button0
